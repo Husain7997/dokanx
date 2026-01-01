@@ -6,6 +6,8 @@ const passport = require("./modules/auth/googleAuth");
 
 const authRoutes = require("./modules/auth/auth.routes");
 
+
+
 const app = express();
 
 app.use(cors());
@@ -16,6 +18,8 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 app.use("/api/auth", authRoutes);
+
+app.use("/api/shops", require("./routes/shop.routes"));
 
 app.get("/api/health", (req, res) => res.json({ status: "OK", app: "DokanX" }));
 
