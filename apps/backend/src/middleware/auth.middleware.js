@@ -20,7 +20,11 @@ if (!user) {
   return res.status(401).json({ message: 'User not found' });
 }
 
-req.user = user;
+req.user = {
+  userId: decoded.userId,
+  role: user.role
+};
+console.log('AUTH USER:', req.user);
 next();
 
   } catch (err) {

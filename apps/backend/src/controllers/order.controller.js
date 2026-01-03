@@ -28,7 +28,7 @@ exports.placeOrder = async (req, res) => {
     const user = req.user;      // auth middleware থেকে
 
     const { items } = req.body;
-console.log('AUTH USER:', req.user);
+// console.log('AUTH USER:', req.user);
 
     let orderItems = [];
     let totalAmount = 0;

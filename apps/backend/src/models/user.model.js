@@ -6,7 +6,13 @@ const userSchema = new mongoose.Schema(
     email: { type: String, unique: true, sparse: true },
     phone: { type: String, unique: true, sparse: true },
     password: String,
+    role: {
+      type: String,
+      enum: ['admin', 'owner', 'staff', 'customer'],
+      default: 'owner'
+    }
   },
+  
   { timestamps: true }
 );
 
