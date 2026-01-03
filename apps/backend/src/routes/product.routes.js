@@ -10,7 +10,7 @@ router.post(
   '/',
   auth,
   tenant,
-  allowRoles('owner', 'staff'),
+  allowRoles('owner', 'admin', 'staff'),
   createProduct
 );
 router.get('/', auth, tenant, getProducts);
