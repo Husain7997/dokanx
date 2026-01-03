@@ -15,5 +15,6 @@ const shopSchema = new mongoose.Schema(
 );
 
 shopSchema.index({ owner: 1 });
+// shopSchema.index({ slug: 1 }, { unique: true });
 
 module.exports = mongoose.model("Shop", shopSchema);

@@ -12,5 +12,7 @@ const productSchema = new mongoose.Schema({
   stock: { type: Number, default: 0 },
   isActive: { type: Boolean, default: true }
 }, { timestamps: true });
+productSchema.index({ shopId: 1, name: 1 });
+productSchema.index({ shopId: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Product', productSchema);

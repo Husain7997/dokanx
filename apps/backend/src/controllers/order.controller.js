@@ -1,66 +1,80 @@
 const Order = require('../models/order.model');
 const Product = require('../models/product.model');
+exports.getOrders = async (req, res) => {
+    try {
+        const orders = await Order.find({
+            shopId: req.shop._id,
+        })
+            .populate('items.product', 'name price')
+            .sort({ createdAt: -1 });
 
-// Customer places order
-const placeOrder = async (req, res) => {
-  try {
-    const { customerName, customerPhone, items } = req.body;
-
-    if (!customerName || !customerPhone || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ message: 'Invalid order data' });
+        res.json({
+            success: true,
+            data: orders,
+        });
+    } catch (error) {
+        console.error('GET ORDERS ERROR:', error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch orders',
+        });
     }
+};
 
-    let total = 0;
+
+exports.placeOrder = async (req, res) => {
+  try {
+    const shop = req.shop;      // tenant middleware থেকে
+    const user = req.user;      // auth middleware থেকে
+
+    const { items } = req.body;
+console.log('AUTH USER:', req.user);
+
+    let orderItems = [];
+    let totalAmount = 0;
 
     for (const item of items) {
-      const product = await Product.findById(item.product);
+      const product = await Product.findOne({
+        _id: item.product,
+        shop: shop._id
+      });
 
       if (!product) {
-        return res.status(400).json({ message: 'Product not found' });
+        return res.status(404).json({
+          success: false,
+          message: 'Product not found'
+        });
       }
 
-      if (product.shop.toString() !== req.shop._id.toString()) {
-        return res.status(403).json({ message: 'Product does not belong to this shop' });
-      }
+      orderItems.push({
+        product: product._id,
+        quantity: item.quantity,
+        price: product.price
+      });
 
-      if (product.stock < item.quantity) {
-        return res.status(400).json({ message: `${product.name} out of stock` });
-      }
-
-      product.stock -= item.quantity;
-      await product.save();
-
-      item.price = product.price;
-      total += product.price * item.quantity;
+      totalAmount += product.price * item.quantity;
     }
 
-    const order = await Order.create({
-      shop: req.shop._id,
-      customerName,
-      customerPhone,
-      items,
-      totalAmount: total,
+    // ✅ THIS IS THE MISSING PART
+    const order = new Order({
+      shop: shop._id,     // 🔥 REQUIRED
+      user: user._id,     // 🔥 REQUIRED
+      items: orderItems,
+      totalAmount
     });
 
-    res.status(201).json(order);
+    await order.save();
+
+    res.status(201).json({
+      success: true,
+      data: order
+    });
+
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('ORDER ERROR:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Order failed'
+    });
   }
-};
-
-// Owner views orders
-const getOrders = async (req, res) => {
-  try {
-    const orders = await Order.find({ shop: req.shop._id })
-      .populate('items.product');
-
-    res.json(orders);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-module.exports = {
-  placeOrder,
-  getOrders,
 };
