@@ -1,11 +1,51 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
 
-const auth = require('../middleware/auth.middleware');
-const allowRoles = require('../middleware/role.middleware');
-const { getAllUsers, updateUserRole } = require('../controllers/admin.controller');
+const { protect } = require("../middlewares/auth.middleware");
+const allowRoles = require("../middlewares/allowRoles");
 
-router.get('/users', auth, allowRoles('admin'), getAllUsers);
-router.put('/users/:id/role', auth, allowRoles('admin'), updateUserRole);
+const adminController = require("../controllers/admin.controller");
+
+// ❗❗ খুব গুরুত্বপূর্ণ: function হিসেবে পাঠাচ্ছি
+router.get("/users",
+  protect,
+  allowRoles("admin"),
+  adminController.getAllUsers
+);
+
+router.put("/users/:id/block",
+  protect,
+  allowRoles("admin"),
+  adminController.blockUser
+);
+router.put("/users/:id/unblock",
+  protect,
+  allowRoles("admin"),
+  adminController.blockUser
+);
+
+router.put("/shops/:id/approve",
+  protect,
+  allowRoles("admin"),
+  adminController.approveShop
+);
+
+router.put("/shops/:id/suspend",
+  protect,
+  allowRoles("admin"),
+  adminController.suspendShop
+);
+
+router.get("/orders",
+  protect,
+  allowRoles("admin"),
+  adminController.getAllOrders
+);
+
+router.get("/audit-logs",
+  protect,
+  allowRoles("admin"),
+  adminController.getAuditLogs
+);
 
 module.exports = router;

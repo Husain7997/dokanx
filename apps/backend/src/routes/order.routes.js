@@ -1,19 +1,19 @@
 const express = require('express');
 const router = express.Router();
 
-const auth = require('../middleware/auth.middleware');
-const tenant = require('../middleware/tenant.middleware');
-const allowRoles = require('../middleware/role.middleware');
+const {protect} = require('../middlewares/auth.middleware');
+const tenant = require('../middlewares/tenant.middleware');
+const allowRoles = require('../middlewares/role.middleware');
 
 const {
   placeOrder,
   getOrders
 } = require('../controllers/order.controller');
-
+console.log("protect TYPE:", typeof protect);
 // CUSTOMER → order create
 router.post(
   '/',
-  auth,
+  protect,
   tenant,
   allowRoles('customer'),
   placeOrder
@@ -22,10 +22,10 @@ router.post(
 // OWNER / ADMIN → view orders
 router.get(
   '/',
-  auth,
+  protect,
   tenant,
   allowRoles('owner', 'admin'),
   getOrders
 );
-
+console.log("createOrder TYPE:", placeOrder, typeof placeOrder, getOrders, typeof getOrders );
 module.exports = router;

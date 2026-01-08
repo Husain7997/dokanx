@@ -1,18 +1,23 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const allowRoles = require('../middleware/role.middleware');
 
-const auth = require('../middleware/auth.middleware');
-const tenant = require('../middleware/tenant.middleware');
-const { createProduct, getProducts } = require('../controllers/product.controller');
+const productController = require("../controllers/product.controller");
+const { protect } = require("../middlewares/auth.middleware");
+const role = require("../middlewares/role.middleware");
+
+console.log("createProduct TYPE:", typeof productController.createProduct);
+console.log("createProduct VALUE:", productController.createProduct);
 
 router.post(
-  '/',
-  auth,
-  tenant,
-  allowRoles('owner', 'admin', 'staff'),
-  createProduct
+  "/",
+  protect,
+  role("owner", "admin"),
+  productController.createProduct
 );
-router.get('/', auth, tenant, getProducts);
+
+router.get(
+  "/shop/:shopId",
+  productController.getProductsByShop
+);
 
 module.exports = router;

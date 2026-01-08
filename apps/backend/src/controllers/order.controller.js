@@ -1,24 +1,32 @@
 const Order = require('../models/order.model');
 const Product = require('../models/product.model');
 exports.getOrders = async (req, res) => {
-    try {
-        const orders = await Order.find({
-            shopId: req.shop._id,
-        })
-            .populate('items.product', 'name price')
-            .sort({ createdAt: -1 });
+  try {
+    const orders = await Order.find({
+      shopId: req.shop._id,
+    })
+      .populate('items.product', 'name price')
+      .sort({ createdAt: -1 });
 
-        res.json({
-            success: true,
-            data: orders,
-        });
-    } catch (error) {
-        console.error('GET ORDERS ERROR:', error.message);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to fetch orders',
-        });
-    }
+    res.json({
+      success: true,
+      data: orders,
+    });
+    await createAudit({
+      action: "PLACE_ORDER",
+      performedBy: user._id,
+      targetType: "Order",
+      targetId: order._id,
+      req
+    });
+  } catch (error) {
+    console.error('GET ORDERS ERROR:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch orders',
+    });
+
+  }
 };
 
 
@@ -28,7 +36,7 @@ exports.placeOrder = async (req, res) => {
     const user = req.user;      // auth middleware থেকে
 
     const { items } = req.body;
-// console.log('AUTH USER:', req.user);
+    // console.log('AUTH USER:', req.user);
 
     let orderItems = [];
     let totalAmount = 0;
@@ -77,4 +85,24 @@ exports.placeOrder = async (req, res) => {
       message: 'Order failed'
     });
   }
+};
+
+exports.getAllOrders = async (req, res) => {
+  const page = Number(req.query.page) || 0;
+  const limit = Number(req.query.limit) || 10;
+
+  const orders = await Order.find()
+    .skip(page * limit)
+    .limit(limit)
+    .populate("user shop");
+
+  const total = await Order.countDocuments();
+
+  res.json({
+    success: true,
+    page,
+    limit,
+    total,
+    data: orders
+  });
 };

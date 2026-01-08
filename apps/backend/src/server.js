@@ -8,6 +8,7 @@ const shopRoutes = require("./routes/shop.routes");
 const errorHandler = require("./utils/errorHandler");
 const productRoutes = require('./routes/product.routes');
 const orderRoutes = require('./routes/order.routes');
+const adminRoutes = require("./routes/admin.routes");
 
 const app = express();
 
@@ -20,12 +21,17 @@ app.use("/api/auth", authRoutes);
 app.use("/api/shops", shopRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
+app.use("/api/admin", adminRoutes);
 
 // Health Check
 app.get("/api/health", (req, res) => {
   res.json({ status: "OK", app: "DokanX Backend" });
 });
 
+app.use((req, res, next) => {
+  console.log(`[${req.method}] ${req.originalUrl}`);
+  next();
+});
 // Global Error Handler
 app.use(errorHandler);
 

@@ -1,32 +1,77 @@
-const Product = require('../models/product.model');
-
-// Create Product
+const Product = require("../models/product.model");
+const Shop = require("../models/shop.model");
 exports.createProduct = async (req, res) => {
   try {
-    const { name, price, stock } = req.body;
+    const { name, price, description, stock, shop } = req.body;
 
-    if (!name || !price)
-      return res.status(400).json({ message: 'Name & price required' });
+    if (!shop) {
+      return res.status(400).json({
+        success: false,
+        message: "Shop is required",
+      });
+    }
+
+    const foundShop = await Shop.findById(shop);
+
+    if (!foundShop) {
+      return res.status(404).json({
+        success: false,
+        message: "Shop not found",
+      });
+    }
+
+    if (!foundShop.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: "Shop is not approved yet",
+      });
+    }
+
+    if (!name || !price) {
+      return res.status(400).json({
+        success: false,
+        message: "Product name and price are required",
+      });
+    }
 
     const product = await Product.create({
-      shop: req.shop._id,
       name,
       price,
-      stock
+      description,
+      stock,
+      shop,
+      owner: req.user._id,
     });
 
-    res.status(201).json(product);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(201).json({
+      success: true,
+      data: product,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Product create failed",
+    });
   }
 };
 
-// Get Products (Shop-wise)
-exports.getProducts = async (req, res) => {
+
+
+exports.getProductsByShop = async (req, res) => {
   try {
-    const products = await Product.find({ shop: req.shop._id });
-    res.json(products);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+    const { shopId } = req.params;
+
+    const products = await Product.find({ shop: shopId });
+
+    res.status(200).json({
+      success: true,
+      count: products.length,
+      data: products,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch products",
+    });
   }
 };
