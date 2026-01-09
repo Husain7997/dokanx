@@ -4,17 +4,22 @@ const router = express.Router();
 const {protect} = require('../middlewares/auth.middleware');
 const tenant = require('../middlewares/tenant.middleware');
 const allowRoles = require('../middlewares/role.middleware');
+const checkUserNotBlocked = require("../middlewares/checkUserNotBlocked");
+
 
 const {
+  // createOrder,
   placeOrder,
   getOrders
 } = require('../controllers/order.controller');
-console.log("protect TYPE:", typeof protect);
+
 // CUSTOMER → order create
 router.post(
-  '/',
+  "/",
   protect,
   tenant,
+  checkUserNotBlocked,
+  
   allowRoles('customer'),
   placeOrder
 );
@@ -27,5 +32,5 @@ router.get(
   allowRoles('owner', 'admin'),
   getOrders
 );
-console.log("createOrder TYPE:", placeOrder, typeof placeOrder, getOrders, typeof getOrders );
+
 module.exports = router;

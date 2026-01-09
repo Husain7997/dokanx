@@ -21,7 +21,7 @@ router.put("/users/:id/block",
 router.put("/users/:id/unblock",
   protect,
   allowRoles("admin"),
-  adminController.blockUser
+  adminController.unblockUser
 );
 
 router.put("/shops/:id/approve",

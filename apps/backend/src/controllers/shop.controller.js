@@ -1,5 +1,6 @@
 const Shop = require("../models/shop.model");
-
+const User = require("../models/user.model");
+const { createAudit } = require("../utils/audit.util");
 /**
  * CREATE SHOP (Admin / Owner)
  */
@@ -105,4 +106,36 @@ exports.suspendShop = async (req, res) => {
     targetId: shop._id,
     req
   });
+};
+
+exports.blockCustomer = async (req, res) => {
+  const { shopId, userId } = req.params;
+
+  const shop = await Shop.findById(shopId);
+  if (!shop) {
+    return res.status(404).json({ success: false, message: "Shop not found" });
+  }
+
+  // owner ownership check
+  if (shop.owner.toString() !== req.user._id.toString()) {
+    return res.status(403).json({ success: false, message: "Not your shop" });
+  }
+
+  const user = await User.findById(userId);
+  if (!user) {
+    return res.status(404).json({ success: false, message: "User not found" });
+  }
+
+  user.isBlocked = true;
+  await user.save();
+
+  await createAudit({
+    performedBy: req.user._id,
+    action: "BLOCK_CUSTOMER",
+    targetType: "User",
+    targetId: user._id,
+    req
+  });
+
+  res.json({ success: true, message: "Customer blocked" });
 };

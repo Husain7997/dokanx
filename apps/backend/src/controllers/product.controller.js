@@ -1,5 +1,6 @@
 const Product = require("../models/product.model");
 const Shop = require("../models/shop.model");
+const { createAudit } = require("../utils/audit.util");
 exports.createProduct = async (req, res) => {
   try {
     const { name, price, description, stock, shop } = req.body;
@@ -60,6 +61,17 @@ exports.createProduct = async (req, res) => {
 exports.getProductsByShop = async (req, res) => {
   try {
     const { shopId } = req.params;
+    const exists = await Product.findOne({
+      name: req.body.name,
+      shop: req.shop._id
+    });
+
+    if (exists) {
+      return res.status(400).json({
+        success: false,
+        message: "Product already exists in this shop",
+      });
+    }
 
     const products = await Product.find({ shop: shopId });
 

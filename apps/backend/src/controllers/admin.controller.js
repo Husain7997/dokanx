@@ -67,7 +67,15 @@ exports.suspendShop = async (req, res) => {
     { isActive: false },
     { new: true }
   );
+   await createAudit({
+  performedBy: req.user._id,
+  action: "SUSPEND_SHOP",
+  targetType: "Shop",
+  targetId: shop._id,
+  req
+});
   res.json({ success: true, data: shop });
+ 
 };
 
 exports.getAllOrders = async (req, res) => {

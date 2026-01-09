@@ -1,4 +1,5 @@
 const User = require("../models/user.model");
+const { createAudit } = require("../utils/audit.util");
 exports.blockUser = async (req, res) => {
   const user = await User.findById(req.params.id);
 

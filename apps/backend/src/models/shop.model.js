@@ -9,6 +9,12 @@ const shopSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    blockedCustomers: [
+  {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User"
+  }
+],
     isActive: { type: Boolean, default: false },
   },
   { timestamps: true }
