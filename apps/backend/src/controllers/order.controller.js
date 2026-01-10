@@ -27,6 +27,16 @@ exports.placeOrder = async (req, res) => {
     // 🔹 Guest identifier
     const guestId = user ? null : crypto.randomUUID();
 
+    const isGuest = !req.user;
+
+    if (!isGuest && req.user.isBlocked) {
+      return res.status(403).json({ message: "User blocked" });
+    }
+
+    if (!shop.isActive) {
+      return res.status(403).json({ message: "Shop suspended" });
+    }
+
     let orderItems = [];
     let totalAmount = 0;
 
