@@ -5,7 +5,7 @@ const auditSchema = new mongoose.Schema(
     performedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true
+      required: false
     },
     targetId: mongoose.Schema.Types.ObjectId,
     targetType: String,
@@ -18,24 +18,25 @@ const auditSchema = new mongoose.Schema(
 module.exports = mongoose.model("AuditLog", auditSchema);
 
 exports.createAudit = async ({
-  user,
   action,
+  performedBy = null,
   targetType,
   targetId,
   req,
+  meta = {}
 }) => {
-  if (!user) return;
-
-  await Audit.create({
-    performedBy: {
-  type: mongoose.Schema.Types.ObjectId,
-  ref: "User",
-  required: true
-},
-    action,
-    targetType,
-    targetId,
-    ip: req.ip,
-    userAgent: req.headers["user-agent"],
-  });
+  try {
+    await Audit.create({
+      action,
+      performedBy,
+      targetType,
+      targetId,
+      meta,
+      ip: req.ip,
+      userAgent: req.headers["user-agent"]
+    });
+  } catch (err) {
+    console.error("AUDIT ERROR:", err.message);
+  }
 };
+

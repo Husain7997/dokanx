@@ -5,6 +5,7 @@ const {protect} = require('../middlewares/auth.middleware');
 const tenant = require('../middlewares/tenant.middleware');
 const allowRoles = require('../middlewares/role.middleware');
 const checkUserNotBlocked = require("../middlewares/checkUserNotBlocked");
+const optionalAuth = require("../middlewares/optionalAuth.middleware");
 
 
 const {
@@ -16,11 +17,11 @@ const {
 // CUSTOMER → order create
 router.post(
   "/",
-  protect,
+  optionalAuth,
   tenant,
   checkUserNotBlocked,
   
-  allowRoles('customer'),
+  // allowRoles('customer'),
   placeOrder
 );
 

@@ -1,13 +1,37 @@
-module.exports = (req, res, next) => {
-  // 🔴 Admin blocked user (global)
-  if (req.user.isBlocked) {
+const User = require("../models/user.model");
+
+module.exports = async (req, res, next) => {
+  // 🔹 If logged in
+  if (req.user) {
+    if (req.user.isBlocked) {
+      return res.status(403).json({
+        success: false,
+        message: "User is blocked",
+      });
+    }
+    return next();
+  }
+
+  // 🔹 Guest order → check by phone/email (if provided)
+  const { phone, email } = req.body;
+
+  if (!phone && !email) {
+    return next(); // pure guest → allowed
+  }
+
+  const blockedUser = await User.findOne({
+    $or: [{ phone }, { email }],
+    isBlocked: true,
+  });
+
+  if (blockedUser) {
     return res.status(403).json({
       success: false,
-      message: "User is blocked by admin",
+      message: "This customer is blocked",
     });
   }
 
-  // 🔴 Owner blocked customer (shop-level)
+// 🔴 Owner blocked customer (shop-level)
   if (
     req.shop &&
     req.shop.blockedCustomers?.includes(req.user._id)

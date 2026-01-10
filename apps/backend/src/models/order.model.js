@@ -27,13 +27,28 @@ const orderSchema = new mongoose.Schema(
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true
+      default: null   // 🔥 REQUIRED REMOVED
     },
     items: [orderItemSchema],
     totalAmount: {
       type: Number,
       required: true
     },
+    isGuest: {
+      type: Boolean,
+      default: false
+    },
+
+    contact: {
+      phone: String,
+      email: String
+    },
+
+    isCompleted: {
+      type: Boolean,
+      default: false
+    },
+
     status: {
       type: String,
       enum: [
