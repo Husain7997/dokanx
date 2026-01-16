@@ -13,7 +13,7 @@ exports.createAudit = async ({
       performedBy,
       targetType,
       targetId,
-      ip: req.ip,
+     ip: req?.ip || "SYSTEM",
       userAgent: req.headers["user-agent"]
     });
   } catch (err) {

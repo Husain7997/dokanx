@@ -1,11 +1,19 @@
 const Product = require("../models/product.model");
 const Shop = require("../models/shop.model");
 const { createAudit } = require("../utils/audit.util");
+const Inventory = require('../models/Inventory.model');
+const InventoryTransaction = require("../models/inventoryTransaction.model");
 exports.createProduct = async (req, res) => {
   try {
     const { name, price, description, stock, shop } = req.body;
+    const initialStock = Number(req.body.stock ?? 0);
 
-    if (!shop) {
+    if (initialStock < 0) {
+      return res.status(400).json({
+        message: "Stock cannot be negative"
+      });
+    }
+    if (!req.shop || !req.shop._id) {
       return res.status(400).json({
         success: false,
         message: "Shop is required",
@@ -43,17 +51,42 @@ exports.createProduct = async (req, res) => {
       shop,
       owner: req.user._id,
     });
+    // Initialize inventory for the product
+   // ✅ Auto create inventory for product
+const inventory = await Inventory.create({
+  shop: product.shop,
+  product: product._id,
+  stock: initialStock,
+  reserved: 0,
+  status: initialStock > 0 ? "IN_STOCK" : "OUT_OF_STOCK"
+});
 
+// ✅ Inventory transaction log
+await InventoryTransaction.create({
+  shop: product.shop,
+  product: product._id,
+  type: "INVENTORY_CREATED",
+  quantity: initialStock,
+  note: "Initial stock on product creation"
+});
+
+    await createAudit({
+      action: "CREATE_PRODUCT",
+      user: req.user ? req.user._id : null,
+    });
     res.status(201).json({
       success: true,
       data: product,
+      inventory,
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Product create failed",
-    });
-  }
+  console.error("PRODUCT CREATE ERROR:", error);
+  return res.status(500).json({
+    success: false,
+    message: error.message
+  });
+}
+
 };
 
 

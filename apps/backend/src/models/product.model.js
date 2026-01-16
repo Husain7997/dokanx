@@ -15,4 +15,5 @@ const productSchema = new mongoose.Schema({
 productSchema.index({ shopId: 1, name: 1 });
 productSchema.index({ shopId: 1, createdAt: -1 });
 
-module.exports = mongoose.model('Product', productSchema);
+
+module.exports =  mongoose.models.Product || mongoose.model("Product", productSchema);
