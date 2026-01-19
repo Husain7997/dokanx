@@ -9,11 +9,26 @@ const errorHandler = require("./utils/errorHandler");
 const productRoutes = require('./routes/product.routes');
 const orderRoutes = require('./routes/order.routes');
 const adminRoutes = require("./routes/admin.routes");
+const paymentRoutes = require("./routes/payment.routes");
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+app.use(
+  "/api/payments/webhook",
+  express.raw({ type: "application/json" })
+);
+
+// app.use(
+//   express.json({
+//     verify: (req, res, buf) => {
+//       req.rawBody = buf.toString();
+//     },
+//   })
+// );
+
 
 
 // Routes
@@ -22,6 +37,7 @@ app.use("/api/shops", shopRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/payments", paymentRoutes);
 
 // Health Check
 app.get("/api/health", (req, res) => {

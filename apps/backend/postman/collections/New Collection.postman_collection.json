@@ -1,0 +1,132 @@
+{
+  "info": {
+    "_postman_id": "93ee2747-01e2-4402-9357-32ac42992a04",
+    "name": "New Collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "New Request",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "id": "2abe9030-8a66-4242-8448-598f23658d69",
+            "exec": [
+              "const secret = pm.environment.get(\"WEBHOOK_SECRET\");\r",
+              "\r",
+              "if (!secret) {\r",
+              "  throw new Error(\"❌ WEBHOOK_SECRET is missing in Postman environment\");\r",
+              "}\r",
+              "\r",
+              "const body = pm.request.body.raw;\r",
+              "const crypto = require(\"crypto\");\r",
+              "\r",
+              "const signature = crypto\r",
+              "  .createHmac(\"sha256\", secret)\r",
+              "  .update(body)\r",
+              "  .digest(\"hex\");\r",
+              "\r",
+              "pm.request.headers.upsert({\r",
+              "  key: \"x-webhook-signature\",\r",
+              "  value: signature\r",
+              "});\r",
+              ""
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "id": "b6b6e24e-27c4-4cc4-a880-260b68c64b0e",
+            "exec": [
+              ""
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "id": "726cc30c-1328-427e-bbf9-45694b011266",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OTU4ZTEyNjFjNTRiNDNjZTBkOTM2MzMiLCJpYXQiOjE3Njg2NjUxOTgsImV4cCI6MTc2OTI2OTk5OH0.TNSZ85__QJ5a071dl1T-kKA0YP4_EaiUYKuAPRMAb9g",
+            "type": "text",
+            "uuid": "8bdbca8e-b255-4b02-a422-3bd583442670",
+            "disabled": true
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text",
+            "uuid": "3c9830bd-4d7a-42bf-b5f2-4f7cecaaf05d"
+          },
+          {
+            "key": "x-shop-id",
+            "value": "6959260cd48200ef8a348a12",
+            "type": "text",
+            "uuid": "821d5e97-d3c6-4ee4-b5b4-5df16db5c16d",
+            "disabled": true
+          },
+          {
+            "key": "x-tenant",
+            "value": "shop-slug",
+            "type": "text",
+            "uuid": "f34a2761-6268-4b80-8e7b-48fc92c58fe1",
+            "disabled": true
+          },
+          {
+            "key": "webhook_secret",
+            "value": "",
+            "type": "text",
+            "uuid": "1a54e1ea-2e63-45f3-8eed-801eb0a02805",
+            "disabled": true
+          },
+          {
+            "key": "x-webhook-signature",
+            "value": "{{webhook_signature}}",
+            "type": "text",
+            "uuid": "25ff2771-fa3a-479e-ba5f-8b22aca2f15b"
+          },
+          {
+            "key": "x-webhook-signature",
+            "value": "super_secret_key_123",
+            "type": "text",
+            "uuid": "6c29751c-0798-4b8e-b4c4-2281cd6d968d",
+            "disabled": true
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"gateway\": \"SSLCOMMERZ\",\r\n  \"trx_id\": \"TXN123456\",\r\n  \"status\": \"SUCCESS\",\r\n  \"amount\": 500,\r\n  \"currency\": \"BDT\",\r\n  \"customer_id\": \"6958e1261c54b43ce0d93633\",\r\n  \"shop_id\": \"6959260cd48200ef8a348a12\",\r\n  \"paid_at\": \"2026-01-18T12:30:00Z\"\r\n}\r\n",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:5000/api/payments/webhook",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "5000",
+          "path": [
+            "api",
+            "payments",
+            "webhook"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}

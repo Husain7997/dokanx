@@ -3,7 +3,7 @@ const Product = require("../models/product.model");
 const { createAudit } = require("../utils/audit.util");
 const crypto = require("crypto");
 const InventoryService = require("../services/Inventory.service");
-
+const PaymentAttempt = require("../models/paymentAttempt.model");
 
 const {
   reserveStock,
@@ -116,7 +116,22 @@ exports.placeOrder = async (req, res) => {
       status: "PLACED",
     });
 
+
+
+
     await order.save();
+
+await PaymentAttempt.create({
+  shop: order.shop,
+  order: order._id,
+  gateway: "MANUAL",
+
+  // ⭐ IMPORTANT
+  providerPaymentId: `pay_${order._id}`,
+
+  amount: order.totalAmount,
+  status: "PENDING"
+});
 
     await createAudit({
       action: "ORDER_CREATED",

@@ -25,7 +25,8 @@ exports.canUpdateOrderStatus = async (req, res, next) => {
     const currentStatus = order.status;
 
  const transitions = {
-  PLACED: ["CONFIRMED", "CANCELLED"],
+  PLACED: ["PAYMENT_PENDING", "CANCELLED"],
+PAYMENT_PENDING: ["CONFIRMED", "PAYMENT_FAILED"],
   CONFIRMED: ["SHIPPED", "CANCELLED"],
   SHIPPED: ["DELIVERED"],
   DELIVERED: ["REFUNDED"],   // ✅ ADD THIS

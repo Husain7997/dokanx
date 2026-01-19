@@ -48,11 +48,18 @@ const orderSchema = new mongoose.Schema(
       type: Boolean,
       default: false
     },
+    paymentStatus: {
+  type: String,
+  enum: ["INITIATED", "SUCCESS", "FAILED"],
+  default: "INITIATED"
+},
 
     status: {
       type: String,
       enum: [
         "PLACED",
+        "PAYMENT_PENDING",
+        "PAYMENT_FAILED",
         "CONFIRMED",
         "SHIPPED",
         "DELIVERED",
@@ -61,6 +68,7 @@ const orderSchema = new mongoose.Schema(
       ],
       default: "PLACED"
     }
+
   },
   { timestamps: true }
 );
