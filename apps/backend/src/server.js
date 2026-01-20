@@ -16,9 +16,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.use(
-  "/api/payments/webhook",
-  express.raw({ type: "application/json" })
+app.use("/api/payments/webhook",
+  express.raw({ type:"application/json" })
 );
 
 // app.use(

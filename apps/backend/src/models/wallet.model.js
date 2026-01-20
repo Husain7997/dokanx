@@ -1,36 +1,32 @@
 const mongoose = require("mongoose");
 
-const walletSchema = new mongoose.Schema(
+const WalletSchema = new mongoose.Schema(
   {
-    ownerType: {
-      type: String,
-      enum: ["SHOP", "ADMIN"],
-      required: true,
-    },
-
-    ownerId: {
+    shopId: {
       type: mongoose.Schema.Types.ObjectId,
+      ref: "Shop",
       required: true,
-      index: true,
+      unique: true,
+      index: true
     },
 
     balance: {
       type: Number,
-      default: 0,
+      default: 0
     },
 
     currency: {
       type: String,
-      default: "BDT",
+      default: "BDT"
     },
+
+    status: {
+      type: String,
+      enum: ["ACTIVE", "FROZEN"],
+      default: "ACTIVE"
+    }
   },
   { timestamps: true }
 );
 
-// one wallet per owner
-walletSchema.index(
-  { user: 1, shop: 1 },
-  { unique: true }
-);
-
-module.exports = mongoose.model("Wallet", walletSchema);
+module.exports = mongoose.model("Wallet", WalletSchema);

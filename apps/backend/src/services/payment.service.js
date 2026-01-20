@@ -1,103 +1,115 @@
-const mongoose = require("mongoose");
 const PaymentAttempt = require("../models/paymentAttempt.model");
 const Order = require("../models/order.model");
 const Wallet = require("../models/wallet.model");
-const WalletTransaction = require("../models/walletTransaction.model");
-
-
-
-
+const Ledger = require("../models/ledger.model");
 
 exports.handlePaymentWebhook = async (payload) => {
-  const { payment_id, status } = payload;
+  const { providerPaymentId, status } = payload;
 
-  console.log("🔎 Finding PaymentAttempt by providerPaymentId:", payment_id);
+  if (!providerPaymentId) {
+    throw new Error("providerPaymentId missing in webhook payload");
+  }
 
-  const attempt = await PaymentAttempt.findOne({
-    providerPaymentId: payment_id
+  // 1️⃣ PaymentAttempt
+  const paymentAttempt = await PaymentAttempt.findOne({
+    providerPaymentId
   });
 
-  if (!attempt) {
+  if (!paymentAttempt) {
     throw new Error("PaymentAttempt not found");
   }
 
-  // 🛑 Idempotency — only skip if already SUCCESS processed
-  if (attempt.processed && attempt.status === "SUCCESS") {
-    console.log("⚠️ Already fully processed webhook for:", payment_id);
-    return { ok: true, alreadyProcessed: true };
+  if (paymentAttempt.status === "SUCCESS") {
+    console.log("🔁 Duplicate webhook ignored");
+    return { ok: true, duplicate: true };
   }
 
-  // Update attempt status first (but NOT processed yet)
-  attempt.status = status === "SUCCESS" ? "SUCCESS" : "FAILED";
-  await attempt.save();
+  paymentAttempt.status = status;
+  await paymentAttempt.save();
 
-  if (attempt.status !== "SUCCESS") {
-    console.log("❌ Payment failed for:", payment_id);
-    return { ok: false, failed: true };
+  if (status !== "SUCCESS") {
+    return { ok: false };
   }
 
-  // 🔥 Now do business logic
-
-  // 1️⃣ Load order
-  const order = await Order.findById(attempt.order);
+  // 2️⃣ Order
+  const order = await Order.findById(paymentAttempt.order);
 
   if (!order) {
-    throw new Error("Order not found for payment");
+    throw new Error("Order not found");
   }
 
-  // 2️⃣ Mark order paid
-  order.isCompleted = true;
-order.paymentStatus = "SUCCESS";
-order.status = "CONFIRMED"; 
-await order.save();
+  if (!order.shop) {
+    throw new Error("Order.shop missing");
+  }
 
+  const shopId = order.shop;
 
-  // 3️⃣ Wallet upsert
- let wallet = await Wallet.findOne({
-  ownerType: "SHOP",
-  ownerId: order.shop
-});
+  // 3️⃣ Mark order paid
+  order.paymentStatus = "SUCCESS";
+  order.status = "CONFIRMED";
+  await order.save();
 
-if (!wallet) {
-  wallet = new Wallet({
-    ownerType: "SHOP",
-    ownerId: order.shop,
-    balance: 0
+  // 4️⃣ Wallet (upsert)
+  let wallet = await Wallet.findOne({ shopId });
+
+  if (!wallet) {
+    wallet = await Wallet.create({
+      shopId,
+      balance: 0
+    });
+  }
+
+  const newBalance = wallet.balance + paymentAttempt.amount;
+
+  // 5️⃣ Ledger (source of truth)
+  await Ledger.create({
+    shopId,
+    type: "CREDIT",
+    amount: paymentAttempt.amount,
+    source: "ORDER_PAYMENT",
+    referenceType: "ORDER",
+    referenceId: order._id,
+    balanceAfter: newBalance
   });
-}
 
-wallet.balance += attempt.amount;
-await wallet.save();
+  // 6️⃣ Update cached wallet balance
+  wallet.balance = newBalance;
+  await wallet.save();
 
-
-  // 5️⃣ Wallet transaction
-  await WalletTransaction.create({
-  wallet: wallet._id,
-
-  ownerType: "SHOP",
-  ownerId: order.shop,
-
-  type: "CREDIT",
-  amount: attempt.amount,
-
-  source: "PAYMENT",              
-  referenceType: "ORDER",         
-  referenceId: order._id,         // 🔥 REQUIRED
-
-  description: "Order payment received",
-  balanceAfter: wallet.balance   
-});
-
-
-
-
-
-  // ✅ Finally mark processed ONLY after everything succeeded
-  attempt.processed = true;
-  await attempt.save();
-
-  console.log("✅ Payment fully processed for:", payment_id);
+  console.log("💰 Wallet credited successfully");
 
   return { ok: true };
-};
 
+  
+  async function createSettlement({ order, payment }) {
+
+  const commission = Math.round(order.amount * 0.05);
+  const net = order.amount - commission;
+
+  await Settlement.create({
+    tenant: order.tenant,
+    shop: order.shop,
+    order: order._id,
+    payment: payment._id,
+
+    gross_amount: order.amount,
+    commission_amount: commission,
+    net_amount: net,
+
+    mature_at: dayjs().add(7, "day").toDate(),
+    idempotency_key: `settlement:${payment._id}`
+  });
+
+  // move money to pending_settlement
+  await Wallet.updateOne(
+    { shop: order.shop },
+    {
+      $inc: {
+        available_balance: -order.amount,
+        pending_settlement: order.amount
+      }
+    }
+  );
+}
+
+};

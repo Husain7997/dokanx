@@ -9,8 +9,10 @@ const Ledger = require("../models/ledger.model");
 const { verifySignature } = require("../utils/verifySignature");
 const PaymentService = require("../services/payment.service");
 const { creditWallet } = require("../services/wallet.service");
-const { handlePaymentWebhook } = require("../services/payment.service");
+const mongoose = require("mongoose");
 const PaymentAttempt = require("../models/paymentAttempt.model");
+const { handlePaymentWebhook } = require("../services/payment.service");
+const paymentService = require("../services/payment.service");
 
 
 console.log("✅ payment.controller.js LOADED");
@@ -113,16 +115,24 @@ if (!attempt) {
 
 
 exports.paymentWebhook = async (req, res, next) => {
+  const payload = req.body; // ✅ MUST
+  console.log("🔥 Webhook Controller Hit");
+  console.log("Payload:", payload);
+
   try {
-    console.log("🔥 Webhook Controller Hit");
-    console.log("Payload:", req.body);
+   await paymentService.handlePaymentWebhook(req.body);
 
-    await handlePaymentWebhook(req.body);
-
-    res.status(200).json({ ok: true });
+    return res.json({
+      success: true,
+      message: "Webhook processed",
+    });
   } catch (err) {
     console.error("❌ Webhook error:", err.message);
-    next(err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   }
 };
 
@@ -188,6 +198,9 @@ exports.paymentWebhook = async (req, res, next) => {
 exports.retryPayment = async (req, res) => {
   try {
     const { orderId } = req.body;
+console.log("🔎 Webhook identifiers:", {
+  providerPaymentId: payload.providerPaymentId,
+});
 
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ message: "Order not found" });
