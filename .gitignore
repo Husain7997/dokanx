@@ -35,3 +35,4 @@ docker-data/
 logs/
 *.log
 /apps/backend/src/test/.env.test
+/apps/backend/src/test/.env.test
