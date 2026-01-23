@@ -1,65 +1,24 @@
 require("dotenv").config();
-const express = require("express");
-const cors = require("cors");
 const mongoose = require("mongoose");
+const cron = require("node-cron");
+const app = require("./app");
+const connectDB = require("./config/db");
+const { processSettlements } = require("./modules/settlement/settlement.cron");
 
-const authRoutes = require("./routes/auth.routes");
-const shopRoutes = require("./routes/shop.routes");
-const errorHandler = require("./utils/errorHandler");
-const productRoutes = require('./routes/product.routes');
-const orderRoutes = require('./routes/order.routes');
-const adminRoutes = require("./routes/admin.routes");
-const paymentRoutes = require("./routes/payment.routes");
+(async () => {
+  await connectDB();
+ if (process.env.NODE_ENV !== "test") {
+    const cron = require("node-cron");
+    const { processSettlements } = require("./modules/settlement/settlement.cron");
 
-const app = express();
+    cron.schedule("0 * * * *", async () => {
+      console.log("⏰ Running settlement cron...");
+      await processSettlements();
+    });
+  }
 
-app.use(cors());
-app.use(express.json());
-
-app.use("/api/payments/webhook",
-  express.raw({ type:"application/json" })
-);
-
-// app.use(
-//   express.json({
-//     verify: (req, res, buf) => {
-//       req.rawBody = buf.toString();
-//     },
-//   })
-// );
-
-
-
-// Routes
-app.use("/api/auth", authRoutes);
-app.use("/api/shops", shopRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/orders', orderRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api/payments", paymentRoutes);
-
-// Health Check
-app.get("/api/health", (req, res) => {
-  res.json({ status: "OK", app: "DokanX Backend" });
-});
-
-app.use((req, res, next) => {
-  console.log(`[${req.method}] ${req.originalUrl}`);
-  next();
-});
-// Global Error Handler
-app.use(errorHandler);
-
-// MongoDB Connect
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB Connected"))
-  .catch((err) => {
-    console.error("❌ MongoDB Error:", err.message);
-    process.exit(1);
-  });
-
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () =>
-  console.log(`🚀 Server running on port ${PORT}`)
-);
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () =>
+    console.log(`🚀 DokanX running on port ${PORT}`)
+  );
+})();

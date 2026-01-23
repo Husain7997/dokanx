@@ -14,7 +14,9 @@ const WalletSchema = new mongoose.Schema(
       type: Number,
       default: 0
     },
-
+available_balance: { type: Number, default: 0 },
+  pending_settlement: { type: Number, default: 0 },
+  withdrawable_balance: { type: Number, default: 0 },
     currency: {
       type: String,
       default: "BDT"
@@ -29,4 +31,4 @@ const WalletSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("Wallet", WalletSchema);
+module.exports = mongoose.models.Wallet || mongoose.model("Wallet", WalletSchema);

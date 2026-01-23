@@ -1,5 +1,8 @@
 const Wallet = require("../models/wallet.model");
 const Ledger = require("../models/ledger.model");
+const axios = require('axios');
+const ShopWallet = require('../models/ShopWallet');
+const Settlement = require('../models/settlement.model');
 
 exports.credit = async ({
   shopId,
@@ -107,3 +110,43 @@ exports.recalculateBalance = async (shopId) => {
 
   return balance;
 };
+
+
+
+
+async function payoutToShop(settlementId, bankDetails) {
+  const settlement = await Settlement.findById(settlementId);
+  if (!settlement || settlement.status !== 'PROCESSING') throw new Error('Invalid settlement');
+
+  const wallet = await ShopWallet.findOne({ shop: settlement.shop });
+  if (wallet.balance < settlement.totalAmount) throw new Error('Insufficient wallet balance');
+
+  try {
+    const response = await axios.post('https://sandbox-bank-api.example.com/payout', {
+      account: bankDetails.accountNumber,
+      amount: settlement.totalAmount,
+      currency: wallet.currency
+    });
+
+    if (response.data.status === 'SUCCESS') {
+      wallet.balance -= settlement.totalAmount;
+      wallet.transactions.push({ type: 'DEBIT', amount: settlement.totalAmount, reference: settlementId, status: 'SUCCESS' });
+      await wallet.save();
+
+      settlement.status = 'COMPLETED';
+      settlement.payoutId = response.data.payoutId;
+      await settlement.save();
+
+      return { success: true, payoutId: response.data.payoutId };
+    } else {
+      throw new Error('Payout failed');
+    }
+
+  } catch (err) {
+    settlement.status = 'FAILED';
+    await settlement.save();
+    throw err;
+  }
+}
+
+module.exports = { payoutToShop };

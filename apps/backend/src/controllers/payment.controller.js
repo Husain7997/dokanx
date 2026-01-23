@@ -13,6 +13,7 @@ const mongoose = require("mongoose");
 const PaymentAttempt = require("../models/paymentAttempt.model");
 const { handlePaymentWebhook } = require("../services/payment.service");
 const paymentService = require("../services/payment.service");
+const Settlement = require("../models/settlement.model");
 
 
 console.log("✅ payment.controller.js LOADED");
@@ -118,6 +119,7 @@ exports.paymentWebhook = async (req, res, next) => {
   const payload = req.body; // ✅ MUST
   console.log("🔥 Webhook Controller Hit");
   console.log("Payload:", payload);
+  const { order, payment } = req.body;
 
   try {
    await paymentService.handlePaymentWebhook(req.body);
@@ -125,6 +127,7 @@ exports.paymentWebhook = async (req, res, next) => {
     return res.json({
       success: true,
       message: "Webhook processed",
+
     });
   } catch (err) {
     console.error("❌ Webhook error:", err.message);
@@ -254,7 +257,22 @@ exports.refundPayment = async (req, res) => {
     if (amount > balance) {
       return res.status(400).json({ message: "Insufficient refundable amount" });
     }
+ const settlement = await Settlement.findOne({ order: orderId });
 
+  if (settlement && settlement.status === "PENDING") {
+    settlement.status = "CANCELLED";
+    await settlement.save();
+
+    await Wallet.updateOne(
+      { shop: settlement.shop },
+      {
+        $inc: {
+          pending_settlement: -settlement.gross_amount,
+          available_balance: settlement.gross_amount
+        }
+      }
+    );
+  }
     await Ledger.create({
       order: order._id,
       type: "DEBIT",

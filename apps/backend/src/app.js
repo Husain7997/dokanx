@@ -1,41 +1,43 @@
 const express = require("express");
 const cors = require("cors");
-const session = require("express-session");
+const dotenv = require('dotenv');
+const authRoutes = require("./routes/auth.routes");
+const shopRoutes = require("./routes/shop.routes");
+const productRoutes = require("./routes/product.routes");
+const orderRoutes = require("./routes/order.routes");
+const adminRoutes = require("./routes/admin.routes");
+const paymentRoutes = require("./routes/payment.routes");
+const settlementRoutes = require("./routes/settlement.routes");
+const errorHandler = require("./utils/errorHandler");
 
-const passport = require("./modules/auth/googleAuth");
 
-const authRoutes = require("./modules/auth/auth.routes");
-
-
-
+dotenv.config();
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-app.use(session({ secret: "some_secret", resave: false, saveUninitialized: false }));
-app.use(passport.initialize());
-app.use(passport.session());
+app.use("/api/payments/webhook",
+  express.raw({ type: "application/json" })
+);
 
+// Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/shops", shopRoutes);
+app.use("/api/products", productRoutes);
+app.use("/api/orders", orderRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/payments", paymentRoutes);
+// app.use("/api/settlements", settlementRoutes);
 
-app.use("/api/shops", require("./routes/shop.routes"));
 
-app.get("/api/health", (req, res) => res.json({ status: "OK", app: "DokanX" }));
 
-// Google OAuth routes
-app.get(
-  "/api/auth/google",
-  passport.authenticate("google", { scope: ["profile", "email"] })
-);
 
-app.get(
-  "/api/auth/google/callback",
-  passport.authenticate("google", { failureRedirect: "/" }),
-  (req, res) => {
-    // Successful login
-    res.redirect("/"); // later redirect to frontend dashboard
-  }
-);
+// Health
+app.get("/api/health", (req, res) => {
+  res.json({ status: "OK", app: "DokanX Backend" });
+});
+
+app.use(errorHandler);
 
 module.exports = app;

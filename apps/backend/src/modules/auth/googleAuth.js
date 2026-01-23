@@ -1,7 +1,8 @@
 const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const User = require("./user.model");
-
+if (process.env.NODE_ENV !== "production") return;
+ {
 passport.use(
   new GoogleStrategy(
     {
@@ -35,5 +36,5 @@ passport.deserializeUser(async (id, done) => {
   const user = await User.findById(id);
   done(null, user);
 });
-
+}
 module.exports = passport;

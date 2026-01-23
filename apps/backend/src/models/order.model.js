@@ -50,7 +50,7 @@ const orderSchema = new mongoose.Schema(
     },
     paymentStatus: {
   type: String,
-  enum: ["INITIATED", "SUCCESS", "FAILED"],
+  enum: ["INITIATED","PENDING", "SUCCESS", "FAILED"],
   default: "INITIATED"
 },
 
@@ -67,7 +67,11 @@ const orderSchema = new mongoose.Schema(
         "REFUNDED"
       ],
       default: "PLACED"
-    }
+    },
+      isSettled: {   // ✅ এই ফিল্ড add করুন
+    type: Boolean,
+    default: false,
+  },
 
   },
   { timestamps: true }

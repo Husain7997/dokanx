@@ -2,6 +2,10 @@ const PaymentAttempt = require("../models/paymentAttempt.model");
 const Order = require("../models/order.model");
 const Wallet = require("../models/wallet.model");
 const Ledger = require("../models/ledger.model");
+const Settlement = require("../models/settlement.model");
+const dayjs = require("dayjs");
+// settlement.service.js
+const ShopWallet = require('../models/ShopWallet'); // exact match with filename
 
 exports.handlePaymentWebhook = async (payload) => {
   const { providerPaymentId, status } = payload;
@@ -77,30 +81,37 @@ exports.handlePaymentWebhook = async (payload) => {
   await wallet.save();
 
   console.log("💰 Wallet credited successfully");
-
+  // 7️⃣ Create Settlement
+  await createSettlement({ order, payment: paymentAttempt });
+res.json({ success: true, settlement });
   return { ok: true };
 
-  
-  async function createSettlement({ order, payment }) {
+};
 
-  const commission = Math.round(order.amount * 0.05);
+
+
+async function createSettlement({ order, payment }) {
+
+  const commission = Math.round(order.amount * 0.05); // 5% commission
   const net = order.amount - commission;
 
-  await Settlement.create({
+  // prevent duplicate
+  const exists = await Settlement.findOne({ idempotency_key: `settlement:${payment._id}` });
+  if (exists) return exists;
+
+  const settlement = await Settlement.create({
     tenant: order.tenant,
     shop: order.shop,
     order: order._id,
     payment: payment._id,
-
     gross_amount: order.amount,
     commission_amount: commission,
     net_amount: net,
-
     mature_at: dayjs().add(7, "day").toDate(),
     idempotency_key: `settlement:${payment._id}`
   });
 
-  // move money to pending_settlement
+  // Move money to pending_settlement
   await Wallet.updateOne(
     { shop: order.shop },
     {
@@ -110,6 +121,8 @@ exports.handlePaymentWebhook = async (payload) => {
       }
     }
   );
+
+  return settlement;
 }
 
-};
+module.exports = { createSettlement };
