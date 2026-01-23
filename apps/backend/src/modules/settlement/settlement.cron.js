@@ -4,6 +4,31 @@ const PlatformWallet = require("../../models/platformWallet.model");
 const Ledger = require("../../models/ledger.model");
 const mongoose = require("mongoose");
 
+const cron = require('node-cron');
+const Shop = require('../../models/shop.model');
+const { settleShopOrders } = require('../../services/settlement.service');
+
+/**
+ * Cron: প্রতিদিন রাত 12টায় সব shops এর unpaid orders settle করবে
+ */
+cron.schedule('0 0 * * *', async () => {
+  console.log('Auto settlement cron started...');
+  try {
+    const shops = await Shop.find({});
+    for (let shop of shops) {
+      try {
+        const result = await settleShopOrders(shop._id);
+        console.log(`Shop ${shop.name}: ${result.message}`);
+      } catch (err) {
+        console.error(`Shop ${shop.name} settlement error:`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error('Auto settlement cron failed:', err.message);
+  }
+});
+
+
 async function processSettlements() {
   const settlements = await Settlement.find({
     status: "PENDING",

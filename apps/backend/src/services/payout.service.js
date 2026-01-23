@@ -1,8 +1,8 @@
 // services/payout.service.js
 
 const ShopWallet = require('../models/ShopWallet');
-const Payout = require('../models/Payout');
-const Ledger = require('../models/Ledger');
+const Payout = require('../models/payout.model');
+const Ledger = require('../models/ledger.model');
 const mongoose = require('mongoose');
 
 async function processShopPayout(shopId, amount) {
