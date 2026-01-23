@@ -1,6 +1,6 @@
-describe.skip("Settlement & Payout", () => {
-  // legacy test – disabled in STEP–3
-});
+// describe.skip("Settlement & Payout", () => {
+//   // legacy test – disabled in STEP–3
+// });
 const mongoose = require("mongoose");
 require("dotenv").config({ path: ".env.test" });
 
@@ -37,6 +37,30 @@ describe("Settlement Engine", () => {
     await mongoose.connection.dropDatabase();
     await mongoose.connection.close();
   });
+describe('Multi-tenant settlement & payout', () => {
+  it('should settle multiple shops independently', async () => {
+    const shopA = await Shop.create({ name: 'A' });
+    const shopB = await Shop.create({ name: 'B' });
+
+    await createPaidOrders(shopA._id, 3, 100); // total 300
+    await createPaidOrders(shopB._id, 2, 200); // total 400
+
+    const resultA = await settleShopOrders(shopA._id);
+    const resultB = await settleShopOrders(shopB._id);
+
+    expect(resultA.wallet.balance).toBe(300);
+    expect(resultB.wallet.balance).toBe(400);
+  });
+
+  it('should allow shop payout correctly', async () => {
+    const shop = await Shop.create({ name: 'Payout Shop' });
+    await ShopWallet.create({ shop: shop._id, balance: 500 });
+
+    const result = await processShopPayout(shop._id, 200);
+
+    expect(result.wallet.balance).toBe(300);
+  });
+});
 
   it("should create a settlement correctly", async () => {
     const key = "settle-test-001";

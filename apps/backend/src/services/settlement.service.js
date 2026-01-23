@@ -101,3 +101,73 @@ async function processShopSettlement(shopId, idempotencyKey) {
 module.exports = {
   processShopSettlement,
 };
+
+
+
+
+// services/settlement.service.js
+
+
+
+async function settleShopOrders(shopId) {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    // 1. Fetch unsettled orders for this shop
+    const unsettledOrders = await Order.find({
+      shop: shopId,
+      status: 'PAID',
+      settled: false
+    }).session(session);
+
+    if (unsettledOrders.length === 0) {
+      await session.commitTransaction();
+      session.endSession();
+      return { message: 'No orders to settle' };
+    }
+
+    // 2. Calculate total amount
+    const totalAmount = unsettledOrders.reduce((sum, order) => sum + order.total, 0);
+
+    // 3. Update ShopWallet
+    const wallet = await ShopWallet.findOneAndUpdate(
+      { shop: shopId },
+      { $inc: { balance: totalAmount } },
+      { new: true, upsert: true, session }
+    );
+
+    // 4. Record Settlement
+    const settlement = await Settlement.create([{
+      shop: shopId,
+      amount: totalAmount,
+      orders: unsettledOrders.map(o => o._id)
+    }], { session });
+
+    // 5. Update Ledger
+    await Ledger.create([{
+      shop: shopId,
+      type: 'CREDIT',
+      amount: totalAmount,
+      settlementId: settlement[0]._id
+    }], { session });
+
+    // 6. Mark orders as settled
+    await Order.updateMany(
+      { _id: { $in: unsettledOrders.map(o => o._id) } },
+      { $set: { settled: true } },
+      { session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return { message: 'Settlement complete', wallet };
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
+  }
+}
+
+module.exports = { settleShopOrders };
