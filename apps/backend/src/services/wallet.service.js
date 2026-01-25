@@ -8,12 +8,9 @@ exports.credit = async ({
   shopId,
   amount,
   orderId,
-  paymentId,
   source,
 }) => {
-  if (!shopId) {
-    throw new Error("shopId is required for wallet credit");
-  }
+  if (!shopId) throw new Error("shopId is required");
 
   // 🔒 Idempotency check
   const exists = await Ledger.findOne({
@@ -28,21 +25,20 @@ exports.credit = async ({
 
   // 🔥 Load wallet
   let wallet = await Wallet.findOne({
-  ownerType: "SHOP",
-  ownerId: shopId
-});
-
-if (!wallet) {
-  wallet = await Wallet.create({
     ownerType: "SHOP",
     ownerId: shopId,
-    balance: 0
   });
-}
 
-wallet.balance += paymentAttempt.amount;
+  if (!wallet) {
+    wallet = await Wallet.create({
+      ownerType: "SHOP",
+      ownerId: shopId,
+      balance: 0,
+    });
+  }
 
-
+  const balanceBefore = wallet.balance;
+  const newBalance = balanceBefore + amount;
 
   // 🔥 Ledger entry (SOURCE OF TRUTH)
   await Ledger.create({
@@ -54,8 +50,8 @@ wallet.balance += paymentAttempt.amount;
     referenceType: "ORDER",
     referenceId: orderId,
 
-    balanceBefore: wallet.balance,
-    balanceAfter: newBalance,   // ✅ REQUIRED
+    balanceBefore,
+    balanceAfter: newBalance,
   });
 
   // 🔁 Update wallet snapshot

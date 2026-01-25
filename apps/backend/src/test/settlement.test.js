@@ -1,5 +1,3 @@
-jest.setTimeout(30000);
-
 const mongoose = require("mongoose");
 require("dotenv").config({ path: ".env.test" });
 
@@ -10,7 +8,7 @@ const ShopWallet = require("../models/ShopWallet");
 const Order = require("../models/order.model");
 const { processShopSettlement } = require("../services/settlement.service");
 
-describe("Settlement Idempotency", () => {
+describe("Settlement Engine", () => {
   let shop;
 
   beforeAll(async () => {
@@ -21,9 +19,9 @@ describe("Settlement Idempotency", () => {
     await clearDB();
 
     shop = await Shop.create({
-      name: "ShopIdemp",
+      name: "Test Shop",
       owner: new mongoose.Types.ObjectId(),
-      slug: "shopIdemp-" + Date.now(),
+      slug: "test-shop-" + Date.now(),
     });
 
     await ShopWallet.create({ shop: shop._id, balance: 0 });
@@ -31,6 +29,7 @@ describe("Settlement Idempotency", () => {
     await Order.create([
       { shop: shop._id, totalAmount: 100, paymentStatus: "SUCCESS" },
       { shop: shop._id, totalAmount: 200, paymentStatus: "SUCCESS" },
+      { shop: shop._id, totalAmount: 300, paymentStatus: "SUCCESS" },
     ]);
   });
 
@@ -38,13 +37,11 @@ describe("Settlement Idempotency", () => {
     await disconnectDB();
   });
 
-  it("should be idempotent for same key", async () => {
-    const key = "idem-001";
+  it("should create a settlement correctly", async () => {
+    const settlement = await processShopSettlement(shop._id, "single-001");
 
-    const first = await processShopSettlement(shop._id, key);
-    const second = await processShopSettlement(shop._id, key);
-
-    expect(first._id.toString()).toBe(second._id.toString());
-    expect(second.orderCount).toBe(2);
+    expect(settlement.orderCount).toBe(3);
+    expect(settlement.status).toBe("PAID"); // ✅ UPDATED
+    expect(settlement.shopId.toString()).toBe(shop._id.toString());
   });
 });

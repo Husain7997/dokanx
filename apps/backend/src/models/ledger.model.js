@@ -9,11 +9,11 @@ const LedgerSchema = new mongoose.Schema(
       index: true,
     },
 
-    type: {
-      type: String,
-      enum: ["CREDIT", "DEBIT"],
-      required: true,
-    },
+type: {
+  type: String,
+  enum: ["CREDIT", "DEBIT", "SETTLEMENT_CREDIT", "REFUND_DEBIT"],
+  required: true,
+},
 
     amount: {
       type: Number,
@@ -26,16 +26,15 @@ const LedgerSchema = new mongoose.Schema(
       required: true,
     },
 
-    referenceType: {
-      type: String,
-      enum: ["ORDER", "PAYMENT", "SETTLEMENT"],
-      required: true,
-    },
+  referenceType: {
+  type: String,
+  enum: ["ORDER", "SETTLEMENT", "REFUND"],
+  required: true,
+},
+ referenceId: { 
+  type: String, 
+  index: true },
 
-    referenceId: {
-      type: mongoose.Schema.Types.ObjectId,
-      required: true,
-    },
 
     balanceAfter: {
       type: Number,

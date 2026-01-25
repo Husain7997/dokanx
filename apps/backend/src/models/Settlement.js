@@ -1,36 +1,41 @@
 const mongoose = require('mongoose');
 
-const SettlementSchema = new mongoose.Schema(
+const settlementSchema = new mongoose.Schema(
   {
-    shop: {
+    shopId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Shop',
       required: true,
+      index: true,
     },
 
-    totalAmount: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
+    orderCount: { type: Number, default: 0 },
+    grossAmount: { type: Number, default: 0 },
+    netPayable: { type: Number, default: 0 },
 
     status: {
       type: String,
-      enum: ['pending', 'processing', 'paid', 'failed'],
-      default: 'pending',
+      enum: ['PENDING', 'PAID'],
+      default: 'PENDING',
     },
 
-    payoutRef: {
+    idempotencyKey: {
       type: String,
-    },
-
-    processedAt: {
-      type: Date,
+      required: true,
+      index: true,
     },
   },
   { timestamps: true }
 );
 
+// 🔒 hard idempotency guarantee
+settlementSchema.index(
+  { shopId: 1, idempotencyKey: 1 },
+  { unique: true }
+);
+
 module.exports =
   mongoose.models.Settlement ||
-  mongoose.model('Settlement', SettlementSchema);
+  mongoose.model('Settlement', settlementSchema);
+
+

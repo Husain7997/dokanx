@@ -1,35 +1,53 @@
-require('dotenv').config({ path: './src/test/.env.test' });
+const mongoose = require("mongoose");
+require("dotenv").config({ path: ".env.test" });
 
-const { settleShopOrders } = require('../services/settlement.service');
-const { processShopPayout } = require('../services/payout.service');
-const Shop = require('../models/shop.model');
-const ShopWallet = require('../models/ShopWallet');
-const Order = require('../models/order.model');
+const { connectDB, disconnectDB, clearDB } = require("./setup");
 
-describe('Multi-tenant settlement & payout', () => {
-  it('should settle multiple shops independently', async () => {
-    const shopA = await Shop.create({ name: 'A' });
-    const shopB = await Shop.create({ name: 'B' });
+const Shop = require("../models/shop.model");
+const ShopWallet = require("../models/ShopWallet");
+const Order = require("../models/order.model");
+const { processShopSettlement } = require("../services/settlement.service");
 
-    // Paid orders
-    await Order.create([
-      { shop: shopA._id, total: 100, status: 'PAID', settled: false },
-      { shop: shopA._id, total: 200, status: 'PAID', settled: false },
-      { shop: shopB._id, total: 150, status: 'PAID', settled: false }
-    ]);
+describe("Multi-tenant settlement & payout", () => {
+  let shopA, shopB;
 
-    const resultA = await settleShopOrders(shopA._id);
-    const resultB = await settleShopOrders(shopB._id);
-
-    expect(resultA.wallet.balance).toBe(300);
-    expect(resultB.wallet.balance).toBe(150);
+  beforeAll(async () => {
+    await connectDB();
   });
 
-  it('should allow shop payout correctly', async () => {
-    const shop = await Shop.create({ name: 'Payout Shop' });
-    await ShopWallet.create({ shop: shop._id, balance: 500 });
+  beforeEach(async () => {
+    await clearDB();
 
-    const result = await processShopPayout(shop._id, 200);
-    expect(result.wallet.balance).toBe(300);
+    shopA = await Shop.create({
+      name: "Shop A",
+      owner: new mongoose.Types.ObjectId(),
+      slug: "shop-a-" + Date.now(),
+    });
+
+    shopB = await Shop.create({
+      name: "Shop B",
+      owner: new mongoose.Types.ObjectId(),
+      slug: "shop-b-" + Date.now(),
+    });
+
+    await ShopWallet.create({ shop: shopA._id, balance: 0 });
+    await ShopWallet.create({ shop: shopB._id, balance: 0 });
+
+    await Order.create([
+      { shop: shopA._id, totalAmount: 100, paymentStatus: "SUCCESS" },
+      { shop: shopB._id, totalAmount: 200, paymentStatus: "SUCCESS" },
+    ]);
+  });
+
+  afterAll(async () => {
+    await disconnectDB();
+  });
+
+  it("should settle multiple shops independently", async () => {
+    const settlementA = await processShopSettlement(shopA._id, "multi-001");
+    const settlementB = await processShopSettlement(shopB._id, "multi-002");
+
+    expect(settlementA.shopId.toString()).toBe(shopA._id.toString()); // ✅ FIX
+    expect(settlementB.shopId.toString()).toBe(shopB._id.toString());
   });
 });

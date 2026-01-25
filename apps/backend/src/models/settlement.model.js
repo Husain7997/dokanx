@@ -1,54 +1,30 @@
 const mongoose = require("mongoose");
 
-const settlementSchema = new mongoose.Schema({
-  shop: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Shop",
-    required: true,
-    index: true,
-  },
-
-  periodStart: Date,
-  periodEnd: Date,
-
-  grossAmount: {
-    type: Number,
-    required: true,
-  },
-
-  platformFee: {
-    type: Number,
-    required: true,
-  },
-
-  netAmount: {
-    type: Number,
-    required: true,
-  },
-
-  orderIds: [
-    {
+const SettlementSchema = new mongoose.Schema(
+  {
+    shop: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Order",
+      ref: "Shop",
+      required: true,
+      index: true,
     },
-  ],
 
-  status: {
-    type: String,
-    enum: ["PENDING", "COMPLETED"],
-    default: "COMPLETED",
+    totalAmount: { type: Number, required: true },
+    commission: { type: Number, default: 0 },
+    netAmount: { type: Number, required: true },
+
+    orderCount: { type: Number, required: true },
+
+    status: {
+      type: String,
+      enum: ["PENDING", "COMPLETED", "FAILED"],
+      default: "PENDING",
+    },
+
+    payoutRef: String,
+    processedAt: Date,
   },
+  { timestamps: true }
+);
 
-  idempotencyKey: {
-    type: String,
-    unique: true,
-    sparse: true,
-  },
-
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
-
-module.exports = mongoose.model("Settlement", settlementSchema);
+module.exports = mongoose.model("Settlement", SettlementSchema);

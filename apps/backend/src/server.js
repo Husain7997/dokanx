@@ -2,11 +2,11 @@ require("dotenv").config();
 const mongoose = require("mongoose");
 const cron = require("node-cron");
 const app = require("./app");
-const connectDB = require("./config/db");
+// const connectDB = require("./config/db");
 const { processSettlements } = require("./modules/settlement/settlement.cron");
 
 (async () => {
-  await connectDB();
+  // await connectDB();
  if (process.env.NODE_ENV !== "test") {
     const cron = require("node-cron");
     const { processSettlements } = require("./modules/settlement/settlement.cron");

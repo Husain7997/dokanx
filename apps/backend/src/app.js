@@ -9,7 +9,12 @@ const adminRoutes = require("./routes/admin.routes");
 const paymentRoutes = require("./routes/payment.routes");
 const settlementRoutes = require("./routes/settlement.routes");
 const errorHandler = require("./utils/errorHandler");
+const { startAutoSettlementCron } = require("./jobs/autoSettlement.job");
+const reportRoutes = require("./routes/report.routes");
 
+
+
+// startAutoSettlementCron();
 
 dotenv.config();
 const app = express();
@@ -21,6 +26,7 @@ app.use("/api/payments/webhook",
   express.raw({ type: "application/json" })
 );
 
+
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/shops", shopRoutes);
@@ -28,7 +34,11 @@ app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/payments", paymentRoutes);
-// app.use("/api/settlements", settlementRoutes);
+app.use("/api/settlements", settlementRoutes);
+app.use("/api/reports", reportRoutes);
+
+
+
 
 
 

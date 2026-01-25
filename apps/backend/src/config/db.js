@@ -1,6 +1,21 @@
+// const mongoose = require("mongoose");
+
+// module.exports = async () => {
+//   const uri =
+//     process.env.NODE_ENV === "test"
+//       ? process.env.MONGO_URI_TEST
+//       : process.env.MONGO_URI;
+
+//   if (!uri) throw new Error("❌ Mongo URI missing");
+
+//   await mongoose.connect(uri);
+//   console.log("✅ MongoDB Connected");
+// };
 const mongoose = require("mongoose");
 
-module.exports = async () => {
+mongoose.set("bufferCommands", false); // ensures ops fail if connection not ready
+
+const connectDB = async () => {
   const uri =
     process.env.NODE_ENV === "test"
       ? process.env.MONGO_URI_TEST
@@ -8,6 +23,27 @@ module.exports = async () => {
 
   if (!uri) throw new Error("❌ Mongo URI missing");
 
-  await mongoose.connect(uri);
-  console.log("✅ MongoDB Connected");
+  if (mongoose.connection.readyState === 1) return; // already connected
+
+  await mongoose.connect(uri, {
+    serverSelectionTimeoutMS: 15000,
+    socketTimeoutMS: 45000,
+    maxPoolSize: 5,
+  });
+
+  console.log(
+    `✅ MongoDB connected [${process.env.NODE_ENV || "development"}]`
+  );
 };
+
+const disconnectDB = async () => {
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.connection.dropDatabase(); // clean DB after test run
+    await mongoose.connection.close();
+    console.log("✅ MongoDB disconnected");
+  }
+};
+
+module.exports = { connectDB, disconnectDB };
+
+
