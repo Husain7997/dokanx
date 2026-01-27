@@ -1,20 +1,32 @@
-
 const express = require("express");
 const router = express.Router();
 
-const { createShop } = require("../controllers/shop.controller");
+const {
+  createShop,
+  updateOrderStatus,
+  blockCustomer
+} = require('../controllers/shop.controller');
+
 const { protect } = require("../middlewares/auth.middleware");
 const role = require("../middlewares/role.middleware");
-const { blockCustomer } = require("../controllers/shop.controller");
 
+const canUpdateOrderStatus = (req, res, next) => next();
+console.log("protect TYPE:", typeof protect);
+console.log("role(owner) TYPE:", typeof role("owner"));
+console.log("blockCustomer TYPE:", typeof blockCustomer);
 
-console.log("createShop TYPE:", typeof createShop);
-console.log("createShop VALUE:", createShop);
 router.put(
   "/:shopId/block-user/:userId",
   protect,
   role("owner"),
   blockCustomer
+);
+
+router.put(
+  "/:id/status",
+  protect,
+  canUpdateOrderStatus,
+  updateOrderStatus
 );
 
 router.post(
@@ -23,5 +35,5 @@ router.post(
   role("owner"),
   createShop
 );
-// router.get("/", protect, getMyShops);
+
 module.exports = router;

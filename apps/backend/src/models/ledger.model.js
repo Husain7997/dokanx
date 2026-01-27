@@ -1,5 +1,14 @@
 const mongoose = require("mongoose");
-
+const LEDGER_SOURCES = [
+  'ORDER',
+  'SETTLEMENT',
+  'PAYOUT',
+  'REFUND',
+  'ADJUSTMENT',
+  'SYSTEM',   
+  'TAX', 
+   "WALLET_TOPUP"
+];
 const LedgerSchema = new mongoose.Schema(
   {
     shopId: {
@@ -22,7 +31,7 @@ type: {
 
     source: {
       type: String,
-      enum: ["ORDER", "REFUND", "WALLET_TOPUP", "SETTLEMENT"],
+      enum: LEDGER_SOURCES,
       required: true,
     },
 
@@ -47,4 +56,8 @@ type: {
 // 🔒 Idempotency guard
 LedgerSchema.index({ referenceId: 1, source: 1 }, { unique: true });
 
-module.exports = mongoose.model("Ledger", LedgerSchema);
+// module.exports = mongoose.model("Ledger", LedgerSchema);
+
+module.exports =
+  mongoose.models.Ledger ||
+  mongoose.model("Ledger", LedgerSchema);

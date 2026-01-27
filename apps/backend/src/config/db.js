@@ -13,7 +13,7 @@
 // };
 const mongoose = require("mongoose");
 
-mongoose.set("bufferCommands", false); // ensures ops fail if connection not ready
+mongoose.set("bufferCommands", false);
 
 const connectDB = async () => {
   const uri =
@@ -23,7 +23,11 @@ const connectDB = async () => {
 
   if (!uri) throw new Error("❌ Mongo URI missing");
 
-  if (mongoose.connection.readyState === 1) return; // already connected
+  if (mongoose.connection.readyState === 1) {
+  console.log("ℹ️ Mongo already connected");
+  return;
+}
+
 
   await mongoose.connect(uri, {
     serverSelectionTimeoutMS: 15000,
@@ -31,19 +35,14 @@ const connectDB = async () => {
     maxPoolSize: 5,
   });
 
-  console.log(
-    `✅ MongoDB connected [${process.env.NODE_ENV || "development"}]`
-  );
+  console.log(`✅ MongoDB connected [${process.env.NODE_ENV}]`);
 };
 
 const disconnectDB = async () => {
   if (mongoose.connection.readyState !== 0) {
-    await mongoose.connection.dropDatabase(); // clean DB after test run
     await mongoose.connection.close();
     console.log("✅ MongoDB disconnected");
   }
 };
 
 module.exports = { connectDB, disconnectDB };
-
-

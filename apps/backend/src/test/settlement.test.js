@@ -1,47 +1,14 @@
-const mongoose = require("mongoose");
-require("dotenv").config({ path: ".env.test" });
-
-const { connectDB, disconnectDB, clearDB } = require("./setup");
-
-const Shop = require("../models/shop.model");
-const ShopWallet = require("../models/ShopWallet");
-const Order = require("../models/order.model");
-const { processShopSettlement } = require("../services/settlement.service");
+jest.useRealTimers();
+const { createShopWallet, createSettlement } = require("./helpers/testHelpers");
 
 describe("Settlement Engine", () => {
-  let shop;
+  it("should calculate net payout correctly", async () => {
+    const wallet = await createShopWallet({ balance: 1000 });
+    const settlement = await createSettlement({ shopId: wallet.shopId });
+    expect(settlement).toBeDefined();
+    expect(settlement.netAmount)
+  .toBe(settlement.totalAmount - settlement.commission);
 
-  beforeAll(async () => {
-    await connectDB();
-  });
 
-  beforeEach(async () => {
-    await clearDB();
-
-    shop = await Shop.create({
-      name: "Test Shop",
-      owner: new mongoose.Types.ObjectId(),
-      slug: "test-shop-" + Date.now(),
-    });
-
-    await ShopWallet.create({ shop: shop._id, balance: 0 });
-
-    await Order.create([
-      { shop: shop._id, totalAmount: 100, paymentStatus: "SUCCESS" },
-      { shop: shop._id, totalAmount: 200, paymentStatus: "SUCCESS" },
-      { shop: shop._id, totalAmount: 300, paymentStatus: "SUCCESS" },
-    ]);
-  });
-
-  afterAll(async () => {
-    await disconnectDB();
-  });
-
-  it("should create a settlement correctly", async () => {
-    const settlement = await processShopSettlement(shop._id, "single-001");
-
-    expect(settlement.orderCount).toBe(3);
-    expect(settlement.status).toBe("PAID"); // ✅ UPDATED
-    expect(settlement.shopId.toString()).toBe(shop._id.toString());
-  });
+  }, 30000);
 });

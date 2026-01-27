@@ -11,7 +11,15 @@ const settlementRoutes = require("./routes/settlement.routes");
 const errorHandler = require("./utils/errorHandler");
 const { startAutoSettlementCron } = require("./jobs/autoSettlement.job");
 const reportRoutes = require("./routes/report.routes");
-
+const settlementAdminRoutes = require('./routes/admin/settlement.routes');
+const walletShopRoutes = require('./routes/shop/wallet.routes');
+const financeAdminRoutes = require('./routes/admin/finance.routes');
+const adjustmentAdminRoutes = require('./routes/admin/adjustment.routes');
+const complianceAdminRoutes = require('./routes/admin/compliance.routes');
+const accountingAdminRoutes = require('./routes/admin/accounting.routes');
+const taxAdminRoutes = require('./routes/admin/tax.routes');
+const payoutAdminRoutes = require('./routes/admin/payout.routes');
+const approvalAdminRoutes = require('./routes/admin/approval.routes');
 
 
 // startAutoSettlementCron();
@@ -36,6 +44,22 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/settlements", settlementRoutes);
 app.use("/api/reports", reportRoutes);
+app.use('/api/admin/settlements', settlementAdminRoutes );
+app.use('/api/shop/wallet',walletShopRoutes );
+app.use(
+  '/api/admin/finance',financeAdminRoutes);
+app.use(
+  '/api/admin/adjustments',
+adjustmentAdminRoutes);
+app.use(
+  '/api/admin/compliance', complianceAdminRoutes);
+app.use(
+  '/api/admin/accounting', accountingAdminRoutes);
+app.use('/api/admin/taxes', taxAdminRoutes);
+app.use('/api/admin/payouts', payoutAdminRoutes);
+app.use('/api/admin/approval', approvalAdminRoutes);
+
+
 
 
 

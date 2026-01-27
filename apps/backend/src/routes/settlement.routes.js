@@ -2,15 +2,15 @@ const express = require("express");
 const router = express.Router();
 
 const { protect } = require("../middlewares/auth.middleware");
-const {
-  createSettlement,
-  payoutSettlement,
-} = require("../controllers/settlement.controller");
+const allowRoles = require("../middlewares/rbac.middleware");
+const { createSettlement, payoutSettlement } = require("../controllers/settlement.controller");
+const adminCtrl = require("../controllers/admin/settlement.controller");
 
-// Create settlement (admin/internal)
-router.post("/", protect, createSettlement);
+router.use(protect);
+router.use(allowRoles("ADMIN"));
 
-// Payout a settlement
-router.post("/:settlementId/payout", protect, payoutSettlement);
+router.post("/", createSettlement);
+router.post("/process", adminCtrl.processSettlement);
+router.post("/:settlementId/payout", payoutSettlement);
 
 module.exports = router;

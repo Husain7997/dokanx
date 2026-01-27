@@ -1,8 +1,18 @@
 
 if (process.env.NODE_ENV === "test") {
-  module.exports = {};
-  return;
+  module.exports = {
+    startAutoSettlementCron: () => {}
+  };
+} else {
+  const cron = require("node-cron");
+
+  exports.startAutoSettlementCron = () => {
+    cron.schedule("0 0 * * *", async () => {
+      // real job
+    });
+  };
 }
+
 const cron = require("node-cron");
 const Shop = require("../models/shop.model");
 const { runAutoSettlement  } = require("../services/autoSettlement.service");

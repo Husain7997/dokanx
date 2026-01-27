@@ -34,6 +34,17 @@ exports.createShop = async (req, res) => {
   }
 };
 
+
+exports.updateOrderStatus = async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  res.json({
+    message: "Order status updated (stub)",
+    orderId: id,
+    status
+  });
+};
 /**
  * GET MY SHOPS
  */

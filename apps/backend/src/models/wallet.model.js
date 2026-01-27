@@ -22,6 +22,7 @@ available_balance: { type: Number, default: 0 },
       default: "BDT"
     },
 
+
     status: {
       type: String,
       enum: ["ACTIVE", "FROZEN"],

@@ -1,7 +1,7 @@
 
 
 
-const Settlement = require('../models/Settlement');
+const Settlement = require('../models/settlement.model');
 
 async function runAutoSettlement(shopId, key) {
   const settlement = await Settlement.findOneAndUpdate(

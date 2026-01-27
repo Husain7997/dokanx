@@ -1,46 +1,55 @@
 const mongoose = require("mongoose");
-require("dotenv").config({ path: ".env.test" });
+const dotenv = require("dotenv");
 
-mongoose.set("bufferCommands", false);
+// Load test env
+dotenv.config({
+  path: ".env.test",
+  override: true,
+});
 
-const connectDB = async () => {
-  const uri = process.env.MONGO_URI_TEST;
-  if (!uri) throw new Error("❌ Mongo URI missing in .env.test");
+if (!process.env.MONGO_URI_TEST) {
+  throw new Error("❌ MONGO_URI_TEST missing. Check .env.test");
+}
 
-  if (mongoose.connection.readyState === 1) return; // already connected
+jest.setTimeout(30000);
 
-  await mongoose.connect(uri, {
-    serverSelectionTimeoutMS: 15000,
-    socketTimeoutMS: 45000,
-    maxPoolSize: 5,
-  });
+// 🔹 Connect ONCE before all tests
+beforeAll(async () => {
+  if (mongoose.connection.readyState !== 1) {
+    await mongoose.connect(process.env.MONGO_URI_TEST, {
+      serverSelectionTimeoutMS: 15000,
+      socketTimeoutMS: 45000,
+      maxPoolSize: 5,
+    });
+    console.log("✅ MongoDB connected (test)");
+  }
+});
 
-  console.log("✅ MongoDB connected (test)");
-};
-
-const disconnectDB = async () => {
-  if (mongoose.connection.readyState !== 0) {
-    await mongoose.connection.close();
+// 🔹 Cleanup AFTER all tests
+afterAll(async () => {
+  if (mongoose.connection.readyState === 1) {
+    await mongoose.connection.dropDatabase();
+    await mongoose.disconnect();
     console.log("✅ MongoDB disconnected (test)");
   }
+});
+
+// 🔹 Auth mocks
+jest.mock("../middlewares/auth.middleware", () => ({
+  protect: (req, res, next) => {
+    req.user = { _id: "testUserId", role: "admin" };
+    next();
+  },
+  role: () => (req, res, next) => next(),
+}));
+
+jest.mock("../middlewares/shop.middleware", () => ({
+  protect: (req, res, next) => next(),
+}));
+
+// 🔹 Global helpers
+global.validLedgerValues = {
+  type: ["CREDIT", "DEBIT"],
+  source: ["SYSTEM", "USER"],
+  referenceType: ["ORDER", "SETTLEMENT", "REFUND"],
 };
-
-const clearDB = async () => {
-  if (mongoose.connection.readyState !== 1) {
-    throw new Error("DB not connected");
-  }
-
-  const collections = mongoose.connection.collections;
-  for (const key in collections) {
-    await collections[key].deleteMany({});
-    try {
-      await collections[key].dropIndexes();
-    } catch (err) {
-      if (err.codeName !== 'NamespaceNotFound') throw err;
-    }
-  }
-};
-
-
-
-module.exports = { connectDB, disconnectDB, clearDB };

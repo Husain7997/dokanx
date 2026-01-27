@@ -29,4 +29,6 @@ const PayoutSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model('Payout', PayoutSchema);
+// module.exports = mongoose.model('Payout', PayoutSchema);
+
+module.exports = mongoose.models.Payout || mongoose.model("Payout", PayoutSchema);

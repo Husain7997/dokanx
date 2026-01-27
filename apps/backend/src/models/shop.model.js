@@ -12,10 +12,11 @@ const shopSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("Shop", shopSchema);
+// module.exports = mongoose.model("Shop", shopSchema);
 
-
-
+module.exports =
+  mongoose.models.Shop ||
+  mongoose.model('Shop', shopSchema);
 
 
 // const mongoose = require("mongoose");

@@ -47,4 +47,7 @@ const paymentAttemptSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("PaymentAttempt", paymentAttemptSchema);
+// module.exports = mongoose.model("PaymentAttempt", paymentAttemptSchema);
+
+
+module.exports = mongoose.models.PaymentAttempt || mongoose.model("PaymentAttempt", paymentAttemptSchema);

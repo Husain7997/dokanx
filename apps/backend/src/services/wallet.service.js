@@ -4,62 +4,113 @@ const axios = require('axios');
 const ShopWallet = require('../models/ShopWallet');
 const Settlement = require('../models/settlement.model');
 
-exports.credit = async ({
-  shopId,
-  amount,
-  orderId,
-  source,
-}) => {
+
+
+
+exports.credit = async ({ shopId, amount, source, reference }) => {
   if (!shopId) throw new Error("shopId is required");
+  if (!amount) throw new Error("amount is required");
 
-  // 🔒 Idempotency check
-  const exists = await Ledger.findOne({
-    referenceType: "ORDER",
-    referenceId: orderId,
-    source,
-  });
-
+  // Idempotency check
+  const exists = await Ledger.findOne({ reference });
   if (exists) {
-    return { duplicate: true };
+    return { success: true, duplicate: true };
   }
 
-  // 🔥 Load wallet
-  let wallet = await Wallet.findOne({
-    ownerType: "SHOP",
-    ownerId: shopId,
-  });
+  const session = await Wallet.startSession();
+  session.startTransaction();
 
-  if (!wallet) {
-    wallet = await Wallet.create({
-      ownerType: "SHOP",
-      ownerId: shopId,
-      balance: 0,
-    });
+  try {
+    const wallet = await Wallet.findOne({ shopId }).session(session);
+    if (!wallet) throw new Error("Wallet not found");
+
+    wallet.balance += amount;
+    wallet.available_balance += amount;
+    wallet.withdrawable_balance += amount;
+
+    await wallet.save({ session });
+
+    const ledger = await Ledger.create(
+      [
+        {
+          shopId,
+          amount,
+          type: "CREDIT",
+          source: source || "SYSTEM",
+          reference,
+        },
+      ],
+      { session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return { success: true, wallet, ledger: ledger[0] };
+  } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+    throw err;
   }
-
-  const balanceBefore = wallet.balance;
-  const newBalance = balanceBefore + amount;
-
-  // 🔥 Ledger entry (SOURCE OF TRUTH)
-  await Ledger.create({
-    shopId,
-    type: "CREDIT",
-    amount,
-
-    source,                // "PAYMENT"
-    referenceType: "ORDER",
-    referenceId: orderId,
-
-    balanceBefore,
-    balanceAfter: newBalance,
-  });
-
-  // 🔁 Update wallet snapshot
-  wallet.balance = newBalance;
-  await wallet.save();
-
-  return { ok: true };
 };
+
+
+// exports.credit = async ({
+//   shopId,
+//   amount,
+//   orderId,
+//   source,
+// }) => {
+//   if (!shopId) throw new Error("shopId is required");
+
+//   // 🔒 Idempotency check
+//   const exists = await Ledger.findOne({
+//     referenceType: "ORDER",
+//     referenceId: orderId,
+//     source,
+//   });
+
+//   if (exists) {
+//     return { duplicate: true };
+//   }
+
+//   // 🔥 Load wallet
+//   let wallet = await Wallet.findOne({
+//     ownerType: "SHOP",
+//     ownerId: shopId,
+//   });
+
+//   if (!wallet) {
+//     wallet = await Wallet.create({
+//       ownerType: "SHOP",
+//       ownerId: shopId,
+//       balance: 0,
+//     });
+//   }
+
+//   const balanceBefore = wallet.balance;
+//   const newBalance = balanceBefore + amount;
+
+//   // 🔥 Ledger entry (SOURCE OF TRUTH)
+//   await Ledger.create({
+//     shopId,
+//     type: "CREDIT",
+//     amount,
+
+//     source,                // "PAYMENT"
+//     referenceType: "ORDER",
+//     referenceId: orderId,
+
+//     balanceBefore,
+//     balanceAfter: newBalance,
+//   });
+
+//   // 🔁 Update wallet snapshot
+//   wallet.balance = newBalance;
+//   await wallet.save();
+
+//   return { ok: true };
+// };
 
 
 exports.debit = async ({

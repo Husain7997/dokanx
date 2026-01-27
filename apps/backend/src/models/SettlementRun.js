@@ -45,4 +45,8 @@ settlementRunSchema.index(
   { unique: true, sparse: true }
 );
 
-module.exports = mongoose.model("SettlementRun", settlementRunSchema);
+// module.exports = mongoose.model("SettlementRun", settlementRunSchema);
+
+module.exports =
+  mongoose.models.SettlementRun ||
+  mongoose.model('SettlementRun', settlementRunSchema);

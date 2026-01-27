@@ -12,4 +12,6 @@ const payoutRetrySchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model("PayoutRetry", payoutRetrySchema);
+// module.exports = mongoose.model("PayoutRetry", payoutRetrySchema);
+
+module.exports = mongoose.models.PayoutRetry || mongoose.model("PayoutRetry", payoutRetrySchema);

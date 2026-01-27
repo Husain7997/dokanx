@@ -1,31 +1,19 @@
-jest.setTimeout(30000);
-const mongoose = require("mongoose");
-const { retryPayout } = require("../services/payoutRetry.service");
+jest.useRealTimers();
+const { createShopWallet } = require("./helpers/testHelpers");
+const { processPayout } = require("../services/payout.service");
+const Wallet = require("../models/wallet.model");
+
 
 describe("Payout Retry", () => {
-  beforeEach(() => {
-    jest.useFakeTimers();
-  });
+  it("should retry failed payout", async () => {
+    const { wallet } = await createShopWallet({ balance: 1000 });
+await Wallet.updateOne(
+  { _id: wallet._id },
+  { $set: { balance: 1000 } }
+);
 
-  afterEach(() => {
-    jest.useRealTimers();
-  });
+    const result = await processPayout(wallet._id);
 
-  it("should retry payout safely", async () => {
-    let executed = 0;
-
-    const retry = async () => {
-      executed++;
-      if (executed < 2) throw new Error("fail");
-      return true;
-    };
-
-    const promise = retry().catch(() => retry());
-
-    jest.runAllTimers();
-
-    await expect(promise).resolves.toBe(true);
-    expect(executed).toBe(2);
-  });
+    expect(result.status).toBe("SUCCESS");
+  }, 30000);
 });
-

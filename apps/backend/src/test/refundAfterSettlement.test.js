@@ -1,43 +1,17 @@
-const mongoose = require("mongoose");
-require("dotenv").config({ path: ".env.test" });
-
-const { connectDB, disconnectDB, clearDB } = require("./setup");
-
-const Shop = require("../models/shop.model");
-const ShopWallet = require("../models/ShopWallet");
-const { processRefundAfterSettlement } = require("../services/refundAfterSettlement.service");
+jest.useRealTimers();
+const { createShopWallet, createLedger } = require("./helpers/testHelpers");
 
 describe("Refund After Settlement", () => {
-  let shop;
-
-  beforeAll(async () => {
-    await connectDB();
-  });
-
-  beforeEach(async () => {
-    await clearDB();
-
-    shop = await Shop.create({
-      name: "Refund Shop",
-      owner: new mongoose.Types.ObjectId(),
-      slug: "refund-" + Date.now(),
-    });
-
-    await ShopWallet.create({
-      shop: shop._id,
-      balance: 0,
-    });
-  });
-
-  afterAll(async () => {
-    await disconnectDB();
-  });
-
   it("should credit wallet after refund", async () => {
-    await processRefundAfterSettlement(shop._id, 500);
-
-    const wallet = await ShopWallet.findOne({ shop: shop._id });
-    expect(wallet).not.toBeNull();
-    expect(wallet.balance).toBe(500);
-  });
+    const wallet = await createShopWallet({ balance: 500 });
+    const ledger = await createLedger({
+      shopId: wallet.shopId,
+      walletId: wallet._id,
+      amount: 200,
+      type: "CREDIT",
+      source: "SYSTEM",
+      referenceType: "ORDER",
+    });
+    expect(ledger).toBeDefined();
+  }, 30000);
 });

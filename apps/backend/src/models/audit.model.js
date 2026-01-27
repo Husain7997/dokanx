@@ -15,7 +15,13 @@ const auditSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("AuditLog", auditSchema);
+// module.exports = mongoose.model("AuditLog", auditSchema);
+
+
+module.exports =
+  mongoose.models.AuditLog ||
+  mongoose.model("AuditLog", auditSchema);
+
 
 exports.createAudit = async ({
   action,
