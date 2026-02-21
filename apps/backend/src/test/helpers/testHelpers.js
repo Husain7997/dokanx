@@ -50,43 +50,54 @@ async function createShop(overrides = {}) {
 }
 
 // 🔹 Create wallet
-async function createShopWallet(overrides = {}) {
+
+
+// 🔹 Create wallet (FIXED)
+async function createShopWallet({ balance = 0 } = {}) {
   await ensureConnected();
 
-  const shop = overrides.shop || (await createShop());
+  const owner = await createUser();
+  const shop = await Shop.create({
+    name: 'Test Shop ' + Date.now(),
+    owner: owner._id,
+  });
 
-const wallet = await Wallet.create({
-  shopId: shop._id,
-  balance: overrides.balance || 0,
-  withdrawable_balance: overrides.balance || 0, // 🔥 ADD THIS
-  currency: "BDT",
-});
+  const wallet = await Wallet.create({
+    shopId: shop._id, // ✅ MUST MATCH SCHEMA
+    balance: balance,
+    available_balance: balance,
+    withdrawable_balance: balance,
+    currency: 'BDT',
+    status: 'ACTIVE',
+  });
 
-
-  return {
-    wallet,
-    shopId: shop._id,
-  };
+  return { shop, wallet, owner };
 }
+
 
 // 🔹 Create ledger entry
 async function createLedger(overrides = {}) {
   await ensureConnected();
 
+  const shopId =
+    overrides.shopId ||
+    (overrides.walletId
+      ? (await Wallet.findById(overrides.walletId))?.shopId
+      : null);
+
+  if (!shopId) {
+    throw new Error('shopId is required for ledger');
+  }
+
   return await Ledger.create({
-    shopId: overrides.shopId,
-
+    shopId,
+    walletId: overrides.walletId,
     amount: overrides.amount ?? 100,
-
-    type: overrides.type || "CREDIT",
-
-    // ✅ MUST match Ledger enum
-    source: overrides.source || "SETTLEMENT",
-    referenceType: overrides.referenceType || "SETTLEMENT",
-
-    referenceId: overrides.referenceId || "REF-" + Date.now(),
-
-    balanceAfter: overrides.balanceAfter ?? 100,
+    type: overrides.type ?? 'CREDIT',
+    source: overrides.source ?? 'SYSTEM',
+    referenceType: overrides.referenceType ?? 'TEST',
+    reference: overrides.reference ?? 'TEST',
+    balanceAfter: overrides.balanceAfter ?? 0,
   });
 }
 

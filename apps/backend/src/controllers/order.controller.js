@@ -4,6 +4,9 @@ const { createAudit } = require("../utils/audit.util");
 const crypto = require("crypto");
 const InventoryService = require("../services/Inventory.service");
 const PaymentAttempt = require("../models/paymentAttempt.model");
+const {
+  createInventoryEntry,
+} = require("../services/inventoryLedger.service");
 
 const {
   reserveStock,
@@ -116,8 +119,13 @@ exports.placeOrder = async (req, res) => {
       status: "PLACED",
     });
 
-
-
+for (const item of orderItems) {
+  await reserveStock({
+    shopId: shop._id,
+    productId: item.product,
+    quantity: item.quantity,
+  });
+}
 
     await order.save();
 
@@ -244,7 +252,9 @@ if (order.status === "SHIPPED" && nextStatus === "DELIVERED") {
 if (order.status === "DELIVERED" && nextStatus === "REFUNDED") {
   await InventoryService.rollbackStockOnRefund(order);
 }
-
+if (nextStatus === "CANCELLED") {
+  await releaseStock(order);
+}
     order.status = nextStatus;
 
     await order.save();

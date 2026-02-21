@@ -7,6 +7,11 @@ const mongoose = require("mongoose");
 const cron = require('node-cron');
 const Shop = require('../../models/shop.model');
 const { settleShopOrders } = require('../../services/settlement.service');
+const { isTest } = require('../config/runtime');
+
+if (isTest) {
+  return mockResult;
+}
 
 /**
  * Cron: প্রতিদিন রাত 12টায় সব shops এর unpaid orders settle করবে

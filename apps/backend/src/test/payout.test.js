@@ -17,7 +17,8 @@ describe("Payout Gateway", () => {
       }
     );
 
-    const result = await processPayout(wallet._id);
+    const result = await processPayout({ walletId: wallet._id });
+
 
     expect(result.status).toBe("SUCCESS");
   }, 30000);

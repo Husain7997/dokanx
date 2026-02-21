@@ -1,6 +1,8 @@
 const Inventory = require("../models/Inventory.model");
 const InventoryTransaction = require("../models/inventoryTransaction.model");
-
+const {
+  createInventoryEntry,
+} = require("./inventoryLedger.service");
 /**
  * Reserve stock when order is CONFIRMED
  */
@@ -65,9 +67,15 @@ const getInventoryByProduct = async ({ shopId, productId }) => {
  */
 const deductStockOnDelivery = async (order) => {
   for (const item of order.items) {
-    const inventory = await Inventory.findOne({
+    const inventory =  await createInventoryEntry({
+      shop: order.shop,
       product: item.product,
-      shop: order.shop
+      type: "SALE",
+      quantity: item.quantity,
+      direction: "OUT",
+      referenceId: order._id,
+      referenceModel: "Order",
+      userId: order.user,
     });
 
     if (!inventory) {
@@ -93,9 +101,15 @@ const deductStockOnDelivery = async (order) => {
 
 const rollbackStockOnRefund = async (order) => {
   for (const item of order.items) {
-    const inventory = await Inventory.findOne({
+    const inventory = await createInventoryEntry({
+      shop: order.shop,
       product: item.product,
-      shop: order.shop
+      type: "RETURN",
+      quantity: item.quantity,
+      direction: "IN",
+      referenceId: order._id,
+      referenceModel: "Order",
+      userId: order.user,
     });
 
     if (!inventory) {

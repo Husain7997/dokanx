@@ -14,6 +14,9 @@ const PaymentAttempt = require("../models/paymentAttempt.model");
 const { handlePaymentWebhook } = require("../services/payment.service");
 const paymentService = require("../services/payment.service");
 const Settlement = require("../models/settlement.model");
+const { ensureIdempotent } = require('../utils/idempotency');
+// const features = require('../config/features');
+
 
 
 console.log("✅ payment.controller.js LOADED");
@@ -122,6 +125,11 @@ exports.paymentWebhook = async (req, res, next) => {
   const { order, payment } = req.body;
 
   try {
+    await ensureIdempotent(
+  req.headers['idempotency-key'] || req.body.eventId,
+  'payment'
+);
+
    await paymentService.handlePaymentWebhook(req.body);
 
     return res.json({

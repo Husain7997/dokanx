@@ -1,8 +1,8 @@
 const router = require('express').Router();
 const ctrl = require('../../controllers/admin/compliance.controller');
-const { protect } = require('../../middlewares/auth.middleware');
+const { protect, allowRoles } = require('../../middlewares');
 router.use(protect); 
-const allowRoles = require('../../middlewares/rbac.middleware');
+// const allowRoles = require('../../middlewares/rbac.middleware');
 
 router.use(protect );
 router.use(allowRoles('ADMIN'));

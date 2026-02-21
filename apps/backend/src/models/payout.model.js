@@ -3,27 +3,64 @@ const mongoose = require('mongoose');
 
 const PayoutSchema = new mongoose.Schema(
   {
-    shop: {
+    shopId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Shop',
       required: true,
+    },
+    // shop: {
+    //     type: mongoose.Schema.Types.ObjectId,
+    //     ref: 'Shop',
+    //     required: true,
+    //     index: true,
+    //   },
+    initiatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
     },
     amount: {
       type: Number,
       required: true,
       min: 0,
     },
-    status: {
+ status: {
+  type: String,
+  enum: ['PENDING', 'PROCESSING', 'SUCCESS', 'FAILED'],
+  default: 'PENDING',
+},
+
+    type: {
       type: String,
-      enum: ['PENDING', 'COMPLETED', 'FAILED'],
-      default: 'PENDING',
+        enum: ['AUTO', 'MANUAL'],
+      // enum: ['ADMIN_INITIATED', 'SHOP_REQUESTED'],
+      required: true,
     },
+    idempotencyKey: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+    requestedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    approvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+
+    reference: {
+      type: String,
+      unique: true,
+    },
+    executedAt: Date,
     payoutDate: {
       type: Date,
       default: Date.now,
     },
     transactionId: {
-      type: String, // Optional, external payment reference
+      type: String,
     },
   },
   { timestamps: true }

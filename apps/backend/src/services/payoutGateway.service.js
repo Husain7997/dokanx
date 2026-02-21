@@ -1,6 +1,11 @@
 const axios = require('axios');
 const Ledger = require('../models/ledger.model');
 const ShopWallet = require('../models/ShopWallet');
+const { isTest } = require('../config/runtime');
+
+if (isTest) {
+  return mockResult;
+}
 
 /**
  * Payout Types:

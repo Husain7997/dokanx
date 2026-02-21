@@ -3,9 +3,9 @@ const { createShopWallet, createLedger } = require("./helpers/testHelpers");
 
 describe("Refund After Settlement", () => {
   it("should credit wallet after refund", async () => {
-    const wallet = await createShopWallet({ balance: 500 });
+    const { shop, wallet } = await createShopWallet({ balance: 500 });
     const ledger = await createLedger({
-      shopId: wallet.shopId,
+      shopId: shop._id,
       walletId: wallet._id,
       amount: 200,
       type: "CREDIT",

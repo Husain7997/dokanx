@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { protect } = require('../middlewares/auth.middleware');
+const { protect } = require('../middlewares');
 const tenant = require('../middlewares/tenant.middleware');
 const allowRoles = require('../middlewares/role.middleware');
 const checkUserNotBlocked = require("../middlewares/checkUserNotBlocked");
@@ -22,7 +22,7 @@ console.log("updateOrderStatus TYPE:", typeof updateOrderStatus);
 // CUSTOMER → order create
 router.post(
   "/",
-  resolveShop,
+  // resolveShop,
   optionalAuth,
   tenant,
   checkUserNotBlocked,

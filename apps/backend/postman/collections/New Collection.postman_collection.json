@@ -11,27 +11,26 @@
         {
           "listen": "prerequest",
           "script": {
-            "id": "2abe9030-8a66-4242-8448-598f23658d69",
+            "id": "f367fe5b-e4bb-4980-93dd-c4546c48a5f2",
             "exec": [
-              "const secret = pm.environment.get(\"WEBHOOK_SECRET\");\r",
+              "// const secret = pm.environment.get(\"WEBHOOK_SECRET\");\r",
               "\r",
-              "if (!secret) {\r",
-              "  throw new Error(\"❌ WEBHOOK_SECRET is missing in Postman environment\");\r",
-              "}\r",
+              "// if (!secret) {\r",
+              "//   throw new Error(\"❌ WEBHOOK_SECRET is missing in Postman environment\");\r",
+              "// }\r",
+              "// // \r",
+              "// const rawBody = pm.request.body.raw;\r",
+              "// const crypto = require(\"crypto\");\r",
               "\r",
-              "const body = pm.request.body.raw;\r",
-              "const crypto = require(\"crypto\");\r",
+              "// const signature = crypto\r",
+              "//   .createHmac(\"sha256\", secret)\r",
+              "//   .update(rawBody)\r",
+              "//   .digest(\"hex\");\r",
               "\r",
-              "const signature = crypto\r",
-              "  .createHmac(\"sha256\", secret)\r",
-              "  .update(body)\r",
-              "  .digest(\"hex\");\r",
-              "\r",
-              "pm.request.headers.upsert({\r",
-              "  key: \"x-webhook-signature\",\r",
-              "  value: signature\r",
-              "});\r",
-              ""
+              "// pm.request.headers.upsert({\r",
+              "//   key: \"x-webhook-signature\",\r",
+              "//   value: signature\r",
+              "// });"
             ],
             "type": "text/javascript",
             "packages": {},
@@ -41,7 +40,7 @@
         {
           "listen": "test",
           "script": {
-            "id": "b6b6e24e-27c4-4cc4-a880-260b68c64b0e",
+            "id": "8c0cd674-8b60-433a-baac-909675cd19fe",
             "exec": [
               ""
             ],
@@ -57,10 +56,9 @@
         "header": [
           {
             "key": "Authorization",
-            "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OTU4ZTEyNjFjNTRiNDNjZTBkOTM2MzMiLCJpYXQiOjE3Njg2NjUxOTgsImV4cCI6MTc2OTI2OTk5OH0.TNSZ85__QJ5a071dl1T-kKA0YP4_EaiUYKuAPRMAb9g",
+            "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5N2E0NDM3ZDdkNmEzZDdiMjI0OGM1MyIsInJvbGUiOiJPV05FUiIsInNob3BJZCI6bnVsbCwiaWF0IjoxNzY5NjIwNTM1LCJleHAiOjE3NzAyMjUzMzV9.4WsCTPNy788fDVy_XkvIQ-ij-HMuEun_Z5XZUeGluGs",
             "type": "text",
-            "uuid": "8bdbca8e-b255-4b02-a422-3bd583442670",
-            "disabled": true
+            "uuid": "8bdbca8e-b255-4b02-a422-3bd583442670"
           },
           {
             "key": "Content-Type",
@@ -93,7 +91,8 @@
             "key": "x-webhook-signature",
             "value": "{{webhook_signature}}",
             "type": "text",
-            "uuid": "25ff2771-fa3a-479e-ba5f-8b22aca2f15b"
+            "uuid": "25ff2771-fa3a-479e-ba5f-8b22aca2f15b",
+            "disabled": true
           },
           {
             "key": "x-webhook-signature",
@@ -105,7 +104,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\r\n  \"gateway\": \"SSLCOMMERZ\",\r\n  \"trx_id\": \"TXN123456\",\r\n  \"status\": \"SUCCESS\",\r\n  \"amount\": 500,\r\n  \"currency\": \"BDT\",\r\n  \"customer_id\": \"6958e1261c54b43ce0d93633\",\r\n  \"shop_id\": \"6959260cd48200ef8a348a12\",\r\n  \"paid_at\": \"2026-01-18T12:30:00Z\"\r\n}\r\n",
+          "raw": "// {\r\n//   \"status\": \"SUCCESS\",\r\n//   \"providerPaymentId\": \"pay_696f39dd3810f43c54a9a26f\"\r\n// }\r\n{\r\n  \"email\": \"owner@shop.com\",\r\n  \"password\": \"123456\",\r\n  \"role\": \"OWNER\"\r\n}\r\n\r\n\r\n//  { \"amount\": 500 }",
           "options": {
             "raw": {
               "language": "json"
@@ -113,16 +112,16 @@
           }
         },
         "url": {
-          "raw": "http://localhost:5000/api/payments/webhook",
+          "raw": "http://localhost:5001/api/auth/register",
           "protocol": "http",
           "host": [
             "localhost"
           ],
-          "port": "5000",
+          "port": "5001",
           "path": [
             "api",
-            "payments",
-            "webhook"
+            "auth",
+            "register"
           ]
         }
       },

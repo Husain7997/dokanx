@@ -9,7 +9,10 @@ const WalletSchema = new mongoose.Schema(
       unique: true,
       index: true
     },
-
+isFrozen: {
+  type: Boolean,
+  default: false,
+},
     balance: {
       type: Number,
       default: 0

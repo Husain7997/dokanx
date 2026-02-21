@@ -4,10 +4,10 @@ const Wallet = require("../models/wallet.model"); // ✅ ADD
 
 describe("Refund & Adjustment", () => {
   it("should apply manual adjustment", async () => {
-    const { wallet } = await createShopWallet({ balance: 1000 });
+    const { shop, wallet } = await createShopWallet({ balance: 1000 });
 
     const ledger = await createLedger({
-      shopId: wallet.shopId,
+      shopId: shop._id,
       walletId: wallet._id,
       amount: 100,
       type: "CREDIT",

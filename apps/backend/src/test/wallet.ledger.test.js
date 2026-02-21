@@ -4,9 +4,9 @@ const { createShopWallet, createLedger } = require("./helpers/testHelpers");
 
 describe("Wallet & Ledger", () => {
   it("should credit wallet", async () => {
-    const wallet = await createShopWallet({ balance: 0 });
+    const { shop, wallet } = await createShopWallet({ balance: 0 });
     const ledger = await createLedger({
-      shopId: wallet.shopId,
+      shopId: shop._id,
       walletId: wallet._id,
       amount: 500,
       type: "CREDIT",

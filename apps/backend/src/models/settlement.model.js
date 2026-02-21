@@ -19,13 +19,13 @@ taxAmount: {
   type: Number,
   default: 0,
 },
-
-    shop: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Shop",
-      required: true,
-      index: true,
-    },
+ netPayout: Number,
+    // shop: {
+    //   type: mongoose.Schema.Types.ObjectId,
+    //   ref: "Shop",
+    //   required: true,
+    //   index: true,
+    // },
 
     totalAmount: { type: Number, required: true },
     commission: { type: Number, default: 0 },

@@ -1,48 +1,30 @@
-// const mongoose = require("mongoose");
+// apps/backend/src/config/db.js
 
-// module.exports = async () => {
-//   const uri =
-//     process.env.NODE_ENV === "test"
-//       ? process.env.MONGO_URI_TEST
-//       : process.env.MONGO_URI;
+const mongoose = require('mongoose');
+const { MONGO_URI } = require('./env');
 
-//   if (!uri) throw new Error("❌ Mongo URI missing");
+let isConnected = false;
 
-//   await mongoose.connect(uri);
-//   console.log("✅ MongoDB Connected");
-// };
-const mongoose = require("mongoose");
+async function connectDB() {
+  if (isConnected) return;
 
-mongoose.set("bufferCommands", false);
-
-const connectDB = async () => {
-  const uri =
-    process.env.NODE_ENV === "test"
-      ? process.env.MONGO_URI_TEST
-      : process.env.MONGO_URI;
-
-  if (!uri) throw new Error("❌ Mongo URI missing");
-
-  if (mongoose.connection.readyState === 1) {
-  console.log("ℹ️ Mongo already connected");
-  return;
-}
-
-
-  await mongoose.connect(uri, {
-    serverSelectionTimeoutMS: 15000,
-    socketTimeoutMS: 45000,
-    maxPoolSize: 5,
+  await mongoose.connect(MONGO_URI, {
+    autoIndex: true,
   });
 
-  console.log(`✅ MongoDB connected [${process.env.NODE_ENV}]`);
-};
+  isConnected = true;
+  console.log('🟢 MongoDB connected');
+}
 
-const disconnectDB = async () => {
-  if (mongoose.connection.readyState !== 0) {
-    await mongoose.connection.close();
-    console.log("✅ MongoDB disconnected");
-  }
-};
+async function disconnectDB() {
+  if (!isConnected) return;
 
-module.exports = { connectDB, disconnectDB };
+  await mongoose.disconnect();
+  isConnected = false;
+  console.log('🟡 MongoDB disconnected');
+}
+
+module.exports = {
+  connectDB,
+  disconnectDB,
+};

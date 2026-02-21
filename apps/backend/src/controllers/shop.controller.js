@@ -4,36 +4,63 @@ const { createAudit } = require("../utils/audit.util");
 /**
  * CREATE SHOP (Admin / Owner)
  */
+
+// exports.createShop = async (req, res) => {
+//   try {
+//     const existing = await Shop.findOne({ owner: req.user.id });
+//     if (existing) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Shop already exists',
+//       });
+//     }
+
+//     const shop = await Shop.create({
+//       name: req.body.name,
+//       owner: req.user.id, // ✅ FIXED
+//     });
+
+//     return res.status(201).json({
+//       success: true,
+//       data: shop,
+//     });
+//   } catch (err) {
+//     console.error(err);
+//     return res.status(500).json({
+//       success: false,
+//       message: 'Shop create failed',
+//     });
+//   }
+// };
+
 exports.createShop = async (req, res) => {
   try {
-    const { name, description } = req.body;
-
-    if (!name) {
-      return res.status(400).json({
-        success: false,
-        message: "Shop name is required",
-      });
-    }
+    const userId = req.user.id;
 
     const shop = await Shop.create({
-      name,
-      description,
-      owner: req.user._id,
+      name: req.body.name,
+      subdomain: req.body.subdomain,
+      owner: userId,
+    });
+
+    // ✅ IMPORTANT FIX
+    await User.findByIdAndUpdate(userId, {
+      shop: shop._id,
+      role: 'OWNER',
     });
 
     res.status(201).json({
       success: true,
-      data: shop,
+      shop,
     });
-  } catch (error) {
-    console.error("CREATE SHOP ERROR:", error);
+  } catch (err) {
+    console.error(err);
     res.status(500).json({
       success: false,
-      message: "Shop create failed",
+      message: 'Shop creation failed',
     });
   }
 };
-
 
 exports.updateOrderStatus = async (req, res) => {
   const { id } = req.params;

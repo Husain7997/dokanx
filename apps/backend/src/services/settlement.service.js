@@ -1,5 +1,10 @@
 const Settlement = require("../models/settlement.model");
 const Wallet = require("../models/wallet.model");
+const bus =
+require("../infrastructure/events/eventBus");
+const audit =
+require("../infrastructure/audit/audit.service");
+
 
 exports.processSettlement = async ({
   shopId,
@@ -16,13 +21,25 @@ exports.processSettlement = async ({
   const netAmount = grossAmount - fee;
 
   const settlement = await Settlement.create({
-    shopId,
-    grossAmount,
-    fee,
-    netAmount,
-    status: "COMPLETED",
-    idempotencyKey,
-  });
+  shopId,
+  totalAmount,
+  commission,
+  netPayout,
+  idempotencyKey,
+});
+
+
+
+await audit.record({
+  actor: "system",
+  action: "SETTLEMENT_COMPLETED",
+  entity: shopId,
+});
+
+
+bus.emit("SETTLEMENT_COMPLETED", {
+  shopId,
+});
 
   const wallet = await Wallet.findOne({ shopId });
   if (!wallet) throw new Error("Wallet not found");

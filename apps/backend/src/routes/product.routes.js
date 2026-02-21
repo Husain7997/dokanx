@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const productController = require("../controllers/product.controller");
-const { protect } = require("../middlewares/auth.middleware");
+const { protect } = require("../middlewares");
 const role = require("../middlewares/role.middleware");
 const checkShopOwnership = require("../middlewares/checkShopOwnership");
 const { resolveShop } = require("../middlewares/shop.middleware");
