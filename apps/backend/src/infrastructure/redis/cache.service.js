@@ -1,4 +1,4 @@
-const redis = require("./redis.client");
+const { redis } = require("@/core/infrastructure");
 
 exports.get = async (key) => {
   const data = await redis.get(key);

@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const paymentAttemptSchema = new mongoose.Schema(
   {
-    shop: {
+    shopId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Shop",
       required: true
@@ -39,15 +39,20 @@ const paymentAttemptSchema = new mongoose.Schema(
 
     processed: {
       type: Boolean,
-      default: false
+      default: false,
+      index: true,
     },
 
-    processedAt: Date
+    processedAt: Date,
+    webhookEventId: {
+  type: String,
+  index: true,
+},
   },
   { timestamps: true }
 );
 
-// module.exports = mongoose.model("PaymentAttempt", paymentAttemptSchema);
+
 
 
 module.exports = mongoose.models.PaymentAttempt || mongoose.model("PaymentAttempt", paymentAttemptSchema);

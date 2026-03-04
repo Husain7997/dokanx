@@ -6,7 +6,7 @@ const { createAudit } = require("../utils/audit.util");
 
 exports.getAllUsers = async (req, res) => {
   const users = await User.find();
-  res.json({ success: true, data: users });
+  res.json({ message: t('common.updated', req.lang), data: users });
 };
 
 exports.blockUser = async (req, res) => {
@@ -24,7 +24,7 @@ exports.blockUser = async (req, res) => {
     req,
   });
 
-  res.json({ success: true, data: user });
+  res.json({ message: t('common.updated', req.lang), data: user });
 };
 
 exports.unblockUser = async (req, res) => {
@@ -42,7 +42,7 @@ exports.unblockUser = async (req, res) => {
     req,
   });
 
-  res.json({ success: true, data: user });
+  res.json({ message: t('common.updated', req.lang), data: user });
 };
 
 exports.approveShop = async (req, res) => {
@@ -58,7 +58,7 @@ exports.approveShop = async (req, res) => {
   targetId: shop._id,
   req,
 });
-  res.json({ success: true, data: shop });
+  res.json({ message: t('common.updated', req.lang), data: shop });
 };
 
 exports.suspendShop = async (req, res) => {
@@ -74,16 +74,16 @@ exports.suspendShop = async (req, res) => {
   targetId: shop._id,
   req
 });
-  res.json({ success: true, data: shop });
+  res.json({ message: t('common.updated', req.lang), data: shop });
  
 };
 
 exports.getAllOrders = async (req, res) => {
   const orders = await Order.find().populate("user shop");
-  res.json({ success: true, data: orders });
+  res.json({ message: t('common.updated', req.lang), data: orders });
 };
 
 exports.getAuditLogs = async (req, res) => {
   const logs = await Audit.find().sort({ createdAt: -1 });
-  res.json({ success: true, data: logs });
+  res.json({ message: t('common.updated', req.lang), data: logs });
 };

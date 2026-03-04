@@ -2,46 +2,38 @@ const mongoose = require("mongoose");
 
 const shopSchema = new mongoose.Schema(
   {
-    name: String,
+    name: {
+      type: String,
+      required: true,
+    },
+
     domain: String,
-    owner: { type: mongoose.Schema.Types.ObjectId, required: true },
+
+    owner: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+
+    // ✅ ADD THIS
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+
+    // ✅ Future ready
+    status: {
+      type: String,
+      enum: ["ACTIVE", "SUSPENDED"],
+      default: "ACTIVE",
+    },
   },
   {
     timestamps: true,
-    bufferCommands: false, // 🔥 THIS IS THE FIX
+    bufferCommands: false,
   }
 );
 
-// module.exports = mongoose.model("Shop", shopSchema);
-
 module.exports =
   mongoose.models.Shop ||
-  mongoose.model('Shop', shopSchema);
-
-
-// const mongoose = require("mongoose");
-
-// const shopSchema = new mongoose.Schema(
-//   {
-//     name: { type: String, required: true },
-//     slug: { type: String, unique: true }, // index already here
-//     owner: {
-//       type: mongoose.Schema.Types.ObjectId,
-//       ref: "User",
-//       required: true,
-//     },
-//     blockedCustomers: [
-//   {
-//     type: mongoose.Schema.Types.ObjectId,
-//     ref: "User"
-//   }
-// ],
-//     isActive: { type: Boolean, default: false },
-//   },
-//   { timestamps: true }
-// );
-
-// shopSchema.index({ owner: 1 });
-// // shopSchema.index({ slug: 1 }, { unique: true });
-// module.exports =  mongoose.models.Shop || mongoose.model("Shop", shopSchema);
-
+  mongoose.model("Shop", shopSchema);

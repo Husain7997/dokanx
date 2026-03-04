@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const User = require("../../models/user.model");
 const Shop = require("../../models/shop.model");
 const Wallet = require("../../models/wallet.model");
-const Ledger = require("../../models/ledger.model");
+const Ledger = require("../../modules/ledger/ledger.model");
 const Settlement = require("../../models/settlement.model");
 const TaxRule = require("../../models/TaxRule");
 
@@ -108,7 +108,7 @@ async function createSettlement(overrides = {}) {
   await ensureConnected();
 
   return Settlement.create({
-    shop: overrides.shopId,        // ✅ REQUIRED
+    shopId: overrides.shopId,        // ✅ REQUIRED
     shopId: overrides.shopId,      // ✅ REQUIRED
     idempotencyKey:
       overrides.idempotencyKey || `settle-${Date.now()}`,

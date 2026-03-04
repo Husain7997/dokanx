@@ -12,6 +12,6 @@ const taxRuleSchema = new mongoose.Schema({
   active: { type: Boolean, default: true }
 });
 
-// module.exports = mongoose.model('TaxRule', taxRuleSchema);
+
 
 module.exports = mongoose.models.TaxRule || mongoose.model("TaxRule", taxRuleSchema);

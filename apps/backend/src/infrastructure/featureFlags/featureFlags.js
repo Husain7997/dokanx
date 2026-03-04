@@ -1,5 +1,4 @@
-const redis =
-require("../redis/redis.client");
+const { redis } = require("@/core/infrastructure");
 
 exports.isEnabled =
 async (tenantId, feature) => {

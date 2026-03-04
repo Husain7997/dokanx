@@ -12,11 +12,11 @@ exports.createSettlement = async (req, res) => {
     const shop = await Shop.findById(shopId);
     if (!shop) return res.status(404).json({ message: "Shop not found" });
 
-    const wallet = await ShopWallet.findOne({ shop: shopId });
+    const wallet = await ShopWallet.findOne({ shopId: shopId });
     if (!wallet) return res.status(404).json({ message: "Shop wallet not found" });
 
     const settlement = await Settlement.create({
-      shop: shopId,
+      shopId: shopId,
       totalAmount,
       status: "pending",
     });

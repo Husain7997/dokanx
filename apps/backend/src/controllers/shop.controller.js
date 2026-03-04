@@ -1,66 +1,64 @@
 const Shop = require("../models/shop.model");
 const User = require("../models/user.model");
 const { createAudit } = require("../utils/audit.util");
-/**
- * CREATE SHOP (Admin / Owner)
- */
+const jwt = require("jsonwebtoken");
+const { t } =
+  require('@/core/infrastructure');
 
-// exports.createShop = async (req, res) => {
-//   try {
-//     const existing = await Shop.findOne({ owner: req.user.id });
-//     if (existing) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Shop already exists',
-//       });
-//     }
 
-//     const shop = await Shop.create({
-//       name: req.body.name,
-//       owner: req.user.id, // ✅ FIXED
-//     });
-
-//     return res.status(201).json({
-//       success: true,
-//       data: shop,
-//     });
-//   } catch (err) {
-//     console.error(err);
-//     return res.status(500).json({
-//       success: false,
-//       message: 'Shop create failed',
-//     });
-//   }
-// };
 
 exports.createShop = async (req, res) => {
   try {
-    const userId = req.user.id;
+
+    if (req.user.shopId) {
+      return res.status(400).json({
+        success: false,
+        message: "User already owns a shop",
+      });
+    }
 
     const shop = await Shop.create({
       name: req.body.name,
-      subdomain: req.body.subdomain,
-      owner: userId,
+      currency: req.body.currency,
+      timezone: req.body.timezone,
+      locale: req.body.locale,
+      owner: req.user._id,
+      isActive: true,
     });
+await User.findByIdAndUpdate(
+  req.user._id,
+  { shopId: shop._id }
+);
+res.status(201).json({
+  success: true,
+  shop
+});
+    req.user.shopId = shop._id;
+    await req.user.save();
 
-    // ✅ IMPORTANT FIX
-    await User.findByIdAndUpdate(userId, {
-      shop: shop._id,
-      role: 'OWNER',
+    await createAudit({
+      action: "CREATE_SHOP",
+      performedBy: req.user._id,
+      targetType: "Shop",
+      targetId: shop._id,
+      req
     });
 
     res.status(201).json({
       success: true,
       shop,
     });
+
   } catch (err) {
-    console.error(err);
+    console.error("CREATE SHOP ERROR:", err);
+
     res.status(500).json({
       success: false,
-      message: 'Shop creation failed',
+      message: err.message,
     });
   }
 };
+
 
 exports.updateOrderStatus = async (req, res) => {
   const { id } = req.params;
@@ -80,7 +78,7 @@ exports.getMyShops = async (req, res) => {
     const shops = await Shop.find({ owner: req.user._id });
 
     res.json({
-      success: true,
+      message: t('common.updated', req.lang),
       data: shops,
     });
   } catch (error) {
@@ -100,13 +98,21 @@ exports.approveShop = async (req, res) => {
         message: "Shop not found",
       });
     }
+
+    await createAudit({
+      action: "APPROVE_SHOP",
+      performedBy: req.user._id,
+      targetType: "Shop",
+      targetId: shop._id,
+      req
+    });
    
     shop.isActive = true;
     await shop.save();
 
     res.json({
-      success: true,
-      message: "Shop approved successfully",
+      message: t('common.updated', req.lang),
+    
     });
   } catch (error) {
     res.status(500).json({
@@ -114,13 +120,7 @@ exports.approveShop = async (req, res) => {
       message: "Shop approve failed",
     });
   }
-   await createAudit({
-      action: "APPROVE_SHOP",
-      performedBy: req.user._id,
-      targetType: "Shop",
-      targetId: shop._id,
-      req
-    });
+   
 };
 
 exports.suspendShop = async (req, res) => {
@@ -134,7 +134,7 @@ exports.suspendShop = async (req, res) => {
   await shop.save();
 
   res.json({
-    success: true,
+    message: t('common.updated', req.lang),
     message: "Shop suspended"
   });
   await createAudit({
@@ -160,9 +160,12 @@ exports.blockCustomer = async (req, res) => {
   }
 
   const user = await User.findById(userId);
-  if (!user) {
-    return res.status(404).json({ success: false, message: "User not found" });
-  }
+  // const t = req.t;
+
+if (!user)
+  return res.status(400).json({
+    msg: t("USER_NOT_FOUND"),
+  });
 
   user.isBlocked = true;
   await user.save();
@@ -175,5 +178,5 @@ exports.blockCustomer = async (req, res) => {
     req
   });
 
-  res.json({ success: true, message: "Customer blocked" });
+  res.json({ message: t('common.updated', req.lang), message: "Customer blocked" });
 };

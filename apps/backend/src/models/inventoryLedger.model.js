@@ -1,8 +1,9 @@
 const mongoose = require("mongoose");
 
-const inventoryLedgerSchema = new mongoose.Schema(
+const inventoryLedgerSchema =
+  new mongoose.Schema(
 {
-  shop: {
+  shopId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Shop",
     required: true,
@@ -19,19 +20,13 @@ const inventoryLedgerSchema = new mongoose.Schema(
   type: {
     type: String,
     enum: [
-      "PURCHASE",
-      "SALE",
+      "ORDER_RESERVE",
+      "ORDER_COMMIT",
+      "ORDER_CANCEL",
       "RESTOCK",
-      "ADJUSTMENT",
-      "RETURN",
-      "CANCEL",
-      "DAMAGE",
+      "MANUAL_ADJUST",
+      "REFUND",
     ],
-    required: true,
-  },
-
-  quantity: {
-    type: Number,
     required: true,
   },
 
@@ -41,10 +36,19 @@ const inventoryLedgerSchema = new mongoose.Schema(
     required: true,
   },
 
+  quantity: {
+    type: Number,
+    required: true,
+  },
+
   referenceId: String,
   referenceModel: String,
 
-  note: String,
+  idempotencyKey: {
+    type: String,
+    unique: true,
+    sparse: true,
+  },
 
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
@@ -54,7 +58,18 @@ const inventoryLedgerSchema = new mongoose.Schema(
 { timestamps: true }
 );
 
-module.exports = mongoose.model(
-  "InventoryLedger",
-  inventoryLedgerSchema
-);
+inventoryLedgerSchema.index({
+  product: 1,
+  createdAt: 1,
+});
+
+inventoryLedgerSchema.index({
+  shopId: 1,
+  product: 1,
+});
+
+
+
+module.exports =
+  mongoose.models.InventoryLedger ||
+  mongoose.model("InventoryLedger", inventoryLedgerSchema);

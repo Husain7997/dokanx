@@ -1,34 +1,54 @@
-const ShopWallet = require("../../models/ShopWallet");
+// src/controllers/shop/wallet.controller.js
 
-exports.topupWallet = async (req, res) => {
+const walletService =
+  require("../../services/wallet.service");
+
+const { t } =
+  require("@/core/infrastructure");
+
+exports.topupWallet =
+async (req, res, next) => {
   try {
-    const { amount } = req.body;
-    const wallet = await ShopWallet.findOne({ shop: req.user._id });
-    if (!wallet) return res.status(404).json({ message: "Wallet not found" });
 
-    wallet.balance += amount;
-    await wallet.save();
-    res.json({ message: "Wallet topped up", balance: wallet.balance });
+    const result =
+      await walletService.creditWallet({
+        shopId: req.user._id,
+        amount: req.body.amount,
+        reference: `manual-topup-${Date.now()}`,
+      });
+
+    res.json({
+      message: t(req.lang, "wallet.topped_up"),
+      data: result,
+    });
+
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 };
 
-exports.transferWallet = async (req, res) => {
+exports.transferWallet =
+async (req, res, next) => {
   try {
-    const { toShopId, amount } = req.body;
-    const fromWallet = await ShopWallet.findOne({ shop: req.user._id });
-    const toWallet = await ShopWallet.findOne({ shop: toShopId });
-    if (!fromWallet || !toWallet) return res.status(404).json({ message: "Wallet not found" });
-    if (fromWallet.balance < amount) return res.status(400).json({ message: "Insufficient balance" });
 
-    fromWallet.balance -= amount;
-    toWallet.balance += amount;
-    await fromWallet.save();
-    await toWallet.save();
+    await walletService.debitWallet({
+      shopId: req.user._id,
+      amount: req.body.amount,
+      reference: `transfer-${Date.now()}`,
+    });
 
-    res.json({ message: "Transfer successful", fromBalance: fromWallet.balance });
+    await walletService.creditWallet({
+      shopId: req.body.toShopId,
+      amount: req.body.amount,
+      reference: `transfer-${Date.now()}`,
+    });
+
+    res.json({
+      message:
+        t(req.lang, "wallet.transfer_success"),
+    });
+
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 };

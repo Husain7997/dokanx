@@ -1,4 +1,5 @@
 const AuditLog = require("../models/audit.model");
+const { t } = require('@/core/infrastructure');
 
 exports.getAuditLogs = async (req, res) => {
   try {
@@ -8,7 +9,7 @@ exports.getAuditLogs = async (req, res) => {
       .limit(100);
 
     res.json({
-      success: true,
+      message: t('common.updated', req.lang),
       data: logs,
     });
   } catch (error) {

@@ -1,10 +1,8 @@
 const router = require('express').Router();
 const ctrl = require('../../controllers/admin/adjustment.controller');
 const { protect, allowRoles } = require('../../middlewares');
-router.use(protect); 
-// const allowRoles = require('../../middlewares/rbac.middleware');
 
-router.use(protect );
+router.use(protect);
 router.use(allowRoles('ADMIN'));
 
 router.post('/refund', ctrl.refundShop);

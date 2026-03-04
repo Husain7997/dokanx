@@ -8,7 +8,7 @@ class ReportService {
    */
   async shopSummary(shopId) {
     const revenue = await Order.aggregate([
-      { $match: { shop: shopId, status: "COMPLETED" } },
+      { $match: { shopId: shopId, status: "COMPLETED" } },
       {
         $group: {
           _id: null,
@@ -19,7 +19,7 @@ class ReportService {
     ]);
 
     const settlements = await Settlement.aggregate([
-      { $match: { shop: shopId } },
+      { $match: { shopId: shopId } },
       {
         $group: {
           _id: null,
@@ -60,7 +60,7 @@ class ReportService {
    * Settlement History
    */
   async settlementHistory(shopId) {
-    return Settlement.find({ shop: shopId })
+    return Settlement.find({ shopId: shopId })
       .sort({ createdAt: -1 })
       .limit(50);
   }

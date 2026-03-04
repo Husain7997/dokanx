@@ -5,9 +5,12 @@ const { initiatePayment } = require("../controllers/payment.controller");
 const { protect } = require("../middlewares");
 const paymentController = require("../controllers/payment.controller");
 const verifySignature = require("../utils/verifySignature");
+const {
+  gatewayWebhook,
+} = require("../controllers/payment.webhook.controller");
 
 router.post(
-  "/webhook", verifySignature, paymentController.paymentWebhook
+  "/webhook", verifySignature, gatewayWebhook
 );
 // express.json({ type: "*/*" }),
 

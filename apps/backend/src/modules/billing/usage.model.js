@@ -11,5 +11,8 @@ const schema = new mongoose.Schema({
   },
 });
 
+
+
 module.exports =
-mongoose.model("Usage", schema);
+  mongoose.models.Usage ||
+  mongoose.model("Usage", schema);

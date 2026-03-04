@@ -23,5 +23,8 @@ const schema = new mongoose.Schema(
 { timestamps: true }
 );
 
+
+
 module.exports =
-mongoose.model("Subscription", schema);
+  mongoose.models.Subscription ||
+  mongoose.model("Subscription", schema);

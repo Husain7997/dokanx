@@ -1,20 +1,30 @@
-const { Worker } = require("bullmq");
-const connection =
-require("../infrastructure/queue/queue.connection");
+// src/jobs/settlement.worker.js
+
+const { queue, runOnce } =
+  require("@/core/infrastructure");
 
 const settlementService =
-require("../services/settlement.service");
+  require("../services/settlement.service");
 
-const worker = new Worker(
+queue.process(
   "settlement",
   async (job) => {
-    await settlementService.autoSettlement(
-      job.data.shopId
-    );
-  },
-  { connection }
-);
 
-worker.on("failed", (job, err) => {
-  console.error("Settlement failed", err);
-});
+    const { shopId, grossAmount, fee } =
+      job.data;
+
+    return runOnce(
+      `settlement-${shopId}-${job.id}`,
+      async () => {
+
+        return settlementService.processSettlement({
+          shopId,
+          grossAmount,
+          fee,
+          idempotencyKey: job.id,
+        });
+
+      }
+    );
+  }
+);

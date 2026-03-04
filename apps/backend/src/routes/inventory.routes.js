@@ -1,13 +1,13 @@
 const router = require("express").Router();
-const inventoryController =
+const {adjustStock} =
   require("../controllers/inventory.controller");
 
-const protect = require("../middlewares/protect");
+const {protect} = require("../middlewares");
 
 router.post(
   "/adjust",
   protect,
-  inventoryController.adjustStock
+adjustStock,
 );
 
 module.exports = router;

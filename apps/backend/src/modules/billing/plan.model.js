@@ -21,5 +21,8 @@ const planSchema = new mongoose.Schema(
 { timestamps: true }
 );
 
+
+
 module.exports =
-mongoose.model("Plan", planSchema);
+  mongoose.models.Plan ||
+  mongoose.model("Plan", planSchema);

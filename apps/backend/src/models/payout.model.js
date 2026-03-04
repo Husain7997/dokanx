@@ -8,7 +8,7 @@ const PayoutSchema = new mongoose.Schema(
       ref: 'Shop',
       required: true,
     },
-    // shop: {
+    // shopId: {
     //     type: mongoose.Schema.Types.ObjectId,
     //     ref: 'Shop',
     //     required: true,
@@ -66,6 +66,6 @@ const PayoutSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// module.exports = mongoose.model('Payout', PayoutSchema);
+
 
 module.exports = mongoose.models.Payout || mongoose.model("Payout", PayoutSchema);

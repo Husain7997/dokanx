@@ -1,14 +1,21 @@
-const { Worker } = require("bullmq");
-const connection =
-require("../infrastructure/queue/queue.connection");
+// src/jobs/payout.worker.js
+
+const { queue, runOnce } =
+  require("@/core/infrastructure");
 
 const payoutService =
-require("../services/payout.service");
+  require("../services/payout.service");
 
-const worker = new Worker(
+queue.process(
   "payout",
   async (job) => {
-    await payoutService.processPayout(job.data);
-  },
-  { connection }
+
+    return runOnce(
+      `payout-${job.id}`,
+      async () => {
+        return payoutService.processPayout(job.data);
+      }
+    );
+
+  }
 );

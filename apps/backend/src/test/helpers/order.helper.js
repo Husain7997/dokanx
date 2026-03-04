@@ -5,7 +5,7 @@ async function createPaidOrders(shopId, count, amount) {
 
   for (let i = 0; i < count; i++) {
     orders.push({
-      shop: shopId,
+      shopId: shopId,
       totalAmount: amount,
       status: "CONFIRMED",
       payment: {

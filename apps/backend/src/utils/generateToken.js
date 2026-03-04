@@ -5,7 +5,7 @@ module.exports = (user) => {
     {
       id: user._id,
       role: user.role,
-      shopId: user.shopId || null,
+      shopId: user.shopId || null
     },
     process.env.JWT_SECRET,
     { expiresIn: "7d" }

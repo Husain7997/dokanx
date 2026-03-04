@@ -44,8 +44,5 @@ walletTransactionSchema.index(
   { unique: true }
 );
 
-// module.exports = mongoose.model(
-//   "WalletTransaction",
-//   walletTransactionSchema
-// );
+
 module.exports = mongoose.models.WalletTransaction || mongoose.model("WalletTransaction", walletTransactionSchema);

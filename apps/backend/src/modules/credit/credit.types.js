@@ -1,0 +1,6 @@
+module.exports = {
+  OPERATIONS: {
+    ISSUE_CREDIT: "ISSUE_CREDIT",
+    RECEIVE_PAYMENT: "RECEIVE_PAYMENT",
+  },
+};

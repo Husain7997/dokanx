@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const settlementRunSchema = new mongoose.Schema(
   {
-    shop: {
+    shopId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Shop",
       required: true,
@@ -41,11 +41,11 @@ const settlementRunSchema = new mongoose.Schema(
 
 // ✅ Prevent duplicate runs per shop + key
 settlementRunSchema.index(
-  { shop: 1, idempotencyKey: 1 },
+  { shopId: 1, idempotencyKey: 1 },
   { unique: true, sparse: true }
 );
 
-// module.exports = mongoose.model("SettlementRun", settlementRunSchema);
+
 
 module.exports =
   mongoose.models.SettlementRun ||

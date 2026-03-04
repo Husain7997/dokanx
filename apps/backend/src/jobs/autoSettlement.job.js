@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const SettlementLock = require('../models/SettlementLock');
 const Shop = require('../models/shop.model');
 const { runAutoSettlement } = require('../services/autoSettlement.service');
+const { addJob } = require("@/core/infrastructure");
 
 if (process.env.NODE_ENV === 'test') {
   module.exports = {
@@ -43,6 +44,8 @@ function startAutoSettlementCron() {
           from,
           to,
         });
+        await addJob("settlement", { shopId: shop._id });
+
       } catch (err) {
         console.error('Auto settlement failed', shop._id, err);
       }

@@ -1,85 +1,86 @@
-// require('dotenv').config();
-// require("./infrastructure/redis/redis.client");
-// require("./jobs/settlement.worker");
-// require("./jobs/payout.worker");
-// require("./infrastructure/scheduler/autoSettlement.scheduler");
-// require("./infrastructure/events/listeners");
-// require("./infrastructure/notifications/notification.listener");
-// require(
-//  "./infrastructure/websocket/socket"
-// ).init(server);
-// require("./infrastructure/cacheSync/cacheSync");
-
-
-
-
-// const mongoose = require('mongoose');
-// const app = require('./app');
-// const config = require('./config');
-// const features = require('./config/features');
-// const { startAutoSettlementCron } = require('./jobs/autoSettlement.job');
-
-// const http = require("http");
-
-// const server = http.createServer(app);
-
-
-
-// async function startServer() {
-//   await mongoose.connect(config.db.uri);
-//   console.log('✅ MongoDB connected');
-
-//   // runtime-only cron
-//   if (process.env.NODE_ENV !== 'test' && features.settlement) {
-//     startAutoSettlementCron();
-//   }
-
-
-
-//   app.listen(config.app.port, () => {
-//     console.log(`🚀 DokanX running on port ${config.app.port}`);
-//   });
-// }
-
-// // ❗ Jest এ কখনো auto-start হবে না
-// if (process.env.NODE_ENV !== 'test') {
-//   startServer();
-// }
-
-// module.exports = { startServer };
+require("module-alias/register");
 require("dotenv").config();
 
+/*
+|--------------------------------------------------------------------------
+| GLOBAL PROCESS GUARDS
+|--------------------------------------------------------------------------
+*/
+
+process.on("unhandledRejection", err => {
+  console.error("UNHANDLED:", err);
+  process.exit(1);
+});
+
+process.on("uncaughtException", err => {
+  console.error("CRITICAL:", err);
+  process.exit(1);
+});
+
+/*
+|--------------------------------------------------------------------------
+| IMPORTS
+|--------------------------------------------------------------------------
+*/
+
 const http = require("http");
-const mongoose = require("mongoose");
-mongoose.set('strictPopulate', false);
+
 const app = require("./app");
 
-const startServer = async () => {
+const loadEvents =
+  require("./loaders/event.loader");
+
+const {
+  connectMongo,
+} = require("./infrastructure/database/mongo.client");
+
+const { logger } =
+  require("@/core/infrastructure");
+
+const { registerWorkers } =
+  require("./workers");
+/*
+|--------------------------------------------------------------------------
+| SERVER START
+|--------------------------------------------------------------------------
+*/
+
+async function startServer() {
+
   try {
-    // ✅ MongoDB connect
-    await mongoose.connect(process.env.MONGO_URI);
 
-    console.log("✅ MongoDB Connected");
+    /* ---------- DATABASE ---------- */
+    await connectMongo();
+    logger.info("Mongo Connected");
 
+    /* ---------- EVENTS ---------- */
+    loadEvents();
+
+    /* ---------- WORKERS ---------- */
+
+registerWorkers();
+    /* ---------- HTTP SERVER ---------- */
     const server = http.createServer(app);
 
-    // websocket
-    require("./infrastructure/websocket/socket").init(server);
+    require("./infrastructure/websocket/socket")
+      .init(server);
 
-    const PORT = process.env.PORT || 5000;
+    require("./infrastructure/events/listeners");
+    require("./infrastructure/notifications/notification.listener");
 
-    server.listen(PORT, () =>
-      console.log(`🚀 DokanX running on ${PORT}`)
-    );
+    const PORT = process.env.PORT || 5001;
 
-    // graceful shutdown
+    server.listen(PORT, () => {
+      logger.info(`🚀 DokanX running on ${PORT}`);
+    });
+
     require("./infrastructure/graceful/shutdown")(server);
 
   } catch (err) {
-    console.error("❌ DB Connection Failed", err);
-    process.exit(1);
-  }
-};
+  console.error("🔥 BOOT ERROR DETAILS:", err);
+  logger.error("Server Boot Failed", err);
+  process.exit(1);
+}
+}
 
-// cluster boot
-require("./infrastructure/cluster/cluster")(startServer);
+startServer();

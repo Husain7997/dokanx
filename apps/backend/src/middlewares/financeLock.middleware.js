@@ -1,18 +1,34 @@
-const FinancePeriod = require('../models/FinancePeriod');
+// src/middlewares/financeLock.middleware.js
 
-module.exports = async function financeLock(req, res, next) {
-  const date = new Date();
-  const period = `${date.getFullYear()}-${String(
-    date.getMonth() + 1
-  ).padStart(2, '0')}`;
+const mongoose = require("mongoose");
 
-  const fp = await FinancePeriod.findOne({ period });
+const financeLock = async (req, res, next) => {
+  const session = await mongoose.startSession();
 
-  if (fp?.locked) {
-    return res.status(423).json({
-      message: 'Finance period locked'
+  try {
+    await session.startTransaction();
+
+    req.mongoSession = session;
+
+    res.on("finish", async () => {
+      if (res.statusCode >= 400) {
+        await session.abortTransaction();
+      } else {
+        await session.commitTransaction();
+      }
+      session.endSession();
+    });
+
+    next();
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    return res.status(500).json({
+      success: false,
+      message: "Finance lock failed",
+      error: error.message,
     });
   }
-
-  next();
 };
+
+module.exports = financeLock;

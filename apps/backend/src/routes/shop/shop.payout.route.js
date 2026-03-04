@@ -1,7 +1,7 @@
 const router = require('express').Router();
 
 const { protect, allowRoles } = require('../../middlewares');
-const resolveShop = require('../../middlewares/resolveShop.middleware');
+// const resolveShop = require('../../middlewares/resolveShop.middleware');
 const {requestPayout}  = require('../../controllers/shop/shopPayout.controller');
 
 // ✅ IMPORTANT: function pass করতে হবে, object না
@@ -15,7 +15,7 @@ const {requestPayout}  = require('../../controllers/shop/shopPayout.controller')
 router.post(
   '/request',
   protect,
-  resolveShop,
+  // resolveShop,
   requestPayout   // ✅ FUNCTION
 );
 module.exports = router;

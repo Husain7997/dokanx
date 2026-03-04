@@ -16,6 +16,10 @@ exports.handle = async (req, res) => {
     });
 
   await paymentService.handleWebhook(req.body);
+  
 
   res.json({ received: true });
+  await executeOnce(paymentId, async () => {
+  await publishEvent();
+});
 };

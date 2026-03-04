@@ -1,18 +1,23 @@
 const User = require("../models/user.model");
 const { createAudit } = require("../utils/audit.util");
+const { t } =
+  require('@/core/infrastructure');
 exports.blockUser = async (req, res) => {
   const user = await User.findById(req.params.id);
+  
 
-  if (!user) {
-    return res.status(404).json({ message: "User not found" });
-  }
+  // const t = req.t;
+
+if (!user)
+  return res.status(404).json({
+    msg: t("USER_NOT_FOUND"),
+  });
 
   user.isBlocked = true;
   await user.save();
 
   res.json({
-    success: true,
-    message: "User blocked"
+    message: t('common.updated', req.lang),    
   });
 };
 
@@ -21,7 +26,7 @@ exports.unblockUser = async (req, res) => {
   user.isBlocked = false;
   await user.save();
 
-  res.json({ success: true });
+  res.json({ message: t('common.updated', req.lang) });
 };
 
 exports.getAllUsers = async (req, res) => {
@@ -29,7 +34,7 @@ exports.getAllUsers = async (req, res) => {
     const users = await User.find().select("-password");
 
     res.json({
-      success: true,
+      message: t('common.updated', req.lang),
       data: users,
     });
   } catch (error) {

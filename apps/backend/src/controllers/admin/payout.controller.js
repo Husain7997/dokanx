@@ -1,4 +1,4 @@
-const { triggerPayout } = require('../../services/payoutGateway.service');
+const { triggerPayout } = require('../../infrastructure/payment/payoutGateway.service');
 const payoutService = require('../../services/payout.service');
 const {
   approvePayout,
@@ -7,6 +7,7 @@ const {
 const { processPayout } = require('../../services/payout.service');
 const Shop = require('../../models/shop.model');
 const ShopWallet = require('../../models/ShopWallet');
+const { addJob } = require("@/core/infrastructure");
 
 exports.createShopPayout = async (req, res) => {
   try {
@@ -18,7 +19,7 @@ exports.createShopPayout = async (req, res) => {
       });
     }
 
-    const wallet = await ShopWallet.findOne({ shop: shop._id });
+    const wallet = await ShopWallet.findOne({ shopId: shop._id });
     if (!wallet) {
       return res.status(404).json({
         success: false,
@@ -28,8 +29,10 @@ exports.createShopPayout = async (req, res) => {
 
     const payout = await processPayout(wallet._id);
 
+await addJob("settlement", { walletId: wallet._id });
+
     return res.status(200).json({
-      success: true,
+      message: t('common.updated', req.lang),
       data: payout,
     });
   } catch (err) {

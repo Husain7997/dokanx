@@ -20,7 +20,7 @@ taxAmount: {
   default: 0,
 },
  netPayout: Number,
-    // shop: {
+    // shopId: {
     //   type: mongoose.Schema.Types.ObjectId,
     //   ref: "Shop",
     //   required: true,
@@ -45,7 +45,7 @@ taxAmount: {
   { timestamps: true }
 );
 
-// module.exports = mongoose.model("Settlement", SettlementSchema);
+
 
 module.exports =
   mongoose.models.Settlement ||

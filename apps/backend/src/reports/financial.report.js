@@ -1,12 +1,11 @@
-const Ledger =
-require("../models/ledger.model");
+const Ledger = require("../modules/ledger/ledger.model");
 
 exports.shopFinancialSummary =
 async (shopId) => {
 
   return Ledger.aggregate([
     {
-      $match: { shop: shopId },
+      $match: { shopId: shopId },
     },
     {
       $group: {

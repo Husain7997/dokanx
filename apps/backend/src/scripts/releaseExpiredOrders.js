@@ -2,7 +2,7 @@ require("dotenv").config();
 const mongoose = require("mongoose");
 
 const Order = require("../models/order.model");
-const { releaseStock } = require("../services/Inventory.service");
+
 
 (async () => {
   await mongoose.connect(process.env.MONGO_URI);

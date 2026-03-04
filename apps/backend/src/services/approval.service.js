@@ -1,6 +1,6 @@
 const ApprovalRequest = require('../models/ApprovalRequest');
-const { triggerPayout } = require('./payoutGateway.service');
-const Ledger = require('../models/ledger.model');
+const { triggerPayout } = require('../infrastructure/payment/payoutGateway.service');
+const Ledger = require('../modules/ledger/ledger.model');
 
 exports.createRequest = async ({ type, referenceId, shopId, amount, reason, makerId }) => {
   return await ApprovalRequest.create({

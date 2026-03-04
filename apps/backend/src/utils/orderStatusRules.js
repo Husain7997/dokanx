@@ -11,7 +11,7 @@ exports.updateOrderStatus = async (req, res) => {
 
     const order = await Order.findOne({
       _id: orderId,
-      shop: req.shop._id
+      shopId: req.shop._id
     });
 
     if (!order) {
@@ -36,7 +36,7 @@ exports.updateOrderStatus = async (req, res) => {
       req
     });
 
-    res.json({ success: true, data: order });
+    res.json({ message: t('common.updated', req.lang), data: order });
 
   } catch (err) {
     console.error("ORDER STATUS ERROR:", err.message);

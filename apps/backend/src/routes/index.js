@@ -5,7 +5,9 @@ const router = express.Router();
 
 
 // ---- Import route modules ----
-const authRoutes = require("./auth.routes");
+const meRoutes = require("./me.routes");
+const platformRoutes = require('../modules/platform');
+const authRoutes = require("../modules/auth/auth.routes");
 const shopRoutes = require("./shop.routes");
 const productRoutes = require("./product.routes");
 const orderRoutes = require("./order.routes");
@@ -14,8 +16,8 @@ const paymentRoutes = require("./payment.routes");
 const settlementRoutes = require("./settlement.routes");
 const shopPayoutRoutes = require('./shop/shop.payout.route');
 // const adminRoutes = require('./admin/payout.routes');
-
-const reportRoutes = require("./report.routes");
+const inventoryRoutes = require('./inventory.routes');    
+const reportRoutes = require("../modules/reporting/report.routes");
 const settlementAdminRoutes = require('./admin/settlement.routes');
 const walletShopRoutes = require('./shop/wallet.routes');
 const adminMetricsRoutes  = require('./admin.metrics.routes');
@@ -33,8 +35,10 @@ const webhookRoutes = require('../infrastructure/webhook/webhook.routes');
 console.log("ADMIN FINANCE ROUTES LOADED");
 router.use('/admin/finance', require('./admin/finance.routes'));
 
-
+router.use("/financial-test", require("./financial.test.routes"));
 // ---- Routes ----
+router.use("/api", meRoutes);
+router.use('/platform', platformRoutes);
 router.use("/auth", authRoutes);
 router.use("/shops", shopRoutes);
 router.use("/shop/payouts", shopPayoutRoutes);
@@ -70,9 +74,7 @@ router.use(
  "/system", systemRoute);
 
 router.use(
-  "/api/inventory",
-  require("./routes/inventory.routes")
-);
+  "/api/inventory", inventoryRoutes);
 router.use(
  "/webhooks",webhookRoutes);
 

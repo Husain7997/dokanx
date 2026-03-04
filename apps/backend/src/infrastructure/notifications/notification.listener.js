@@ -1,10 +1,18 @@
-const bus =
-require("../events/eventBus");
+const eventBus = require("@/infrastructure/events/eventBus");
+const NotificationService =
+  require("./notification.service");
 
-bus.on("NOTIFICATION", ({ event, payload }) => {
-  console.log(
-    "🔔 Notification:",
-    event,
-    payload
-  );
-});
+eventBus.on(
+  "USER_NOTIFICATION",
+  async ({ userId, event, payload }) => {
+
+    await NotificationService.send(
+      { _id: userId },
+      event,
+      payload
+    );
+
+  }
+);
+
+console.log("✅ Notification listener registered");

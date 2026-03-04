@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
 
-const { protect } = require('../middlewares');
-const tenant = require('../middlewares/tenant.middleware');
-const allowRoles = require('../middlewares/role.middleware');
+const { protect, allowRoles } = require('../middlewares');
+// const tenant = require('../middlewares/tenant.middleware');
+// const allowRoles = require('../middlewares/role.middleware');
 const checkUserNotBlocked = require("../middlewares/checkUserNotBlocked");
 const optionalAuth = require("../middlewares/optionalAuth.middleware");
-const { resolveShop } = require("../middlewares/shop.middleware");
+// const { resolveShop } = require("../middlewares/shop.middleware");
 // const auth = require("../middlewares/auth.middleware");
 const { canUpdateOrderStatus } = require("../middlewares/orderRole.guard");
 
@@ -16,7 +16,7 @@ const {
   placeOrder,
   getOrders
 } = require('../controllers/order.controller');
-console.log("auth TYPE:", typeof auth);
+
 console.log("canUpdateOrderStatus TYPE:", typeof canUpdateOrderStatus);
 console.log("updateOrderStatus TYPE:", typeof updateOrderStatus);
 // CUSTOMER → order create
@@ -24,20 +24,20 @@ router.post(
   "/",
   // resolveShop,
   optionalAuth,
-  tenant,
+  // tenant,
   checkUserNotBlocked,
 
-  // allowRoles('customer'),
+  allowRoles('CUSTOMER'),
   placeOrder
 );
 // UPDATE ORDER STATUS (OWNER / ADMIN)
 router.patch(
   "/:orderId/status",
-  resolveShop,
+  // resolveShop,
   protect,                 // ✅ MUST
-  tenant,                  // ✅ tenant context
+  // tenant,                  // ✅ tenant context
   checkUserNotBlocked,
-  allowRoles("owner", "admin", "customer"),
+  allowRoles("OWNER", "ADMIN", "CUSTOMER"),
   canUpdateOrderStatus,    // role + order state guard
   updateOrderStatus
 );
@@ -48,8 +48,8 @@ router.patch(
 router.get(
   '/',
   protect,
-  tenant,
-  allowRoles('owner', 'admin'),
+  // tenant,
+  allowRoles('OWNER', 'ADMIN'),
   getOrders
 );
 

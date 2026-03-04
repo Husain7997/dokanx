@@ -1,28 +1,30 @@
-const crypto = require('crypto');
-const IdempotencyKey = require('../models/IdempotencyKey');
+const Idempotency =
+  require("@/models/idempotency.model");
 
+/**
+ * Prevent duplicate execution
+ */
 async function ensureIdempotent(key, scope) {
-  if (!key) {
-    throw new Error('Idempotency key missing');
-  }
 
-  const hash = crypto
-    .createHash('sha256')
-    .update(`${scope}:${key}`)
-    .digest('hex');
+  if (!key)
+    throw new Error("IDEMPOTENCY_KEY_REQUIRED");
 
-  const exists = await IdempotencyKey.findOne({ hash });
-  if (exists) {
-    const err = new Error('Duplicate request');
-    err.status = 409;
-    throw err;
-  }
+  const exists =
+    await Idempotency.findOne({
+      key,
+      scope,
+    });
 
-  await IdempotencyKey.create({
-    hash,
+  if (exists)
+    throw new Error("DUPLICATE_REQUEST");
+
+  await Idempotency.create({
+    key,
     scope,
     createdAt: new Date(),
   });
+
+  return true;
 }
 
 module.exports = {

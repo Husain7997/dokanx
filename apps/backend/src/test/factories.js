@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const ShopWallet = require("../models/ShopWallet");
 const Settlement = require("../models/settlement.model");
-const Ledger = require("../models/ledger.model");
+const Ledger = require("../modules/ledger/ledger.model");
 
 exports.oid = () => new mongoose.Types.ObjectId();
 
@@ -9,7 +9,7 @@ exports.createShopWallet = async (opts = {}) => {
   const shopId = opts.shopId || exports.oid();
 
   return ShopWallet.create({
-    shop: shopId,
+    shopId: shopId,
     shopId,
     balance: opts.balance ?? 0,
     bkashNumber: opts.bkashNumber ?? "01700000000"
@@ -18,7 +18,7 @@ exports.createShopWallet = async (opts = {}) => {
 
 exports.createSettlement = async (opts = {}) => {
   return Settlement.create({
-    shop: opts.shopId,
+    shopId: opts.shopId,
     shopId: opts.shopId,
     orderCount: opts.orderCount ?? 2,
     totalAmount: opts.totalAmount ?? 1000,

@@ -1,14 +1,28 @@
 /* ===============================
    ROLE BASED ACCESS
 ================================*/
-const allowRoles = (...roles) => {
-  const normalized = roles.map(r => r.toUpperCase());
 
+const allowRoles = (...allowedRoles) => {
   return (req, res, next) => {
-    const role = req.user?.role?.toUpperCase();
 
-    if (!role || !normalized.includes(role)) {
-      return res.status(403).json({ message: "Forbidden" });
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const userRole = req.user.role?.toLowerCase();
+
+    const normalized = allowedRoles.map(r =>
+      r.toLowerCase()
+    );
+
+    if (!normalized.includes(userRole)) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden",
+      });
     }
 
     next();
@@ -18,8 +32,9 @@ const allowRoles = (...roles) => {
 /* ===============================
    BLOCK CUSTOMER
 ================================*/
+
 const blockCustomer = (req, res, next) => {
-  if (req.user.role === "CUSTOMER") {
+  if (req.user.role?.toLowerCase() === "customer") {
     return res.status(403).json({
       message: "Customers not allowed",
     });

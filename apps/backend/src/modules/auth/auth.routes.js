@@ -1,6 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const authController = require("./auth.controller");
+const passport = require("passport"); 
+
+// load strategy
+require("./googleAuth"); 
 if (process.env.GOOGLE_CLIENT_ID) {
   router.get("/google",
     passport.authenticate("google", { scope: ["profile", "email"] })

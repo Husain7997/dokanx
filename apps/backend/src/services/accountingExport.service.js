@@ -1,4 +1,4 @@
-const Ledger = require('../models/ledger.model');
+const Ledger = require('@/modules//ledger/ledger.model');
 const AccountingExport = require('../models/AccountingExport');
 const crypto = require('crypto');
 

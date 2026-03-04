@@ -1,15 +1,11 @@
-const bus = require("./eventBus");
+const eventBus = require("./eventBus");
 
-bus.on("SETTLEMENT_COMPLETED", async (data) => {
-  console.log(
-    "📊 Settlement completed for:",
-    data.shopId
-  );
+eventBus.on("ORDER_CREATED", async (payload) => {
+  console.log("ORDER_CREATED received", payload);
 });
 
-bus.on("PAYOUT_COMPLETED", async (data) => {
-  console.log(
-    "💰 Payout processed:",
-    data.payoutId
-  );
+eventBus.on("PAYMENT_SUCCESS", async (payload) => {
+  console.log("PAYMENT_SUCCESS received", payload);
 });
+
+console.log("✅ Event listeners registered");

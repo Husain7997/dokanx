@@ -1,0 +1,8 @@
+{
+  "notification": {
+    "order_created": "Order created successfully"
+  },
+  "errors": {
+    "UNKNOWN_ERROR": "Something went wrong"
+  }
+}

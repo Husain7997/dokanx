@@ -1,11 +1,13 @@
 
 // const crypto = require("crypto");
+const { addJob } = require("@/core/infrastructure");
+
 
 const Wallet = require("../models/wallet.model");
 const Order = require("../models/order.model");
 const Payment = require("../models/payment.model");
 const walletService = require("../services/wallet.service");
-const Ledger = require("../models/ledger.model");
+const Ledger = require("../modules/ledger/ledger.model");
 const { verifySignature } = require("../utils/verifySignature");
 const PaymentService = require("../services/payment.service");
 const { creditWallet } = require("../services/wallet.service");
@@ -15,6 +17,7 @@ const { handlePaymentWebhook } = require("../services/payment.service");
 const paymentService = require("../services/payment.service");
 const Settlement = require("../models/settlement.model");
 const { ensureIdempotent } = require('../utils/idempotency');
+
 // const features = require('../config/features');
 
 
@@ -44,9 +47,11 @@ let attempt = await PaymentAttempt.findOne({
 
 if (!attempt) {
   const providerPaymentId = "pay_" + order._id;
+  await addJob("settlement", { orderId: order._id });
+  
   attempt = await PaymentAttempt.create({
     order: order._id,
-    shop: order.shop,
+    shopId: order.shop,
     amount: order.totalAmount,
 
     provider: "sandbox",
@@ -62,7 +67,7 @@ if (!attempt) {
 
 
     res.status(201).json({
-      success: true,
+      message: t('common.updated', req.lang),
       providerPaymentId,
       attemptId: attempt._id
     });
@@ -72,44 +77,6 @@ if (!attempt) {
 };
 
 
-// exports.initiatePayment = async (req, res) => {
-//   const { orderId } = req.params;
-
-//   const order = await Order.findById(orderId);
-//   if (!order) {
-//     return res.status(404).json({ message: "Order not found" });
-//   }
-
-//   if (order.status === "CONFIRMED") {
-//     return res.status(400).json({ message: "Order already paid" });
-//   }
-
-//   // 🔥 CREATE PAYMENT DOCUMENT (CRITICAL)
-//   const payment = await Payment.create({
-//     order: order._id,
-//     attemptNo: 1,
-//     amount: order.totalAmount,
-//     status: "PENDING",
-//   });
-
-//   // 🔗 Link payment to order
-//   order.payments.push(payment._id);
-//   order.status = "PAYMENT_PENDING";
-//   await order.save();
-
-//   const intent = await PaymentService.createPaymentIntent({
-//     order,
-//     payment,
-//     req,
-//   });
-
-//   res.json({
-//     success: true,
-//     redirectUrl: intent.redirectUrl,
-//     paymentId: payment._id,
-//   });
-// };
-
 
 /* ================================
    PAYMENT WEBHOOK
@@ -117,30 +84,31 @@ if (!attempt) {
 
 
 
-
-exports.paymentWebhook = async (req, res, next) => {
-  const payload = req.body; // ✅ MUST
-  console.log("🔥 Webhook Controller Hit");
-  console.log("Payload:", payload);
-  const { order, payment } = req.body;
+exports.paymentWebhook = async (req, res) => {
 
   try {
+
     await ensureIdempotent(
-  req.headers['idempotency-key'] || req.body.eventId,
-  'payment'
-);
+      req.headers["idempotency-key"]
+        || req.body.eventId,
+      "payment"
+    );
 
-   await paymentService.handlePaymentWebhook(req.body);
+    const result =
+      await paymentService.handlePaymentWebhook(
+        req.body
+      );
+return res.json({
+  success: true,
+  result
+});
+ 
 
-    return res.json({
-      success: true,
-      message: "Webhook processed",
-
-    });
   } catch (err) {
-    console.error("❌ Webhook error:", err.message);
 
-    return res.status(500).json({
+    console.error(err);
+
+    return res.status(400).json({
       success: false,
       message: err.message,
     });
@@ -149,69 +117,13 @@ exports.paymentWebhook = async (req, res, next) => {
 
 
 
-// exports.webhook = async (req, res) => {
-//   try {
-//     const payload = req.body;
-
-//     // Only SUCCESS payments
-//     if (payload.status !== "SUCCESS") {
-//       return res.json({ ok: true });
-//     }
-
-//     // 1️⃣ Find payment
-//     const payment = await Payment.findOne({
-//       gateway: payload.gateway,
-//       gatewayTxnId: payload.trx_id
-//     });
-
-//     if (!payment) {
-//       return res.status(404).json({
-//         error: "Payment not found"
-//       });
-//     }
-
-//     // 2️⃣ Idempotency check
-//     if (payment.status === "SUCCESS") {
-//       return res.json({
-//         ok: true,
-//         duplicate: true
-//       });
-//     }
-
-//     // 3️⃣ Credit wallet
-//     await walletService.creditWalletOnPayment({
-//       userId: payment.user,
-//       shopId: payment.shop,
-//       amount: payment.amount,
-//       currency: payment.currency,
-//       referenceId: payment._id.toString(),
-//       meta: payload
-//     });
-
-//     // 4️⃣ Update payment
-//     payment.status = "SUCCESS";
-//     payment.gatewayPayload = payload;
-//     await payment.save();
-
-//     return res.json({ ok: true });
-//   } catch (error) {
-//     console.error("WEBHOOK ERROR:", error);
-//     return res.status(500).json({
-//       error: "Webhook processing failed"
-//     });
-//   }
-// };
-
-
 /* ================================
    RETRY PAYMENT
 ================================ */
 exports.retryPayment = async (req, res) => {
   try {
     const { orderId } = req.body;
-console.log("🔎 Webhook identifiers:", {
-  providerPaymentId: payload.providerPaymentId,
-});
+
 
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ message: "Order not found" });
@@ -251,55 +163,23 @@ console.log("🔎 Webhook identifiers:", {
    REFUND (LEDGER BASED)
 ================================ */
 exports.refundPayment = async (req, res) => {
-  try {
-    const { orderId, amount, reason } = req.body;
 
-    const order = await Order.findById(orderId);
-    if (!order) return res.status(404).json({ message: "Order not found" });
+  const { orderId, amount, reason } = req.body;
 
-    const lastLedger = await Ledger.findOne({ order: order._id }).sort({
-      createdAt: -1,
-    });
+  const order =
+    await Order.findById(orderId);
 
-    const balance = lastLedger?.balanceAfter || 0;
-    if (amount > balance) {
-      return res.status(400).json({ message: "Insufficient refundable amount" });
-    }
- const settlement = await Settlement.findOne({ order: orderId });
+  if (!order)
+    return res.status(404)
+      .json({ message: "Order not found" });
 
-  if (settlement && settlement.status === "PENDING") {
-    settlement.status = "CANCELLED";
-    await settlement.save();
+  
 
-    await Wallet.updateOne(
-      { shop: settlement.shop },
-      {
-        $inc: {
-          pending_settlement: -settlement.gross_amount,
-          available_balance: settlement.gross_amount
-        }
-      }
-    );
-  }
-    await Ledger.create({
-      order: order._id,
-      type: "DEBIT",
-      source: "REFUND",
-      amount,
-      reason,
-      balanceAfter: balance - amount,
-    });
+  order.status = "REFUNDED";
+  await order.save();
 
-    order.status =
-      balance - amount === 0 ? "REFUNDED" : "PARTIALLY_REFUNDED";
-    await order.save();
-
-    res.json({
-      message: "Refund processed",
-      refundedAmount: amount,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Refund failed" });
-  }
+  res.json({
+    success: true,
+    refundedAmount: amount,
+  });
 };

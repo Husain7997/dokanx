@@ -19,7 +19,7 @@ const orderItemSchema = new mongoose.Schema({
 
 const orderSchema = new mongoose.Schema(
   {
-    shop: {
+    shopId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Shop',
       required: true

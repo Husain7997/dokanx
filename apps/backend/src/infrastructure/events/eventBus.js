@@ -1,5 +1,10 @@
-const EventEmitter = require("events");
+// src/infrastructure/events/eventBus.js
 
-class EventBus extends EventEmitter {}
+const { EventEmitter2 } = require("eventemitter2");
 
-module.exports = new EventBus();
+const eventBus = new EventEmitter2({
+  wildcard: true,
+  delimiter: ".",
+});
+
+module.exports = eventBus;

@@ -26,7 +26,7 @@ const userSchema = new mongoose.Schema(
     default: "CUSTOMER",
   },
 
-  shop: {
+  shopId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Shop",
     default: null,

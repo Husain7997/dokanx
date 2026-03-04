@@ -1,23 +1,22 @@
-jest.useRealTimers();
-const { createShopWallet, createLedger } = require("./helpers/testHelpers");
-const Wallet = require("../models/wallet.model"); // ✅ ADD
+const request = require("supertest");
+const app = require("../app");
 
-describe("Refund & Adjustment", () => {
-  it("should apply manual adjustment", async () => {
-    const { shop, wallet } = await createShopWallet({ balance: 1000 });
+describe("Adjustment Flow", () => {
 
-    const ledger = await createLedger({
-      shopId: shop._id,
-      walletId: wallet._id,
-      amount: 100,
-      type: "CREDIT",
-      source: "SYSTEM",
-      referenceType: "ORDER",
+  it("should adjust balance safely",
+    async () => {
+
+      const res = await request(app)
+        .post("/admin/adjust")
+        .send({
+          shopId:
+            "000000000000000000000001",
+          amount: 100,
+          reason: "test",
+        });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.success)
+        .toBe(true);
     });
-
-    expect(ledger).toBeDefined();
-
-    const freshWallet = await Wallet.findById(wallet._id); // ✅ RELOAD
-    expect(freshWallet.balance).toBeGreaterThanOrEqual(0);
-  }, 30000);
 });

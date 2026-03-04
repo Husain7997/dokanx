@@ -1,8 +1,7 @@
 const bus =
-require("../events/eventBus");
+require("@/core/infrastructure");
 
-const redis =
-require("../redis/redis.client");
+const { redis } = require("@/core/infrastructure");
 
 bus.on("CACHE_INVALIDATE", async (key) => {
   await redis.del(key);

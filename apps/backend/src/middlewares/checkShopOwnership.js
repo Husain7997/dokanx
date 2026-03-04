@@ -1,31 +1,45 @@
 const Shop = require("../models/shop.model");
-
 module.exports = async (req, res, next) => {
-  const shopId = req.body.shop || req.params.shopId;
+  try {
+    const shop = req.shop;
 
-  const shop = await Shop.findById(shopId);
+    if (!shop) {
+      return res.status(404).json({
+        success: false,
+        message: "Shop context missing",
+      });
+    }
 
-  if (!shop) {
-    return res.status(404).json({
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    // ✅ Owner validation
+    if (shop.owner.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Shop ownership mismatch",
+      });
+    }
+
+    // ✅ Active shop check
+ if (shop.isActive === false || shop.status === "SUSPENDED") {
+  return res.status(403).json({
+    success: false,
+    message: "Shop is suspended",
+  });
+}
+
+    next();
+  } catch (error) {
+    console.error("SHOP OWNERSHIP ERROR:", error);
+
+    return res.status(500).json({
       success: false,
-      message: "Shop not found",
+      message: "Ownership validation failed",
     });
   }
-
-  if (shop.owner.toString() !== req.user._id.toString()) {
-    return res.status(403).json({
-      success: false,
-      message: "Shop ownership mismatch",
-    });
-  }
-
-  if (!shop.isActive) {
-    return res.status(403).json({
-      success: false,
-      message: "Shop is suspended",
-    });
-  }
-
-  req.shop = shop;
-  next();
 };

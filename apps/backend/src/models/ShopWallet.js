@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const ShopWalletSchema = new mongoose.Schema(
   {
-    shop: {
+    shopId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Shop',
       required: true,
