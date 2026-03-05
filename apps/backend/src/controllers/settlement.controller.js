@@ -1,8 +1,8 @@
 const Settlement = require("../models/settlement.model");
 const Shop = require("../models/shop.model");
 const ShopWallet = require("../models/ShopWallet");
-const { processShopSettlement } = require("../services/settlement.service");
-const { payoutToShop } = require("../services/wallet.service");
+const { processSettlement } = require("../services/settlement.service");
+const { processPayout } = require("../services/payout.service");
 
 exports.createSettlement = async (req, res) => {
   try {
@@ -18,7 +18,16 @@ exports.createSettlement = async (req, res) => {
     const settlement = await Settlement.create({
       shopId: shopId,
       totalAmount,
-      status: "pending",
+      netAmount: totalAmount,
+      orderCount: 0,
+      status: "PENDING",
+    });
+
+    await processSettlement({
+      shopId,
+      grossAmount: totalAmount,
+      fee: 0,
+      idempotencyKey: `SETTLEMENT_${settlement._id}`
     });
 
     res.json(settlement);
@@ -31,7 +40,11 @@ exports.createSettlement = async (req, res) => {
 exports.payoutSettlement = async (req, res) => {
   try {
     const { settlementId } = req.params;
-    const result = await payoutToShop(settlementId, req.body.bankDetails);
+    const settlement = await Settlement.findById(settlementId);
+    if (!settlement) {
+      return res.status(404).json({ error: "Settlement not found" });
+    }
+    const result = await processPayout({ shopId: settlement.shopId });
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });

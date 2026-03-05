@@ -24,6 +24,8 @@ const languageMiddleware =
 
 const httpLogger =
   require("./middlewares/httpLogger");
+const openApiDocs =
+  require("./docs/openapi/swagger");
 
 require("@/core/transaction/transaction.audit");
 
@@ -35,6 +37,7 @@ const { logger } =
 
   const { resolveLanguage } = require("@/core/language");
 
+  const {tenantGuard} =require("./api/middleware/tenantGuard");
 
 /*
 |--------------------------------------------------------------------------
@@ -58,6 +61,9 @@ app.use(languageMiddleware);
 app.use(httpLogger);
 
 app.use(passport.initialize());
+app.use("/docs", openApiDocs);
+
+app.use(tenantGuard);
 
 app.use((req, res, next) => {
   req.lang = resolveLanguage(req);

@@ -1,10 +1,10 @@
-const { triggerPayout } = require('../../infrastructure/payment/payoutGateway.service');
-const payoutService = require('../../services/payout.service');
 const {
+  processPayout,
+  retryFailedPayout,
+  createAdminPayout: createAdminPayoutService,
   approvePayout,
-  executePayout,
+  executePayout
 } = require('../../services/payout.service');
-const { processPayout } = require('../../services/payout.service');
 const Shop = require('../../models/shop.model');
 const ShopWallet = require('../../models/ShopWallet');
 const { addJob } = require("@/core/infrastructure");
@@ -27,12 +27,12 @@ exports.createShopPayout = async (req, res) => {
       });
     }
 
-    const payout = await processPayout(wallet._id);
+    const payout = await processPayout({ shopId: shop._id });
 
-await addJob("settlement", { walletId: wallet._id });
+    await addJob("settlement", { shopId: shop._id });
 
     return res.status(200).json({
-      message: t('common.updated', req.lang),
+      message: "Payout processed",
       data: payout,
     });
   } catch (err) {
@@ -47,7 +47,7 @@ await addJob("settlement", { walletId: wallet._id });
 exports.createAdminPayout = async (req, res) => {
   const { shopId, amount } = req.body;
 
-  const payout = await payoutService.createAdminPayout({
+  const payout = await createAdminPayoutService({
     shopId,
     amount,
     adminId: req.user.id,
@@ -57,35 +57,27 @@ exports.createAdminPayout = async (req, res) => {
 };
 
 exports.manualPayout = async (req, res) => {
-  const { walletId, amount, type, referenceId } = req.body;
+  const { shopId } = req.body;
+  if (!shopId) {
+    return res.status(400).json({ message: "shopId is required" });
+  }
 
-  const ledgerEntry = await triggerPayout({
-    walletId,
-    amount,
-    type,
-    referenceId,
-    idempotencyKey: `${referenceId}_${type}`
+  const payout = await processPayout({
+    shopId
   });
 
-  res.json({ message: 'Payout triggered', data: ledgerEntry });
+  res.json({ message: 'Payout triggered', data: payout });
 };
 
 exports.retryPayout = async (req, res) => {
-  const { walletId, amount, type, referenceId } = req.body;
+  const { shopId } = req.body;
+  if (!shopId) {
+    return res.status(400).json({ message: "shopId is required" });
+  }
 
-  const ledgerEntry = await triggerPayout({
-    walletId,
-    amount,
-    type,
-    referenceId,
-    idempotencyKey: `${referenceId}_${type}`
-  });
-
-  res.json({ message: 'Retry triggered', data: ledgerEntry });
+  const payout = await retryFailedPayout(shopId);
+  res.json({ message: 'Retry triggered', data: payout });
 };
-
-
-
 
 exports.approve = async (req, res) => {
   const payout = await approvePayout(req.params.id, req.user._id);

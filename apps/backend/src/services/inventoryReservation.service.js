@@ -18,7 +18,7 @@ async function reserveStock({
     shopId,
     productId,
     quantity,
-    type: "RESERVATION",
+    type: "ORDER_RESERVE",
     direction: "OUT",
     referenceId: orderId
   });

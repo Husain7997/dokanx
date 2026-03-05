@@ -1,17 +1,17 @@
 // src/core/infrastructure/queue.engine.js
 
 const Queue = require("bull");
-const redis = require("./redis.client");
+const { redisClient } = require("@/system/singletons/redisClient");
 
 const queue = new Queue("dokanx-queue", {
   createClient: function (type) {
     switch (type) {
       case "client":
-        return redis;
+        return redisClient;
       case "subscriber":
-        return redis.duplicate();
+        return redisClient.duplicate();
       default:
-        return redis.duplicate();
+        return redisClient.duplicate();
     }
   },
 });

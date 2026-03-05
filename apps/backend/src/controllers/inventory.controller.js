@@ -7,12 +7,15 @@ exports.adjustStock = async (req, res) => {
 
   const ledger = await inventory.createInventoryEntry({
     shopId: req.shop._id,
-    product,
+    productId: product,
     type: "MANUAL_ADJUST",
     quantity: Math.abs(quantity),
     direction: quantity > 0 ? "IN" : "OUT",
-    userId: req.user._id,
-    note,
+    meta: {
+      userId: req.user._id,
+      note,
+      referenceModel: "ManualAdjustment"
+    }
   });
 
 res.json({

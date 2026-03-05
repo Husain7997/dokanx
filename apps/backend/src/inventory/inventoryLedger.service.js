@@ -1,10 +1,8 @@
 const Product = require("../models/product.model");
-const inventory = require("@/inventory");
+const InventoryLedger = require("../models/inventoryLedger.model");
 const { withTransaction } =
   require("@/core/transaction/transaction.context");
-
-  const { publishEvent } =
-require("@/infrastructure/events/event.dispatcher");
+const { eventBus, publishEvent } = require("@/core/infrastructure");
 
 async function createInventoryEntry({
   productId,
@@ -34,28 +32,33 @@ async function createInventoryEntry({
     if (newStock < 0)
       throw new Error("Stock underflow");
 
-    await inventory.createInventoryEntry([{
+    await InventoryLedger.create(
+      [
+        {
+          product: productId,
+          shopId,
+          quantity,
+          type,
+          direction,
+          referenceId,
+          referenceModel: meta.referenceModel || "Order",
+          createdBy: meta.userId || null
+        }
+      ],
+      { session }
+    );
+
+    await publishEvent("INVENTORY_MUTATION", {
       productId,
       shopId,
       quantity,
-      type,
       direction,
-      referenceId,
-      meta,
-      createdAt: new Date()
-    }], { session });
-await publishEvent(
-  "INVENTORY_MUTATION",
-  {
-    productId,
-    shopId,
-    quantity,
-    direction,
-    type,
-    referenceId
-  }
-);
+      type,
+      referenceId
+    });
+
     product.stock = newStock;
+    eventBus.emit("inventory.updated", { productId, shopId, stock: newStock });
     await product.save({ session });
 
     return {

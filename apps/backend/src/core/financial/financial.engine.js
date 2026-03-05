@@ -1,151 +1,104 @@
-const Wallet =
-  require("@/models/wallet.model");
-
-const ledgerRepo =
-  require("@/modules/ledger/ledger.repository");
-
 const mongoose = require("mongoose");
+const Ledger = require("@/modules/ledger/ledger.model");
+const { lockManager, eventBus, redisClient } =
+  require("@/core/infrastructure");
 
-const circuit =
-  require("../selfheal/circuit.breaker");
-
-const { publishEvent } =
-  require("@/infrastructure/events/event.dispatcher");
-
-/* =========================================
-   🔒 GLOBAL LEDGER CONTRACT
-========================================= */
-
-const REQUIRED = [
-  "shopId",
-  "amount",
-  "type",
-  "referenceId"
-];
-
-const ALLOWED = [
-  "shopId",
-  "amount",
-  "type",
-  "referenceId",
-  "meta"
-];
-
-const FORBIDDEN = [
-  "reference",
-  "metadata",
-  "walletId",
-  "direction",
-  "source"
-];
-
-function validateCommand(cmd) {
-
-  for (const key of REQUIRED) {
-    if (cmd[key] === undefined)
-      throw new Error(
-        `FINANCIAL_CONTRACT_MISSING_${key}`
-      );
+/**
+ * REAL DOUBLE ENTRY FINANCIAL ENGINE
+ */
+async function execute({
+  tenantId,
+  idempotencyKey,
+  entries
+}) {
+  if (!tenantId || !idempotencyKey || !Array.isArray(entries)) {
+    throw new Error(
+      "Invalid financial execute payload: tenantId, idempotencyKey and entries[] are required"
+    );
   }
 
-  for (const bad of FORBIDDEN) {
-    if (bad in cmd)
-      throw new Error(
-        `ILLEGAL_FINANCIAL_FIELD_${bad}`
-      );
+  const lockKey = `${tenantId}:${idempotencyKey}`;
+  const acquired = await lockManager.acquire(lockKey);
+
+  if (!acquired) {
+    throw new Error("Transaction locked");
   }
 
-  Object.keys(cmd).forEach(k => {
-    if (!ALLOWED.includes(k))
-      throw new Error(
-        `FINANCIAL_CONTRACT_VIOLATION_${k}`
-      );
-  });
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  if (typeof cmd.amount !== "number")
-    throw new Error("AMOUNT_MUST_BE_NUMBER");
-}
+  try {
 
-/* =========================================
-   CENTRAL MONEY ENGINE
-========================================= */
-
-async function execute(command) {
-
-  validateCommand(command);
-
-  return circuit.guard(async () => {
-
-    const session =
-      await mongoose.startSession();
-
-    try {
-
-      session.startTransaction();
-
-      const {
-        shopId,
-        amount,
-        type,
-        referenceId,
-        meta = {}
-      } = command;
-
-      const wallet =
-        await Wallet.findOne(
-          { shopId },
-          null,
-          { session }
-        );
-
-      if (!wallet)
-        throw new Error("Wallet not found");
-
-      const newBalance =
-        wallet.balance + amount;
-
-      if (newBalance < 0)
-        throw new Error(
-          "INSUFFICIENT_BALANCE"
-        );
-
-      wallet.balance = newBalance;
-
-      await wallet.save({ session });
-
-      await ledgerRepo.append({
-        shopId,
-        amount,
-        type,
-        referenceId,
-        meta
-      }, session);
-
-      await publishEvent(
-        "FINANCE_MUTATION",
-        {
-          shopId,
-          amount,
-          type,
-          referenceId
-        }
-      );
-
-      await session.commitTransaction();
-
-      return { balance: newBalance };
-
-    } catch (err) {
-
+    /* 1️⃣ IDEMPOTENCY CHECK */
+    const existing = await redisClient.get(`idem:${lockKey}`);
+    if (existing) {
       await session.abortTransaction();
-      throw err;
-
-    } finally {
-
       session.endSession();
+      return JSON.parse(existing);
     }
 
-  });
+    /* 2️⃣ DOUBLE ENTRY VALIDATION */
+    const totalDebit = entries
+      .filter(e => e.type === "debit")
+      .reduce((sum, e) => sum + e.amount, 0);
+
+    const totalCredit = entries
+      .filter(e => e.type === "credit")
+      .reduce((sum, e) => sum + e.amount, 0);
+
+    if (totalDebit !== totalCredit) {
+      throw new Error("Double-entry imbalance detected");
+    }
+if (totalDebit <= 0 || totalCredit <= 0) {
+  throw new Error("Invalid transaction amount");
+}
+    /* 3️⃣ PERSIST LEDGER ENTRIES (ATOMIC) */
+    const ledgerDocs = entries.map(entry => ({
+      shopId: tenantId,
+      amount: entry.amount,
+      type: entry.type,
+      referenceId: idempotencyKey,
+      meta: entry.meta || {}
+    }));
+
+    await Ledger.insertMany(ledgerDocs, { session });
+
+    /* 4️⃣ COMMIT TRANSACTION */
+    await session.commitTransaction();
+    session.endSession();
+
+    const result = {
+      success: true,
+      transactionId: idempotencyKey
+    };
+
+    /* 5️⃣ STORE IDEMPOTENCY RESULT */
+    await redisClient.set(
+      `idem:${lockKey}`,
+      JSON.stringify(result),
+      "EX",
+      3600
+    );
+
+    /* 6️⃣ EMIT EVENT (AFTER COMMIT) */
+    eventBus.emit("LEDGER_TRANSACTION_COMPLETED", {
+      tenantId,
+      idempotencyKey
+    });
+
+    return result;
+
+  } catch (err) {
+
+    await session.abortTransaction();
+    session.endSession();
+    throw err;
+
+  } finally {
+    await lockManager.release(lockKey);
+  }
 }
 
-module.exports = { execute };
+module.exports = {
+  execute
+};

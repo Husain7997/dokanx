@@ -1,0 +1,82 @@
+{
+  "info": {
+    "name": "DokanX Phase-2 Collection",
+    "_postman_id": "dokanx-phase2-collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth - Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "x-request-id", "value": "req-auth-login-001" }
+        ],
+        "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"owner@example.com\",\n  \"password\": \"Secret123!\"\n}" }
+      }
+    },
+    {
+      "name": "Products - List",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "x-request-id", "value": "req-products-001" }
+        ],
+        "url": { "raw": "{{baseUrl}}/api/products", "host": ["{{baseUrl}}"], "path": ["api", "products"] }
+      }
+    },
+    {
+      "name": "Orders - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "idempotency-key", "value": "order-001" }
+        ],
+        "url": { "raw": "{{baseUrl}}/api/orders", "host": ["{{baseUrl}}"], "path": ["api", "orders"] },
+        "body": { "mode": "raw", "raw": "{\n  \"items\": [{\"product\": \"{{productId}}\", \"quantity\": 1, \"price\": 100}],\n  \"totalAmount\": 100\n}" }
+      }
+    },
+    {
+      "name": "Wallet - Topup",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "idempotency-key", "value": "wallet-topup-001" }
+        ],
+        "url": { "raw": "{{baseUrl}}/api/shop/wallet/topup", "host": ["{{baseUrl}}"], "path": ["api", "shop", "wallet", "topup"] },
+        "body": { "mode": "raw", "raw": "{\n  \"amount\": 500\n}" }
+      }
+    },
+    {
+      "name": "Inventory - Adjust",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": { "raw": "{{baseUrl}}/api/inventory/adjust", "host": ["{{baseUrl}}"], "path": ["api", "inventory", "adjust"] },
+        "body": { "mode": "raw", "raw": "{\n  \"product\": \"{{productId}}\",\n  \"quantity\": 5,\n  \"note\": \"Stock correction\"\n}" }
+      }
+    },
+    {
+      "name": "Settlement - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": { "raw": "{{baseUrl}}/api/settlements", "host": ["{{baseUrl}}"], "path": ["api", "settlements"] },
+        "body": { "mode": "raw", "raw": "{\n  \"shopId\": \"{{shopId}}\",\n  \"totalAmount\": 1200\n}" }
+      }
+    }
+  ]
+}

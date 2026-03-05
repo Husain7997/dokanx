@@ -5,12 +5,10 @@ const Payout =
 
 const crypto = require("crypto");
 
+const {eventBus} = require("@/core/infrastructure");
 const {
-  FinancialEngine,
-  FinancialTypes,
-} = require("@/core/financial");
-
-const eventBus = require("@/infrastructure/events/eventBus");
+  executeFinancial
+} = require("@/services/financialCommand.service");
 
 async function processPayout({ shopId }) {
 
@@ -32,21 +30,18 @@ async function processPayout({ shopId }) {
               .toString("hex")}`,
         },
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: "after" }
     );
 
   if (payout.status === "SUCCESS")
     return payout;
 
-  await FinancialEngine.execute({
-  shopId,
-  amount: -Math.abs(payout.amount),
-  type: "PAYOUT",
-  referenceId: payout.reference,
-  meta: {
-    payoutId: payout._id,
-  },
-});
+  await executeFinancial({
+    shopId,
+    amount: Math.abs(payout.amount || 0),
+    idempotencyKey: payout.reference,
+    reason: "wallet_debit"
+  });
 
   payout.status = "SUCCESS";
   payout.processedAt = new Date();
@@ -70,7 +65,7 @@ async function createShopPayoutRequest({
     shopId,
     amount,
     requestedBy: userId,
-    status: "REQUESTED",
+    status: "PENDING",
     type: "MANUAL",
     reference:
       `REQ_${shopId}_${Date.now()}`,
@@ -78,7 +73,66 @@ async function createShopPayoutRequest({
 
 }
 
+async function createAdminPayout({
+  shopId,
+  amount,
+  adminId
+}) {
+  return Payout.create({
+    shopId,
+    amount,
+    requestedBy: adminId,
+    status: "PENDING",
+    type: "MANUAL",
+    reference: `ADMIN_REQ_${shopId}_${Date.now()}`
+  });
+}
+
+async function approvePayout(id, adminId) {
+  const payout = await Payout.findById(id);
+  if (!payout) throw new Error("Payout not found");
+  if (payout.status === "SUCCESS") return payout;
+
+  payout.approvedBy = adminId;
+  payout.status = "PROCESSING";
+  await payout.save();
+  return payout;
+}
+
+async function executePayout(id, idempotencyKey) {
+  const payout = await Payout.findById(id);
+  if (!payout) throw new Error("Payout not found");
+  if (payout.status === "SUCCESS") return payout;
+
+  await executeFinancial({
+    shopId: payout.shopId,
+    amount: Math.abs(payout.amount || 0),
+    idempotencyKey: idempotencyKey || payout.reference || payout._id,
+    reason: "wallet_debit"
+  });
+
+  payout.status = "SUCCESS";
+  payout.processedAt = new Date();
+  await payout.save();
+
+  return payout;
+}
+
+async function triggerPayout(settlementId) {
+  // Backward-compatible hook used by admin settlement controllers.
+  return processPayout({ shopId: settlementId });
+}
+
+async function retryFailedPayout(shopId) {
+  return processPayout({ shopId });
+}
+
 module.exports = {
   processPayout,
   createShopPayoutRequest,
+  createAdminPayout,
+  approvePayout,
+  executePayout,
+  triggerPayout,
+  retryFailedPayout
 };

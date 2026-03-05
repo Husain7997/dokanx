@@ -1,6 +1,9 @@
 const { processOutbox } =
   require("../jobs/outbox.worker");
 
+const { registerWalletEvents } =
+  require("@/infrastructure/events/wallet.events");
+
 
 
 const { startSnapshotWorker } =
@@ -22,6 +25,8 @@ const { startRecoveryWorker } =
 
 const { startAIObserver } =
   require("@/core/ai/agents/ai.observer");
+const { startPhase2Workers } =
+  require("@/workers/phase2");
 
  
 
@@ -53,6 +58,9 @@ function registerWorkers() {
     startRecoveryWorker();
     startAIObserver();
     
+registerWalletEvents();
+    startPhase2Workers();
+
     AutonomousEngine.start();
     /* ---------- BOOT VALIDATION ---------- */
     runBootValidation();

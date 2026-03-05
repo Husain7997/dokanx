@@ -13,15 +13,17 @@ exports.triggerManualPayout = async (req, res) => {
   if (!settlement) return res.status(404).json({ message: "Settlement not found" });
   if (settlement.payoutStatus === "SUCCESS") return res.status(400).json({ message: "Already paid out" });
   
-await addJob("settlement", { settlementId: settlement._id });
+  await addJob("settlement", { settlementId: settlement._id });
 
-  await triggerPayout(settlement._id);
+  await triggerPayout(settlement.shopId);
   res.json({ message: "Payout triggered" });
 };
 
 exports.retryPayout = async (req, res) => {
   const { settlementId } = req.params;
-  await triggerPayout(settlementId, { forceRetry: true });
+  const settlement = await Settlement.findById(settlementId);
+  if (!settlement) return res.status(404).json({ message: "Settlement not found" });
+  await triggerPayout(settlement.shopId, { forceRetry: true });
   res.json({ message: "Retry initiated" });
 };
 

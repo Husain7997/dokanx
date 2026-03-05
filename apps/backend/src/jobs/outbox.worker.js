@@ -1,10 +1,12 @@
 const Outbox =
   require("../models/outbox.model");
 
-const eventBus  =
-  require("@/infrastructure/events/eventBus");
+const {eventBus} = require("@/core/infrastructure");
+const { dispatchOutboxBatch } =
+  require("@/platform/events/outbox.dispatcher");
 
 async function processOutbox() {
+  await dispatchOutboxBatch(100);
 
   const events =
     await Outbox.find({

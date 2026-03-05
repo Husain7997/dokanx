@@ -1,16 +1,9 @@
-const Order =
-  require("@/models/order.model");
-
-const PaymentAttempt =
-  require("@/models/paymentAttempt.model");
-
+const Order = require("@/models/order.model");
+const PaymentAttempt = require("@/models/paymentAttempt.model");
 const inventory = require("@/inventory");
 
-const { withLock } =
-  require("@/core/infrastructure/lock.manager");
-
-const { publishEvent } =
-  require("@/infrastructure/events/event.dispatcher");
+const { lockManager } = require("@/core/infrastructure");
+const { eventBus } = require("@/core/infrastructure");
 
 /**
  * CENTRAL CHECKOUT ORCHESTRATOR
@@ -21,75 +14,74 @@ async function checkout({
   items,
   totalAmount
 }) {
+  const lockKey = `checkout:${customerId}`;
 
-  return withLock(
-    `checkout:${customerId}`,
-    async () => {
+  const acquired = await lockManager.acquire(lockKey);
+  if (!acquired) {
+    throw new Error("Checkout already in progress");
+  }
 
-      /* ======================
-         1️⃣ CREATE ORDER
-      ====================== */
+  try {
+    /* ======================
+       1️⃣ CREATE ORDER
+    ====================== */
 
-      const order =
-        await Order.create({
-          shop: shopId,
-          customer: customerId,
-          items,
-          totalAmount,
-          status: "PENDING_PAYMENT"
-        });
+    const order = await Order.create({
+      shopId,
+      user: customerId || null,
+      items,
+      totalAmount,
+      status: "PLACED",
+      paymentStatus: "PENDING"
+    });
 
-      /* ======================
-         2️⃣ RESERVE INVENTORY
-      ====================== */
+    /* ======================
+       2️⃣ RESERVE INVENTORY
+    ====================== */
 
+    for (const item of items) {
       await inventory.createInventoryEntry({
         shopId,
-        orderId: order._id,
-        items,
-        type: "RESERVATION",
-        direction: "OUT"
+        productId: item.product,
+        quantity: item.quantity,
+        type: "ORDER_RESERVE",
+        direction: "OUT",
+        referenceId: order._id
       });
-
-      /* ======================
-         3️⃣ PAYMENT ATTEMPT
-      ====================== */
-
-      const attempt =
-        await PaymentAttempt.create({
-          order: order._id,
-          shopId,
-          amount: totalAmount,
-          provider: "sandbox",
-          gateway: "sandbox",
-          providerPaymentId:
-            "pay_" + order._id,
-          status: "PENDING",
-          processed: false
-        });
-
-      /* ======================
-         4️⃣ EVENT
-      ====================== */
-
-      await publishEvent(
-        "ORDER_CREATED",
-        {
-          orderId: order._id,
-          shopId,
-          amount: totalAmount
-        }
-      );
-
-      return {
-        orderId: order._id,
-        attemptId: attempt._id
-      };
-
     }
-  );
+
+    /* ======================
+       3️⃣ PAYMENT ATTEMPT
+    ====================== */
+
+    const attempt = await PaymentAttempt.create({
+      order: order._id,
+      shopId,
+      amount: totalAmount,
+      provider: "sandbox",
+      gateway: "sandbox",
+      providerPaymentId: "pay_" + order._id,
+      status: "PENDING",
+      processed: false
+    });
+
+    /* ======================
+       4️⃣ EVENT
+    ====================== */
+
+    eventBus.emit("ORDER_CREATED", {
+      orderId: order._id,
+      shopId,
+      amount: totalAmount
+    });
+
+    return {
+      orderId: order._id,
+      attemptId: attempt._id
+    };
+  } finally {
+    await lockManager.release(lockKey);
+  }
 }
 
-module.exports = {
-  checkout
-};
+module.exports = { checkout };

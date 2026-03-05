@@ -1,14 +1,10 @@
 // src/services/settlement.service.js
 
-const {
-  FinancialEngine,
-  FinancialTypes,
-} = require("@/core/financial");
-
-const { withLock } = require("@/core/infrastructure/lock.manager");
-
 const { runOnce } =
   require("@/core/infrastructure");
+const {
+  executeFinancial
+} = require("@/services/financialCommand.service");
 
 async function processSettlement({
   shopId,
@@ -21,13 +17,12 @@ async function processSettlement({
     `settlement:${idempotencyKey}`,
     async () => {
 
-      return FinancialEngine.execute({
-  shopId,
-  amount: grossAmount,
-  type: "SETTLEMENT",
-  referenceId: idempotencyKey,
-  meta: { fee },
-});
+      return executeFinancial({
+        shopId,
+        amount: grossAmount,
+        idempotencyKey,
+        reason: "wallet_credit"
+      });
 
     }
   );

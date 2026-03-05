@@ -5,13 +5,11 @@ const Order =
  require("../models/order.model");
 
 const {
-  FinancialEngine,
-  FinancialTypes,
-} =
- require("@/core/financial");
-
-const { runOnce } =
- require("@/core/infrastructure");
+  runOnce
+} = require("@/core/infrastructure");
+const {
+  executeFinancial
+} = require("@/services/financialCommand.service");
 
 async function handlePaymentWebhook(
   payload
@@ -45,16 +43,12 @@ async function handlePaymentWebhook(
   await runOnce(
     `payment:${attempt._id}`,
     async () => {
-
-      await FinancialEngine.execute({
-  shopId: order.shop,
-  amount: attempt.amount,
-  type: "ORDER_PAYMENT",
-  referenceId: order._id,
-  meta: {
-    paymentAttempt: attempt._id
-  }
-});
+      await executeFinancial({
+        shopId: order.shopId || order.shop,
+        idempotencyKey: `ORDER_PAYMENT_${order._id}_${attempt._id}`,
+        amount: attempt.amount,
+        reason: "wallet_credit"
+      });
 
     }
   );
