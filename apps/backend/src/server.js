@@ -32,9 +32,12 @@ const loadEvents =
 
 const {
   connectMongo,
+  disconnectMongo,
 } = require("./infrastructure/database/mongo.client");
 
 const logger = require("@/core/infrastructure/logger");
+const { redisClient } = require("@/system/singletons/redisClient");
+const { closeQueueInfra } = require("@/platform/queue/queue.client");
 
 const { registerWorkers } =
   require("./workers");
@@ -57,7 +60,7 @@ async function startServer() {
 
     /* ---------- WORKERS ---------- */
 
-registerWorkers();
+    const stopWorkers = registerWorkers();
     /* ---------- HTTP SERVER ---------- */
     const server = http.createServer(app);
 
@@ -73,7 +76,18 @@ registerWorkers();
       logger.info(`🚀 DokanX running on ${PORT}`);
     });
 
-    require("./infrastructure/graceful/shutdown")(server);
+    require("./infrastructure/graceful/shutdown")(server, {
+      beforeCloseServer: async () => {
+        if (typeof stopWorkers === "function") {
+          await stopWorkers();
+        }
+      },
+      afterCloseServer: async () => {
+        await closeQueueInfra().catch(() => {});
+        await redisClient.quit().catch(() => {});
+        await disconnectMongo().catch(() => {});
+      },
+    });
 
   } catch (err) {
   console.error("🔥 BOOT ERROR DETAILS:", err);

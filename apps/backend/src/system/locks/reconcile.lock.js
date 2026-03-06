@@ -25,7 +25,7 @@ async function acquireLock(name, ttlMs = 60000) {
       },
       {
         upsert: true,
-        new: true,
+        returnDocument: "after",
       }
     );
 

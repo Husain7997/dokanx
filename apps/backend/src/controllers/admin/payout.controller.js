@@ -70,25 +70,43 @@ exports.manualPayout = async (req, res) => {
 };
 
 exports.retryPayout = async (req, res) => {
-  const { shopId } = req.body;
-  if (!shopId) {
-    return res.status(400).json({ message: "shopId is required" });
-  }
+  try {
+    const { shopId } = req.body;
+    if (!shopId) {
+      return res.status(400).json({ message: "shopId is required" });
+    }
 
-  const payout = await retryFailedPayout(shopId);
-  res.json({ message: 'Retry triggered', data: payout });
+    const payout = await retryFailedPayout(shopId);
+    return res.json({ message: 'Retry triggered', data: payout });
+  } catch (err) {
+    return res.status(400).json({
+      message: err.message || "Retry failed",
+    });
+  }
 };
 
 exports.approve = async (req, res) => {
-  const payout = await approvePayout(req.params.id, req.user._id);
-  res.json(payout);
+  try {
+    const payout = await approvePayout(req.params.id, req.user._id);
+    return res.json(payout);
+  } catch (err) {
+    return res.status(400).json({
+      message: err.message || "Approve failed",
+    });
+  }
 };
 
 exports.execute = async (req, res) => {
-  const payout = await executePayout(
-    req.params.id,
-    req.headers['idempotency-key']
-  );
-  res.json(payout);
+  try {
+    const payout = await executePayout(
+      req.params.id,
+      req.headers['idempotency-key']
+    );
+    return res.json(payout);
+  } catch (err) {
+    return res.status(400).json({
+      message: err.message || "Execute failed",
+    });
+  }
 };
 

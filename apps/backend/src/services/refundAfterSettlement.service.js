@@ -9,7 +9,7 @@ async function processRefundAfterSettlement(shopId, amount) {
   const wallet = await ShopWallet.findOneAndUpdate(
     { shopId: shopId },
     { $inc: { balance: amount } },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: "after" }
   );
 
   return wallet;

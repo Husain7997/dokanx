@@ -210,7 +210,7 @@ async function upsertBehaviorSignal({
     },
     {
       upsert: true,
-      new: true,
+      returnDocument: "after",
     }
   );
 
@@ -304,7 +304,7 @@ async function resolveSignal({
         resolvedBy: userId,
       },
     },
-    { new: true }
+    { returnDocument: "after" }
   );
 
   if (!signal) throw new Error("Signal not found");

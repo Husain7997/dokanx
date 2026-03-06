@@ -140,7 +140,7 @@ async function upsertLocalProduct({
     const updated = await Product.findOneAndUpdate(
       { _id: productId, shopId },
       { $set: data },
-      { new: true }
+      { returnDocument: "after" }
     );
     if (!updated) throw new Error("Product not found for this shop");
     return updated;

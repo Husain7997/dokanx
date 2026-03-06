@@ -11,7 +11,7 @@ exports.lockPeriod = async (req, res) => {
       lockedAt: new Date(),
       lockedBy: req.user._id
     },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: "after" }
   );
 
   res.json({ message: 'Finance period locked', data: fp });

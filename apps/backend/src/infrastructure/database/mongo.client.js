@@ -24,5 +24,11 @@ async function connectMongo() {
 
 module.exports = {
   connectMongo,
+  async disconnectMongo() {
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.disconnect();
+    }
+    isConnected = false;
+  },
   mongoose,
 };

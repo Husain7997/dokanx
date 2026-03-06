@@ -1,11 +1,10 @@
-const request = require('supertest');
-const app = require('../../app');
-const mongoose = require('mongoose');
+const request = require("supertest");
+const app = require("../../app");
 
-const { createAdminAndLogin } = require('../helpers/auth.helper');
-const { createFailedPayout } = require('../helpers/payout.helper');
+const { createAdminAndLogin } = require("../helpers/auth.helper");
+const { createFailedPayout } = require("../helpers/payout.helper");
 
-describe('PAYOUT RETRY', () => {
+describe("PAYOUT RETRY", () => {
   let token;
   let shopId;
 
@@ -17,14 +16,10 @@ describe('PAYOUT RETRY', () => {
     shopId = payout.shopId;
   });
 
-  afterAll(async () => {
-    await mongoose.connection.close();
-  });
-
-  it('✅ admin can retry failed payout', async () => {
+  it("admin can retry failed payout", async () => {
     const res = await request(app)
-      .post('/api/admin/payouts/retry')
-      .set('Authorization', `Bearer ${token}`)
+      .post("/api/admin/payouts/retry")
+      .set("Authorization", `Bearer ${token}`)
       .send({ shopId: String(shopId) });
 
     expect([200, 400]).toContain(res.statusCode);

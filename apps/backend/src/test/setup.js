@@ -1,12 +1,13 @@
 const mongoose = require("mongoose");
 const dotenv = require("dotenv");
 const { performance } = require("perf_hooks");
+const { redisClient } = require("../system/singletons/redisClient");
+const { closeQueueInfra } = require("../platform/queue/queue.client");
 
 if (!global.performance) {
   global.performance = performance;
 }
 
-// Load test env
 dotenv.config({
   path: ".env.test",
   override: true,
@@ -14,12 +15,11 @@ dotenv.config({
 });
 
 if (!process.env.MONGO_URI_TEST) {
-  throw new Error("❌ MONGO_URI_TEST missing. Check .env.test");
+  throw new Error("MONGO_URI_TEST missing. Check .env.test");
 }
 
 jest.setTimeout(30000);
 
-// 🔹 Connect ONCE before all tests
 beforeAll(async () => {
   if (mongoose.connection.readyState !== 1) {
     await mongoose.connect(process.env.MONGO_URI_TEST, {
@@ -27,22 +27,21 @@ beforeAll(async () => {
       socketTimeoutMS: 45000,
       maxPoolSize: 5,
     });
-    console.log("✅ MongoDB connected (test)");
+    console.log("MongoDB connected (test)");
   }
 });
 
-// 🔹 Cleanup AFTER all tests
 afterAll(async () => {
   if (mongoose.connection.readyState === 1) {
-    await mongoose.connection.dropDatabase();
-    await mongoose.disconnect();
-    console.log("✅ MongoDB disconnected (test)");
+    await mongoose.disconnect().catch(() => {});
   }
+
+  await closeQueueInfra().catch(() => {});
+  await redisClient.quit().catch(() => {});
 });
 
-// 🔹 Auth mocks
 jest.mock("../middlewares/auth.middleware", () => ({
-  protect: (req, res, next) => {
+  protect: (req, _res, next) => {
     const auth = String(req.headers.authorization || "");
     const isOwner = auth.includes("owner");
     const shopId = req.headers["x-test-shop-id"] || "000000000000000000000001";
@@ -59,14 +58,17 @@ jest.mock("../middlewares/auth.middleware", () => ({
     req.shop = { _id: shopId, id: shopId };
     next();
   },
-  role: () => (req, res, next) => next(),
+  role: () => (_req, _res, next) => next(),
 }));
 
-jest.mock("../middlewares/shop.middleware", () => ({
-  protect: (req, res, next) => next(),
-}), { virtual: true });
+jest.mock(
+  "../middlewares/shop.middleware",
+  () => ({
+    protect: (_req, _res, next) => next(),
+  }),
+  { virtual: true }
+);
 
-// 🔹 Global helpers
 global.validLedgerValues = {
   type: ["CREDIT", "DEBIT"],
   source: ["SYSTEM", "USER"],

@@ -13,7 +13,7 @@ exports.blockUser = async (req, res) => {
   const user = await User.findByIdAndUpdate(
     req.params.id,
     { isBlocked: true },
-    { new: true }
+    { returnDocument: "after" }
   );
 
   await createAudit({
@@ -31,7 +31,7 @@ exports.unblockUser = async (req, res) => {
   const user = await User.findByIdAndUpdate(
     req.params.id,
     { isBlocked: false  },
-    { new: true }
+    { returnDocument: "after" }
   );
 
   await createAudit({
@@ -49,7 +49,7 @@ exports.approveShop = async (req, res) => {
   const shop = await Shop.findByIdAndUpdate(
     req.params.id,
     { isActive: true },
-    { new: true }
+    { returnDocument: "after" }
   );
   await createAudit({
   admin: req.user._id,
@@ -65,7 +65,7 @@ exports.suspendShop = async (req, res) => {
   const shop = await Shop.findByIdAndUpdate(
     req.params.id,
     { isActive: false },
-    { new: true }
+    { returnDocument: "after" }
   );
    await createAudit({
   performedBy: req.user._id,

@@ -50,7 +50,7 @@ async function updatePolicy({
         ...(autoBlockCustomer !== undefined ? { autoBlockCustomer: Boolean(autoBlockCustomer) } : {}),
       },
     },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: "after" }
   );
 
   return policy;

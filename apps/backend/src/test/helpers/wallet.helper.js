@@ -13,7 +13,7 @@ async function seedShopWallet(shopId, balance = 0) {
         status: "ACTIVE",
       },
     },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: "after" }
   );
 }
 

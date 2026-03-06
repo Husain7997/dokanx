@@ -11,7 +11,7 @@ const mappedRowSchema = new mongoose.Schema(
     imageUrl: { type: String, default: "" },
     errors: [{ type: String }],
   },
-  { _id: false }
+  { _id: false, suppressReservedKeysWarning: true }
 );
 
 const schema = new mongoose.Schema(
