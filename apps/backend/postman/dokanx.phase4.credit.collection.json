@@ -1,0 +1,289 @@
+{
+  "info": {
+    "name": "DokanX Phase-4 Credit (Baki)",
+    "_postman_id": "dokanx-phase4-credit",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Credit - Upsert Policy",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{ownerToken}}" },
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "x-request-id", "value": "req-credit-policy-001" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"allowCredit\": true,\n  \"defaultLimit\": 8000,\n  \"maxOverdueDays\": 21,\n  \"autoBlockCustomer\": false\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/credit/policy",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "credit", "policy"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const json = pm.response.json();",
+              "pm.test(\"Policy response shape\", function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json).to.have.property(\"policy\");",
+              "  pm.expect(json.policy.allowCredit).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Credit - Register Customer",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{ownerToken}}" },
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "x-request-id", "value": "req-credit-customer-001" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"{{customerPhone}}\",\n  \"name\": \"{{customerName}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/credit/customers",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "credit", "customers"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 201\", function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "const json = pm.response.json();",
+              "pm.test(\"Register customer response\", function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json).to.have.property(\"customer\");",
+              "  pm.expect(json.customer).to.have.property(\"_id\");",
+              "  pm.expect(json).to.have.property(\"account\");",
+              "});",
+              "pm.collectionVariables.set(\"customerId\", json.customer._id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Credit - Issue",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{ownerToken}}" },
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "idempotency-key", "value": "credit-issue-{{customerId}}-001" },
+          { "key": "x-request-id", "value": "req-credit-issue-001" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"amount\": 1500,\n  \"reference\": \"SALE-001\",\n  \"meta\": {\n    \"note\": \"Baki sale\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/credit/issue",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "credit", "issue"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 201\", function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "const json = pm.response.json();",
+              "pm.test(\"Issue credit response\", function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json).to.have.property(\"account\");",
+              "  pm.expect(json.account.outstandingBalance).to.be.at.least(1500);",
+              "  pm.expect(json).to.have.property(\"ledger\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Credit - Receive Payment",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{ownerToken}}" },
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "idempotency-key", "value": "credit-pay-{{customerId}}-001" },
+          { "key": "x-request-id", "value": "req-credit-payment-001" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"amount\": 700,\n  \"reference\": \"PAY-001\",\n  \"meta\": {\n    \"channel\": \"cash\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/credit/payment",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "credit", "payment"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 201\", function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "const json = pm.response.json();",
+              "pm.test(\"Receive payment response\", function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json).to.have.property(\"account\");",
+              "  pm.expect(json.account.outstandingBalance).to.be.a(\"number\");",
+              "  pm.expect(json).to.have.property(\"ledger\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Credit - Customer Snapshot",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{ownerToken}}" },
+          { "key": "x-request-id", "value": "req-credit-customer-snapshot-001" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/credit/customer/{{customerId}}?limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "credit", "customer", "{{customerId}}"],
+          "query": [{ "key": "limit", "value": "20" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const json = pm.response.json();",
+              "pm.test(\"Customer snapshot response\", function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json).to.have.property(\"account\");",
+              "  pm.expect(json).to.have.property(\"history\");",
+              "  pm.expect(json.history).to.be.an(\"array\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Credit - Due Accounts",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{ownerToken}}" },
+          { "key": "x-request-id", "value": "req-credit-due-001" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/credit/due?overdueOnly=false&limit=50",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "credit", "due"],
+          "query": [
+            { "key": "overdueOnly", "value": "false" },
+            { "key": "limit", "value": "50" }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const json = pm.response.json();",
+              "pm.test(\"Due list response\", function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json).to.have.property(\"count\");",
+              "  pm.expect(json).to.have.property(\"data\");",
+              "  pm.expect(json.data).to.be.an(\"array\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Credit - Reminder Ready",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{ownerToken}}" },
+          { "key": "x-request-id", "value": "req-credit-reminder-001" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/credit/reminders/ready?limit=50",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "credit", "reminders", "ready"],
+          "query": [{ "key": "limit", "value": "50" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const json = pm.response.json();",
+              "pm.test(\"Reminder-ready response\", function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json).to.have.property(\"count\");",
+              "  pm.expect(json).to.have.property(\"data\");",
+              "  pm.expect(json.data).to.be.an(\"array\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5001" },
+    { "key": "ownerToken", "value": "" },
+    { "key": "customerPhone", "value": "01700000000" },
+    { "key": "customerName", "value": "Baki Customer" },
+    { "key": "customerId", "value": "" }
+  ]
+}

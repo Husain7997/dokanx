@@ -1,9 +1,15 @@
+// src/utils/orderStatusRules.js
 
-import { canTransition } from "./orderStatus.util.js";
-import { createAudit } from"../utils/audit.util.js";
+const { createAudit } = require("@/utils/audit.util");
+const { canTransition } = require("@/utils/orderStatus.util");
+const Order = require("@/models/order.model");
 
-import Order from"../models/order.model.js";
-
+/**
+ * UPDATE ORDER STATUS
+ * - Validates transition rules
+ * - Enforces shop isolation
+ * - Creates audit trail
+ */
 exports.updateOrderStatus = async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -15,7 +21,9 @@ exports.updateOrderStatus = async (req, res) => {
     });
 
     if (!order) {
-      return res.status(404).json({ message: "Order not found" });
+      return res.status(404).json({
+        message: "Order not found"
+      });
     }
 
     if (!canTransition(order.status, status)) {
@@ -24,22 +32,36 @@ exports.updateOrderStatus = async (req, res) => {
       });
     }
 
+    const previousStatus = order.status;
+
     order.status = status;
     await order.save();
+
+    /* =========================
+       AUDIT TRAIL
+    ========================= */
 
     await createAudit({
       action: "ORDER_STATUS_UPDATED",
       performedBy: req.user._id,
       targetType: "Order",
       targetId: order._id,
-      meta: { from: order.status, to: status },
+      meta: {
+        from: previousStatus,
+        to: status
+      },
       req
     });
 
-    res.json({ message: t('common.updated', req.lang), data: order });
+    return res.json({
+      message: "Order status updated",
+      data: order
+    });
 
   } catch (err) {
-    console.error("ORDER STATUS ERROR:", err.message);
-    res.status(500).json({ message: "Failed to update order" });
+    console.error("ORDER STATUS ERROR:", err);
+    return res.status(500).json({
+      message: "Failed to update order"
+    });
   }
 };

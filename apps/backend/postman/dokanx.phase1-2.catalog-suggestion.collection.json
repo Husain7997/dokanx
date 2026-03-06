@@ -1,0 +1,168 @@
+{
+  "info": {
+    "name": "DokanX Phase-1-2 Catalog Suggestion",
+    "_postman_id": "dokanx-phase1-2-catalog",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Catalog - Suggest Product",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{ownerToken}}" },
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "x-request-id", "value": "req-catalog-suggest-001" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Napa\",\n  \"barcode\": \"\",\n  \"limit\": 10\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/catalog/suggest",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "catalog", "suggest"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+              "const json = pm.response.json();",
+              "pm.test(\"Suggest response shape\", function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json).to.have.property(\"query\");",
+              "  pm.expect(json).to.have.property(\"found\");",
+              "  pm.expect(json).to.have.property(\"suggestions\");",
+              "});",
+              "if (json.bestMatch && json.bestMatch.globalProductId) {",
+              "  pm.collectionVariables.set(\"globalProductId\", json.bestMatch.globalProductId);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Catalog - Decision ACCEPT",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{ownerToken}}" },
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "x-request-id", "value": "req-catalog-accept-001" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"ACCEPT\",\n  \"query\": {\n    \"name\": \"Napa\",\n    \"barcode\": \"\"\n  },\n  \"globalProductId\": \"{{globalProductId}}\",\n  \"localProduct\": {\n    \"price\": 10,\n    \"stock\": 20\n  },\n  \"allowCreateGlobal\": false\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/catalog/decision",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "catalog", "decision"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+              "const json = pm.response.json();",
+              "pm.test(\"Decision accept response\", function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json).to.have.property(\"decision\");",
+              "  pm.expect(json.decision.action).to.eql(\"ACCEPT\");",
+              "  pm.expect(json).to.have.property(\"product\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Catalog - Decision EDIT + Allow Global Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{ownerToken}}" },
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "x-request-id", "value": "req-catalog-edit-001" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"EDIT\",\n  \"query\": {\n    \"name\": \"New Sample Product\",\n    \"barcode\": \"1234567890\"\n  },\n  \"localProduct\": {\n    \"name\": \"New Sample Product 500mg\",\n    \"brand\": \"Sample Brand\",\n    \"category\": \"Medicine\",\n    \"barcode\": \"1234567890\",\n    \"imageUrl\": \"https://example.com/p.jpg\",\n    \"price\": 55,\n    \"stock\": 5\n  },\n  \"allowCreateGlobal\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/catalog/decision",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "catalog", "decision"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+              "const json = pm.response.json();",
+              "pm.test(\"Decision edit response\", function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json.decision.action).to.eql(\"EDIT\");",
+              "  pm.expect(json).to.have.property(\"product\");",
+              "  pm.expect(json).to.have.property(\"globalProduct\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Catalog - Decision IGNORE",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{ownerToken}}" },
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "x-request-id", "value": "req-catalog-ignore-001" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"IGNORE\",\n  \"query\": {\n    \"name\": \"Ignore Product\",\n    \"barcode\": \"\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/catalog/decision",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "catalog", "decision"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+              "const json = pm.response.json();",
+              "pm.test(\"Decision ignore response\", function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json.decision.action).to.eql(\"IGNORE\");",
+              "  pm.expect(json.product).to.eql(null);",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5001" },
+    { "key": "ownerToken", "value": "" },
+    { "key": "globalProductId", "value": "" }
+  ]
+}

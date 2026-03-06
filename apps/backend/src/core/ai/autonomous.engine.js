@@ -1,4 +1,4 @@
-const eventBus = require("@/infrastructure/events/eventBus");
+const {eventBus} = require("@/core/infrastructure");
 const StoreBrain = require("./agents/store.brain");
 
 class AutonomousEngine {

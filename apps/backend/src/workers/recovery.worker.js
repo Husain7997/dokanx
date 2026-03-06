@@ -1,9 +1,12 @@
 const { runRecovery } =
   require("@/core/recovery/recovery.engine");
 
-async function startRecoveryWorker() {
-  console.log("🤖 Recovery Worker Started");
+const { safeWorker } = require("@/system/workerWrapper");
 
+const startRecoveryWorker = safeWorker(async () => {
+console.log("Recovery worker started");
+
+ 
   setInterval(async () => {
     try {
       await runRecovery();
@@ -11,6 +14,13 @@ async function startRecoveryWorker() {
       console.error("Recovery error:", err.message);
     }
   }, 60 * 1000); // every 1 minute
-}
+
+  console.log("Recovery worker completed");
+});
 
 module.exports = { startRecoveryWorker };
+
+
+
+
+

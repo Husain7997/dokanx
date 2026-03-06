@@ -1,7 +1,6 @@
 const mongoose = require("mongoose");
 
-const ledgerSchema =
- new mongoose.Schema({
+const ledgerSchema = new mongoose.Schema({
 
   shopId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -16,12 +15,14 @@ const ledgerSchema =
 
   type: {
     type: String,
+    enum: ["debit", "credit"], // ✅ strict double entry
     required: true
   },
 
   referenceId: {
     type: String,
-    required: true
+    required: true,
+    index: true
   },
 
   meta: {
@@ -39,5 +40,4 @@ ledgerSchema.pre("deleteOne", () => {
   throw new Error("Ledger delete forbidden");
 });
 
-module.exports =
- mongoose.model("Ledger", ledgerSchema);
+module.exports = mongoose.model("Ledger", ledgerSchema);

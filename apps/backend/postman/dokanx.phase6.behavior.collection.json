@@ -1,0 +1,163 @@
+{
+  "info": {
+    "name": "DokanX Phase-6 Behavior Intelligence",
+    "_postman_id": "dokanx-phase6-behavior",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Behavior - Customer Insight",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{ownerToken}}" },
+          { "key": "x-request-id", "value": "req-behavior-customer-001" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/behavior/customer/{{customerId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "behavior", "customer", "{{customerId}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+              "const json = pm.response.json();",
+              "pm.test(\"Behavior insight shape\", function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json).to.have.property(\"data\");",
+              "  pm.expect(json.data).to.have.property(\"customer\");",
+              "  pm.expect(json.data).to.have.property(\"credit\");",
+              "  pm.expect(json.data).to.have.property(\"purchase\");",
+              "  pm.expect(json.data).to.have.property(\"composite\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Behavior - Scan Risk",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{ownerToken}}" },
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "x-request-id", "value": "req-behavior-scan-001" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"maxCustomers\": 100\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/behavior/scan",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "behavior", "scan"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+              "const json = pm.response.json();",
+              "pm.test(\"Risk scan shape\", function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json).to.have.property(\"generatedSignals\");",
+              "  pm.expect(json).to.have.property(\"data\");",
+              "  pm.expect(json.data).to.be.an(\"array\");",
+              "});",
+              "if (json.data && json.data.length > 0) {",
+              "  pm.collectionVariables.set(\"signalId\", json.data[0]._id);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Behavior - List Signals",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{ownerToken}}" },
+          { "key": "x-request-id", "value": "req-behavior-list-001" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/behavior/signals?severity=HIGH&limit=50",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "behavior", "signals"],
+          "query": [
+            { "key": "severity", "value": "HIGH" },
+            { "key": "limit", "value": "50" }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+              "const json = pm.response.json();",
+              "pm.test(\"Signal list shape\", function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json).to.have.property(\"count\");",
+              "  pm.expect(json).to.have.property(\"data\");",
+              "  pm.expect(json.data).to.be.an(\"array\");",
+              "});",
+              "if (json.data && json.data.length > 0) {",
+              "  pm.collectionVariables.set(\"signalId\", json.data[0]._id);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Behavior - Resolve Signal",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{ownerToken}}" },
+          { "key": "x-request-id", "value": "req-behavior-resolve-001" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/behavior/signals/{{signalId}}/resolve",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "behavior", "signals", "{{signalId}}", "resolve"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+              "const json = pm.response.json();",
+              "pm.test(\"Signal resolved\", function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json).to.have.property(\"signal\");",
+              "  pm.expect(json.signal.resolved).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5001" },
+    { "key": "ownerToken", "value": "" },
+    { "key": "customerId", "value": "" },
+    { "key": "signalId", "value": "" }
+  ]
+}

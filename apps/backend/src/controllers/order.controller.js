@@ -8,7 +8,7 @@ const mongoose = require("mongoose");
 const CheckoutEngine =
 require("@/core/checkout/checkout.engine");
 const { publishEvent } = require("@/core/infrastructure");
-const logger = require("../infrastructure/logger/logger");
+const {logger} = require("@/core/infrastructure");
 const { t } =
   require('@/core/infrastructure');
 const { addJob } = require("@/core/infrastructure");

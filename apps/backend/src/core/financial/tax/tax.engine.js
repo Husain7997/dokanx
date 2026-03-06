@@ -14,9 +14,12 @@ exports.applyTax = async ({ shopId, amount }) => {
   const ledger = await Ledger.create({
     shopId,
     amount: taxAmount,
-    type: "DEBIT",
-    source: "TAX",
-    reference: "TAX-" + Date.now(),
+    type: "debit",
+    referenceId: "TAX-" + Date.now(),
+    meta: {
+      source: "TAX",
+      ruleId: rule._id,
+    },
   });
 
   return {

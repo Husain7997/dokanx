@@ -1,5 +1,5 @@
 const { addJob } = require("@/core/infrastructure");
-const eventBus  = require("@/infrastructure/events/eventBus");
+const {eventBus} = require("@/core/infrastructure");
 const decision = require("./decision.engine");
 
 exports.observe = async event => {

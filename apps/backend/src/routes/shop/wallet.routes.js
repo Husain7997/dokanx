@@ -3,6 +3,7 @@ const router = express.Router();
 
 const { protect, allowRoles } = require("../../middlewares");
 // const allowRoles = require("../../middlewares/rbac.middleware");
+const { tenantGuard } = require("@/api/middleware/tenantGuard");
 const WalletController = require("../../controllers/shop/wallet.controller");
 const { redisRateLimiter } =
   require("@/platform/rate-limit/redisRateLimiter");
@@ -11,6 +12,7 @@ const {
 } = require('../../controllers/shop/shopPayout.controller');
 
 router.use(protect);
+router.use(tenantGuard);
 router.use(allowRoles("OWNER", "ADMIN"));
 router.post(
   '/payouts',

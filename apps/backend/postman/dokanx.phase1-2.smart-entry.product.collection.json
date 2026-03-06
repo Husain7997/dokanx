@@ -1,0 +1,154 @@
+{
+  "info": {
+    "name": "DokanX Phase-1-2 Smart Product Entry",
+    "_postman_id": "dokanx-phase1-2-smart-entry-product",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Product - Smart Suggest",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{ownerToken}}" },
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "x-request-id", "value": "req-product-smart-suggest-001" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Napa\",\n  \"barcode\": \"\",\n  \"limit\": 10,\n  \"localProduct\": {\n    \"price\": 12,\n    \"stock\": 25\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/products/smart-suggest",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "products", "smart-suggest"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+              "const json = pm.response.json();",
+              "pm.test(\"Smart suggest response shape\", function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json).to.have.property(\"suggestion\");",
+              "  pm.expect(json).to.have.property(\"prefill\");",
+              "  pm.expect(json.prefill).to.have.property(\"name\");",
+              "});",
+              "if (json.suggestion && json.suggestion.bestMatch && json.suggestion.bestMatch.globalProductId) {",
+              "  pm.collectionVariables.set(\"globalProductId\", json.suggestion.bestMatch.globalProductId);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Product - Create With Smart Entry Accept",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{ownerToken}}" },
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "x-request-id", "value": "req-product-smart-create-accept-001" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Napa Test {{uniq}}\",\n  \"price\": 10,\n  \"stock\": 20,\n  \"smartEntry\": {\n    \"enabled\": true,\n    \"queryName\": \"Napa\",\n    \"queryBarcode\": \"\",\n    \"globalProductId\": \"{{globalProductId}}\",\n    \"applySuggestion\": true,\n    \"recordDecision\": true,\n    \"action\": \"ACCEPT\",\n    \"allowCreateGlobal\": false\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/products",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "products"]
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set(\"uniq\", Date.now());"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+              "const json = pm.response.json();",
+              "pm.test(\"Create with smart entry accept\", function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json).to.have.property(\"product\");",
+              "  pm.expect(json).to.have.property(\"inventory\");",
+              "  pm.expect(json).to.have.property(\"smartEntry\");",
+              "  pm.expect(json.smartEntry.enabled).to.eql(true);",
+              "});",
+              "if (json.product && json.product._id) {",
+              "  pm.collectionVariables.set(\"createdProductId\", json.product._id);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Product - Create With Smart Entry Edit + Global Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{ownerToken}}" },
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "x-request-id", "value": "req-product-smart-create-edit-001" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Custom New Product {{uniq}}\",\n  \"brand\": \"Custom Brand\",\n  \"category\": \"Medicine\",\n  \"barcode\": \"CB-{{uniq}}\",\n  \"imageUrl\": \"https://example.com/custom.jpg\",\n  \"price\": 45,\n  \"stock\": 10,\n  \"smartEntry\": {\n    \"enabled\": true,\n    \"queryName\": \"Custom New Product {{uniq}}\",\n    \"queryBarcode\": \"CB-{{uniq}}\",\n    \"applySuggestion\": true,\n    \"recordDecision\": true,\n    \"action\": \"EDIT\",\n    \"allowCreateGlobal\": true\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/products",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "products"]
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set(\"uniq\", Date.now());"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+              "const json = pm.response.json();",
+              "pm.test(\"Create with smart entry edit\", function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json.smartEntry.enabled).to.eql(true);",
+              "  pm.expect(json.smartEntry).to.have.property(\"decision\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5001" },
+    { "key": "ownerToken", "value": "" },
+    { "key": "globalProductId", "value": "" },
+    { "key": "createdProductId", "value": "" },
+    { "key": "uniq", "value": "" }
+  ]
+}

@@ -1,0 +1,140 @@
+{
+  "info": {
+    "name": "DokanX Phase-3 Catalog Import",
+    "_postman_id": "dokanx-phase3-catalog-import",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Catalog Import - Upload Excel",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{ownerToken}}" },
+          { "key": "x-request-id", "value": "req-catalog-upload-001" }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": "{{catalogExcelFile}}"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/catalog/import-excel/upload",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "catalog", "import-excel", "upload"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 201\", function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "pm.test(\"Upload response shape\", function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json).to.have.property(\"batchId\");",
+              "  pm.expect(json).to.have.property(\"summary\");",
+              "  pm.expect(json.status).to.eql(\"UPLOADED\");",
+              "});",
+              "",
+              "pm.collectionVariables.set(\"batchId\", json.batchId);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Catalog Import - Preview Batch",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{ownerToken}}" },
+          { "key": "x-request-id", "value": "req-catalog-preview-001" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/catalog/import-excel/preview/{{batchId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "catalog", "import-excel", "preview", "{{batchId}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "pm.test(\"Preview response shape\", function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json.batchId).to.eql(pm.collectionVariables.get(\"batchId\"));",
+              "  pm.expect([\"PREVIEWED\", \"CONFIRMED\"]).to.include(json.status);",
+              "  pm.expect(json).to.have.property(\"summary\");",
+              "  pm.expect(json).to.have.property(\"mappedRows\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Catalog Import - Confirm Batch",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{ownerToken}}" },
+          { "key": "idempotency-key", "value": "catalog-import-{{batchId}}" },
+          { "key": "x-request-id", "value": "req-catalog-confirm-001" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/catalog/import-excel/confirm/{{batchId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "catalog", "import-excel", "confirm", "{{batchId}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "pm.test(\"Confirm response shape\", function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json.batchId).to.eql(pm.collectionVariables.get(\"batchId\"));",
+              "  pm.expect(json.status).to.eql(\"CONFIRMED\");",
+              "  pm.expect(json).to.have.property(\"summary\");",
+              "  pm.expect(json.summary).to.have.property(\"importedRows\");",
+              "  pm.expect(json.summary).to.have.property(\"skippedRows\");",
+              "  pm.expect(json).to.have.property(\"confirmedAt\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5001" },
+    { "key": "ownerToken", "value": "" },
+    { "key": "catalogExcelFile", "value": "" },
+    { "key": "batchId", "value": "" }
+  ]
+}

@@ -34,8 +34,7 @@ const {
   connectMongo,
 } = require("./infrastructure/database/mongo.client");
 
-const { logger } =
-  require("@/core/infrastructure");
+const logger = require("@/core/infrastructure/logger");
 
 const { registerWorkers } =
   require("./workers");

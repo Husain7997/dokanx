@@ -1,6 +1,6 @@
 // src/core/notification/notification.publisher.js
 
-const eventBus = require("@/infrastructure/events/eventBus");
+const {eventBus} = require("@/core/infrastructure");
 
 /**
  * Publish user notification event

@@ -1,7 +1,7 @@
 const Shop =
   require("@/models/shop.model");
 
-const eventBus = require("@/infrastructure/events/eventBus");
+const {eventBus} = require("@/core/infrastructure");
 
 exports.act = async ({ risk, event }) => {
 

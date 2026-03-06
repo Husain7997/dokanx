@@ -1,18 +1,36 @@
 const mongoose = require("mongoose");
 
 const schema = new mongoose.Schema({
-  shop: ObjectId,
+  shop: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Shop",
+    required: true,
+    unique: true,
+    index: true,
+  },
 
-  allowCredit: Boolean,
+  allowCredit: {
+    type: Boolean,
+    default: true,
+  },
 
-  defaultLimit: Number,
+  defaultLimit: {
+    type: Number,
+    default: 5000,
+  },
 
-  maxOverdueDays: Number,
+  maxOverdueDays: {
+    type: Number,
+    default: 30,
+  },
 
-  autoBlockCustomer: Boolean,
+  autoBlockCustomer: {
+    type: Boolean,
+    default: false,
+  },
 });
 
-module.exports = mongoose.model(
+module.exports = mongoose.models.CreditPolicy || mongoose.model(
   "CreditPolicy",
   schema
 );

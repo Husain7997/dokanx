@@ -1,16 +1,16 @@
-const eventBus = require("@/infrastructure/events/eventBus");
-const brain = require("./ai.brain");
+// src/core/ai/agents/ai.observer.js
+
+const { eventBus } = require("@/core/infrastructure");
 
 function startAIObserver() {
   console.log("🧠 AI Observer started");
 
-  eventBus.onAny(async (event, value) => {
-    try {
-      await brain.process(value);
-    } catch (err) {
-      console.error("AI error:", err.message);
-    }
-  });
+  const originalEmit = eventBus.emit;
+
+  eventBus.emit = function (eventName, ...args) {
+    console.log(`🤖 AI Observed Event: ${eventName}`);
+    return originalEmit.call(this, eventName, ...args);
+  };
 }
 
 module.exports = { startAIObserver };

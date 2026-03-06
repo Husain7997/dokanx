@@ -1,5 +1,5 @@
 const saga = require("./saga.engine");
-const eventBus = require("@/infrastructure/events/eventBus"); 
+const {eventBus} = require("@/core/infrastructure"); 
 eventBus.on("*", async (event) => {
   await saga.execute(event);
 });

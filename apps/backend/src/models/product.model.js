@@ -13,6 +13,22 @@ const productSchema = new mongoose.Schema(
     type: String,
     required: true,
   },
+  brand: {
+    type: String,
+    default: "",
+  },
+  category: {
+    type: String,
+    default: "",
+  },
+  barcode: {
+    type: String,
+    default: "",
+  },
+  imageUrl: {
+    type: String,
+    default: "",
+  },
 
   price: {
     type: Number,
@@ -48,6 +64,7 @@ isReconciling: {
 );
 
 productSchema.index({ shopId: 1, name: 1 });
+productSchema.index({ shopId: 1, barcode: 1 });
 productSchema.index({ shopId: 1, createdAt: -1 });
 
 module.exports =

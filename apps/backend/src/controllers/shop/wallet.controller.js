@@ -12,10 +12,10 @@ async (req, res, next) => {
 
     const result =
       await walletService.creditWallet({
-        shopId: req.user._id,
-        amount: req.body.amount,
-        reference: `manual-topup-${Date.now()}`,
-      });
+  shopId: req.user._id,
+  amount: req.body.amount,
+  referenceId: `manual-topup-${Date.now()}`
+});
 
     res.json({
       message: t(req.lang, "wallet.topped_up"),
@@ -34,13 +34,13 @@ async (req, res, next) => {
     await walletService.debitWallet({
       shopId: req.user._id,
       amount: req.body.amount,
-      reference: `transfer-${Date.now()}`,
+      referenceId: `transfer-${Date.now()}`,
     });
 
     await walletService.creditWallet({
       shopId: req.body.toShopId,
       amount: req.body.amount,
-      reference: `transfer-${Date.now()}`,
+      referenceId: `transfer-${Date.now()}`,
     });
 
     res.json({

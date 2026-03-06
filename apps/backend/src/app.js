@@ -37,8 +37,6 @@ const { logger } =
 
   const { resolveLanguage } = require("@/core/language");
 
-  const {tenantGuard} =require("./api/middleware/tenantGuard");
-
 /*
 |--------------------------------------------------------------------------
 | APP INIT
@@ -62,8 +60,6 @@ app.use(httpLogger);
 
 app.use(passport.initialize());
 app.use("/docs", openApiDocs);
-
-app.use(tenantGuard);
 
 app.use((req, res, next) => {
   req.lang = resolveLanguage(req);

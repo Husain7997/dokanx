@@ -1,11 +1,26 @@
-const eventBus = require("./eventBus");
+// src/infrastructure/events/listeners.js
 
-eventBus.on("ORDER_CREATED", async (payload) => {
-  console.log("ORDER_CREATED received", payload);
-});
+const { eventBus, logger } = require("@/core/infrastructure");
 
-eventBus.on("PAYMENT_SUCCESS", async (payload) => {
-  console.log("PAYMENT_SUCCESS received", payload);
-});
+/**
+ * GLOBAL EVENT LISTENERS
+ * All domain events are registered here
+ */
 
-console.log("✅ Event listeners registered");
+function registerEventListeners() {
+
+  eventBus.on("LEDGER_TRANSACTION_COMPLETED", (payload) => {
+    logger.info({
+      event: "LEDGER_TRANSACTION_COMPLETED",
+      payload
+    });
+  });
+
+  // Add more domain listeners here
+
+  logger.info("Event listeners registered");
+}
+
+registerEventListeners();
+
+module.exports = {};

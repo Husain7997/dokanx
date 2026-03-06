@@ -5,28 +5,33 @@ const productController = require("../controllers/product.controller");
 const { protect } = require("../middlewares");
 const role = require("../middlewares/role.middleware");
 const checkShopOwnership = require("../middlewares/checkShopOwnership");
-// const { resolveShop } = require("../middlewares/shop.middleware");
-console.log("createProduct TYPE:", typeof productController.createProduct);
-console.log("createProduct VALUE:", productController.createProduct);
+const { tenantGuard } = require("@/api/middleware/tenantGuard");
+
+router.post(
+  "/smart-suggest",
+  protect,
+  tenantGuard,
+  role("OWNER"),
+  checkShopOwnership,
+  productController.smartSuggest
+);
 
 router.post(
   "/",
-  protect,        // 🔥 MUST FIRST
-  // resolveShop,
+  protect,
+  tenantGuard,
   role("OWNER"),
   checkShopOwnership,
   productController.createProduct
 );
 
-router.get(
-  "/shop/:shopId",
-  productController.getProductsByShop
-);
+router.get("/shop/:shopId", productController.getProductsByShop);
 
 router.get(
   "/:productId/inventory",
   protect,
-  // resolveShop,
+  tenantGuard,
   productController.getProductInventory
 );
+
 module.exports = router;

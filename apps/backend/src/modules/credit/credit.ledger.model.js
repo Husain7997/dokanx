@@ -2,8 +2,19 @@ const mongoose = require("mongoose");
 
 const schema = new mongoose.Schema(
   {
-    shop: ObjectId,
-    customer: ObjectId,
+    shop: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Shop",
+      required: true,
+      index: true,
+    },
+
+    customer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "CustomerIdentity",
+      required: true,
+      index: true,
+    },
 
     type: {
       type: String,
@@ -14,16 +25,34 @@ const schema = new mongoose.Schema(
       ],
     },
 
-    amount: Number,
+    amount: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
 
-    reference: String,
+    reference: {
+      type: String,
+      default: "",
+      index: true,
+    },
+
+    idempotencyKey: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
 
     meta: Object,
   },
   { timestamps: true }
 );
 
-module.exports = mongoose.model(
+schema.pre("deleteOne", () => {
+  throw new Error("Credit ledger delete forbidden");
+});
+
+module.exports = mongoose.models.CreditLedger || mongoose.model(
   "CreditLedger",
   schema
 );

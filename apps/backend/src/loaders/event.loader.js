@@ -1,5 +1,4 @@
-const  eventBus  =
-require("../infrastructure/events/eventBus");
+const {eventBus} = require("@/core/infrastructure");
 
 const {
   handleInventoryReserved,

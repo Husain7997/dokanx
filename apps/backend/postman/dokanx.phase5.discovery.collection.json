@@ -1,0 +1,96 @@
+{
+  "info": {
+    "name": "DokanX Phase-5 Discovery",
+    "_postman_id": "dokanx-phase5-discovery",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Search Shops - Grocery Near Me",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "x-request-id", "value": "req-search-shops-001" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/search/shops?q=grocery&lat={{lat}}&lng={{lng}}&radiusKm=10&limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "search", "shops"],
+          "query": [
+            { "key": "q", "value": "grocery" },
+            { "key": "lat", "value": "{{lat}}" },
+            { "key": "lng", "value": "{{lng}}" },
+            { "key": "radiusKm", "value": "10" },
+            { "key": "limit", "value": "20" }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const json = pm.response.json();",
+              "pm.test(\"Shop search response shape\", function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json).to.have.property(\"count\");",
+              "  pm.expect(json).to.have.property(\"data\");",
+              "  pm.expect(json.data).to.be.an(\"array\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Search Products - Napa Near Me",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "x-request-id", "value": "req-search-products-001" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/search/products?q=napa&lat={{lat}}&lng={{lng}}&radiusKm=10&limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "search", "products"],
+          "query": [
+            { "key": "q", "value": "napa" },
+            { "key": "lat", "value": "{{lat}}" },
+            { "key": "lng", "value": "{{lng}}" },
+            { "key": "radiusKm", "value": "10" },
+            { "key": "limit", "value": "20" }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const json = pm.response.json();",
+              "pm.test(\"Product search response shape\", function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "  pm.expect(json).to.have.property(\"count\");",
+              "  pm.expect(json).to.have.property(\"data\");",
+              "  pm.expect(json.data).to.be.an(\"array\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5001" },
+    { "key": "lat", "value": "23.8103" },
+    { "key": "lng", "value": "90.4125" }
+  ]
+}

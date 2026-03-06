@@ -27,6 +27,7 @@ async function createUser(overrides = {}) {
   await ensureConnected();
 
   return await User.create({
+    name: overrides.name || `Test User ${Date.now()}`,
     email:
   overrides.email ||
   `user-${Date.now()}-${Math.random().toString(36).slice(2)}@test.com`,
@@ -71,7 +72,7 @@ async function createShopWallet({ balance = 0 } = {}) {
     status: 'ACTIVE',
   });
 
-  return { shop, wallet, owner };
+  return { shop, shopId: shop._id, wallet, owner };
 }
 
 
@@ -89,15 +90,23 @@ async function createLedger(overrides = {}) {
     throw new Error('shopId is required for ledger');
   }
 
+  const normalizedType = String(overrides.type || "CREDIT").toLowerCase();
+  const type = normalizedType === "debit" ? "debit" : "credit";
+
   return await Ledger.create({
     shopId,
-    walletId: overrides.walletId,
     amount: overrides.amount ?? 100,
-    type: overrides.type ?? 'CREDIT',
-    source: overrides.source ?? 'SYSTEM',
-    referenceType: overrides.referenceType ?? 'TEST',
-    reference: overrides.reference ?? 'TEST',
-    balanceAfter: overrides.balanceAfter ?? 0,
+    type,
+    referenceId:
+      overrides.referenceId ||
+      overrides.reference ||
+      `TEST_REF_${Date.now()}`,
+    meta: {
+      walletId: overrides.walletId || null,
+      source: overrides.source ?? "SYSTEM",
+      referenceType: overrides.referenceType ?? "TEST",
+      balanceAfter: overrides.balanceAfter ?? 0,
+    },
   });
 }
 
