@@ -1,24 +1,21 @@
 const { createShopWallet } = require("./helpers/testHelpers");
+const Payout = require("../models/payout.model");
 const { processPayout } = require("../services/payout.service");
-const Wallet = require("../models/wallet.model"); // ✅ ADD
 
 describe("Payout Gateway", () => {
   it("should trigger payout", async () => {
-    const { wallet } = await createShopWallet({ balance: 1000 });
+    const { shopId, owner } = await createShopWallet({ balance: 1000 });
 
-    // ✅ SET WITHDRAWABLE BALANCE
-    await Wallet.updateOne(
-      { _id: wallet._id },
-      {
-        $set: {
-          withdrawable_balance: 1000,
-          available_balance: 1000,
-        },
-      }
-    );
+    await Payout.create({
+      shopId,
+      amount: 1000,
+      requestedBy: owner._id,
+      status: "PENDING",
+      type: "MANUAL",
+      reference: `TEST_REQ_${shopId}_${Date.now()}`,
+    });
 
-    const result = await processPayout({ walletId: wallet._id });
-
+    const result = await processPayout({ shopId });
 
     expect(result.status).toBe("SUCCESS");
   }, 30000);

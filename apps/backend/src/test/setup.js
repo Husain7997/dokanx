@@ -1,10 +1,16 @@
 const mongoose = require("mongoose");
 const dotenv = require("dotenv");
+const { performance } = require("perf_hooks");
+
+if (!global.performance) {
+  global.performance = performance;
+}
 
 // Load test env
 dotenv.config({
   path: ".env.test",
   override: true,
+  quiet: true,
 });
 
 if (!process.env.MONGO_URI_TEST) {
@@ -45,7 +51,7 @@ jest.mock("../middlewares/auth.middleware", () => ({
 
 jest.mock("../middlewares/shop.middleware", () => ({
   protect: (req, res, next) => next(),
-}));
+}), { virtual: true });
 
 // 🔹 Global helpers
 global.validLedgerValues = {

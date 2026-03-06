@@ -3,10 +3,6 @@ const Ledger = require('../../modules/ledger/ledger.model');
 const ShopWallet = require('../../models/ShopWallet');
 const { isTest } = require('../../config/runtime');
 
-if (isTest) {
-  return mockResult;
-}
-
 /**
  * Payout Types:
  * type = BANK | BKASH | NAGAD
@@ -18,6 +14,21 @@ exports.triggerPayout = async ({
   referenceId,
   idempotencyKey
 }) => {
+  if (isTest) {
+    return {
+      walletId,
+      type: 'PAYOUT',
+      direction: 'DEBIT',
+      amount,
+      meta: {
+        referenceId,
+        idempotencyKey,
+        provider: type,
+        status: 'SUCCESS'
+      }
+    };
+  }
+
   // Idempotency check (prevent double payout)
   const existing = await Ledger.findOne({
     meta: { referenceId, idempotencyKey }

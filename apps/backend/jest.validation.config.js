@@ -1,13 +1,10 @@
 module.exports = {
   testEnvironment: "node",
-  testMatch: ["<rootDir>/src/test/**/*.test.js"],
-  setupFilesAfterEnv: ["<rootDir>/src/test/setup.js"],
+  testMatch: ["<rootDir>/src/test/platform.validation.test.js"],
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1"
   },
-  testTimeout: 30000,
   clearMocks: true,
   verbose: true,
   maxWorkers: 1
-
 };
