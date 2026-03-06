@@ -43,7 +43,20 @@ afterAll(async () => {
 // 🔹 Auth mocks
 jest.mock("../middlewares/auth.middleware", () => ({
   protect: (req, res, next) => {
-    req.user = { _id: "testUserId", role: "admin" };
+    const auth = String(req.headers.authorization || "");
+    const isOwner = auth.includes("owner");
+    const shopId = req.headers["x-test-shop-id"] || "000000000000000000000001";
+    const userId = isOwner
+      ? "0000000000000000000000a1"
+      : "0000000000000000000000a2";
+
+    req.user = {
+      _id: userId,
+      id: userId,
+      role: isOwner ? "OWNER" : "ADMIN",
+      shopId,
+    };
+    req.shop = { _id: shopId, id: shopId };
     next();
   },
   role: () => (req, res, next) => next(),

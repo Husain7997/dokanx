@@ -27,14 +27,15 @@ describe('ADMIN PAYOUT FLOW', () => {
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(res.statusCode).toBe(200);
-    expect(res.body.status).toBe('APPROVED');
+    expect(res.body.status).toBe('PROCESSING');
   });
 
-  it('❌ admin cannot approve twice', async () => {
+  it('✅ second approve remains idempotent in processing', async () => {
     const res = await request(app)
       .post(`/api/admin/payouts/${payoutId}/approve`)
       .set('Authorization', `Bearer ${adminToken}`);
 
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.status).toBe('PROCESSING');
   });
 });

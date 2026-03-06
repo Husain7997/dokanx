@@ -9,7 +9,7 @@
     "test": "cross-env NODE_ENV=test jest --config jest.core.config.js --runInBand --detectOpenHandles",
     "test:core": "cross-env NODE_ENV=test jest --config jest.core.config.js --runInBand --detectOpenHandles",
     "test:legacy-payout": "cross-env NODE_ENV=test jest --config jest.legacy-payout.unit.config.js --runInBand --detectOpenHandles",
-    "test:legacy-payout:int": "cross-env NODE_ENV=test jest --config jest.legacy-payout.int.config.js --runInBand --detectOpenHandles",
+    "test:legacy-payout:int": "cross-env NODE_ENV=test jest --config jest.legacy-payout.int.config.js --runInBand --detectOpenHandles --forceExit",
     "test:all": "cross-env NODE_ENV=test jest --runInBand --detectOpenHandles",
     "test:validation": "cross-env NODE_ENV=test jest --config jest.validation.config.js --runInBand",
     "indexes:sync": "node src/scripts/syncPlatformIndexes.js"

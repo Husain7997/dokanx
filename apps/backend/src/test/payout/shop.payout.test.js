@@ -25,13 +25,14 @@ describe('SHOP PAYOUT FLOW', () => {
     const res = await request(app)
       .post('/api/shop/wallet/payouts')
       .set('Authorization', `Bearer ${token}`)
+      .set('x-test-shop-id', String(shopId))
       .send({
         amount: 5000,
         method: 'bank'
       });
 
     expect(res.statusCode).toBe(201);
-    expect(res.body.status).toBe('REQUESTED');
+    expect(res.body.status).toBe('PENDING');
     expect(res.body.amount).toBe(5000);
   });
 

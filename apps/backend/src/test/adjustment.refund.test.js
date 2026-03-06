@@ -7,7 +7,8 @@ describe("Adjustment Flow", () => {
     async () => {
 
       const res = await request(app)
-        .post("/admin/adjust")
+        .post("/api/admin/adjustments/adjust")
+        .set("Authorization", "Bearer test-admin-token")
         .send({
           shopId:
             "000000000000000000000001",

@@ -1,5 +1,6 @@
-const FinancialEngine =
-  require("@/core/financial/financial.engine");
+const {
+  executeFinancial
+} = require("@/services/financialCommand.service");
 
 /* ================================
    ADMIN WALLET ADJUSTMENT
@@ -8,17 +9,16 @@ const FinancialEngine =
 exports.adjustWallet = async (req, res) => {
   const { shopId, amount, reason } = req.body;
 
-  const result = await FinancialEngine.execute({
+  const result = await executeFinancial({
     shopId,
     amount,
-    type: "ADMIN_ADJUSTMENT",
-    referenceId: req.user.id,
-    meta: { reason },
+    reason: reason || "admin_adjustment",
+    idempotencyKey: `ADMIN_ADJUST_${shopId}_${req.user.id}_${Date.now()}`,
   });
 
   res.json({
     success: true,
-    balance: result.balance,
+    transactionId: result.transactionId,
   });
 };
 
@@ -29,16 +29,15 @@ exports.adjustWallet = async (req, res) => {
 exports.refundShop = async (req, res) => {
   const { shopId, amount, reason } = req.body;
 
-  const result = await FinancialEngine.execute({
+  const result = await executeFinancial({
     shopId,
-    amount: -Math.abs(amount), // debit
-    type: "ADMIN_REFUND",
-    referenceId: req.user.id,
-    meta: { reason },
+    amount: Math.abs(amount),
+    reason: reason || "admin_refund",
+    idempotencyKey: `ADMIN_REFUND_${shopId}_${req.user.id}_${Date.now()}`,
   });
 
   res.json({
     success: true,
-    balance: result.balance,
+    transactionId: result.transactionId,
   });
 };

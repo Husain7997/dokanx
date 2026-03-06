@@ -8,8 +8,7 @@ if (process.env.NODE_ENV === 'test') {
   module.exports = {
     startAutoSettlementCron: () => {},
   };
-  return;
-}
+} else {
 
 async function lockShop(shopId) {
   try {
@@ -54,3 +53,4 @@ function startAutoSettlementCron() {
 }
 
 module.exports = { startAutoSettlementCron };
+}
