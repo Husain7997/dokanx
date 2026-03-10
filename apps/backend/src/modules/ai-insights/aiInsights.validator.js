@@ -22,6 +22,13 @@ function validateBusinessInsightsQuery(input) {
     }
   }
 
+  if (input.maxAdjustmentPct !== undefined) {
+    const maxAdjustmentPct = Number(input.maxAdjustmentPct);
+    if (!Number.isFinite(maxAdjustmentPct) || maxAdjustmentPct < 1 || maxAdjustmentPct > 30) {
+      errors.push("maxAdjustmentPct must be between 1 and 30");
+    }
+  }
+
   return { valid: errors.length === 0, errors };
 }
 

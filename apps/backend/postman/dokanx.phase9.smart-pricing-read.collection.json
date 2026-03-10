@@ -1,0 +1,29 @@
+{
+  "info": {
+    "name": "DokanX Phase 9 Smart Pricing (Read-Only)",
+    "_postman_id": "2ed4d3f3-490a-4fad-9f37-c3fc0be5ba2f",
+    "description": "Phase 9 Step 1 - Pricing recommendation API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get Pricing Recommendations",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/insights/pricing/recommendations?days=14&limit=10&maxAdjustmentPct=15",
+          "host": ["{{baseUrl}}"],
+          "path": ["insights", "pricing", "recommendations"],
+          "query": [
+            { "key": "days", "value": "14" },
+            { "key": "limit", "value": "10" },
+            { "key": "maxAdjustmentPct", "value": "15" }
+          ]
+        }
+      }
+    }
+  ]
+}

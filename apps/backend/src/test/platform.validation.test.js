@@ -237,6 +237,14 @@ describe("Platform Validation - AI Insights", () => {
     expect(result.valid).toBe(false);
     expect(result.errors).toContain("maxActions must be between 1 and 25");
   });
+
+  it("should reject invalid maxAdjustmentPct", () => {
+    const result = aiInsightsValidator.validateBusinessInsightsQuery({
+      maxAdjustmentPct: 50,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("maxAdjustmentPct must be between 1 and 30");
+  });
 });
 
 describe("validateRequest Middleware", () => {

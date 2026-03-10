@@ -42,4 +42,32 @@ describe("AI Insights Helpers", () => {
     expect(insightsService._internals.pctChange(0, 0)).toBe(0);
     expect(insightsService._internals.pctChange(5, 0)).toBe(100);
   });
+
+  it("should recommend price increase on high demand and low stock", () => {
+    const rec = insightsService._internals.buildPricingRecommendation({
+      name: "Napa",
+      currentPrice: 10,
+      soldQty: 70,
+      stock: 10,
+      days: 7,
+      maxAdjustmentPct: 15,
+    });
+
+    expect(rec.adjustmentPct).toBeGreaterThan(0);
+    expect(rec.suggestedPrice).toBeGreaterThan(10);
+  });
+
+  it("should recommend price decrease on low demand and high stock", () => {
+    const rec = insightsService._internals.buildPricingRecommendation({
+      name: "Soap",
+      currentPrice: 50,
+      soldQty: 2,
+      stock: 120,
+      days: 14,
+      maxAdjustmentPct: 15,
+    });
+
+    expect(rec.adjustmentPct).toBeLessThan(0);
+    expect(rec.suggestedPrice).toBeLessThan(50);
+  });
 });

@@ -30,6 +30,10 @@ function buildActionPriority(level) {
   return priorityMap[level] || 10;
 }
 
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
 async function getTopSellingProducts({ shopId, sinceDate, limit }) {
   const rows = await Order.aggregate([
     {
@@ -124,6 +128,67 @@ function pctChange(current, previous) {
     return 100;
   }
   return Number((((c - p) / p) * 100).toFixed(2));
+}
+
+function buildPricingRecommendation({
+  name,
+  currentPrice,
+  soldQty,
+  stock,
+  days,
+  maxAdjustmentPct = 15,
+}) {
+  const safePrice = Number(currentPrice || 0);
+  if (!Number.isFinite(safePrice) || safePrice <= 0) {
+    return {
+      productName: name || "",
+      currentPrice: safePrice,
+      suggestedPrice: safePrice,
+      adjustmentPct: 0,
+      reason: "No price signal available",
+      confidence: "LOW",
+    };
+  }
+
+  const dailyDemand = Number(days) > 0 ? Number(soldQty || 0) / Number(days) : 0;
+  const stockDays = dailyDemand > 0 ? Number(stock || 0) / dailyDemand : null;
+
+  let adjustmentPct = 0;
+  let reason = "Price stable for current demand";
+  let confidence = "MEDIUM";
+
+  if (Number.isFinite(stockDays) && stockDays <= 3 && dailyDemand >= 2) {
+    adjustmentPct = clamp(8, -maxAdjustmentPct, maxAdjustmentPct);
+    reason = "High demand with very low stock coverage";
+    confidence = "HIGH";
+  } else if (Number.isFinite(stockDays) && stockDays <= 7 && dailyDemand >= 1) {
+    adjustmentPct = clamp(4, -maxAdjustmentPct, maxAdjustmentPct);
+    reason = "Demand is healthy and stock is tightening";
+  } else if (Number.isFinite(stockDays) && stockDays >= 45 && dailyDemand <= 0.5) {
+    adjustmentPct = clamp(-8, -maxAdjustmentPct, maxAdjustmentPct);
+    reason = "Slow demand with high stock holding";
+    confidence = "HIGH";
+  } else if (Number.isFinite(stockDays) && stockDays >= 30 && dailyDemand <= 1) {
+    adjustmentPct = clamp(-4, -maxAdjustmentPct, maxAdjustmentPct);
+    reason = "Stock cover is high compared to sales velocity";
+  }
+
+  const suggestedPrice = Number((safePrice * (1 + adjustmentPct / 100)).toFixed(2));
+
+  return {
+    productName: name || "",
+    currentPrice: safePrice,
+    suggestedPrice,
+    adjustmentPct,
+    reason,
+    confidence,
+    diagnostics: {
+      soldQty: Number(soldQty || 0),
+      stock: Number(stock || 0),
+      stockDays: Number.isFinite(stockDays) ? Number(stockDays.toFixed(1)) : null,
+      dailyDemand: Number(dailyDemand.toFixed(2)),
+    },
+  };
 }
 
 async function getBusinessInsights({
@@ -315,15 +380,59 @@ async function getBusinessTrends({
   };
 }
 
+async function getPricingRecommendations({
+  shopId,
+  days = 14,
+  limit = 10,
+  maxAdjustmentPct = 15,
+}) {
+  const windowDays = Math.min(Math.max(Number(days) || 14, 1), 90);
+  const itemLimit = Math.min(Math.max(Number(limit) || 10, 1), 30);
+  const adjustmentCap = Math.min(Math.max(Number(maxAdjustmentPct) || 15, 1), 30);
+  const sinceDate = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+
+  const topProducts = await getTopSellingProducts({
+    shopId,
+    sinceDate,
+    limit: itemLimit,
+  });
+
+  const recommendations = topProducts
+    .map(p =>
+      buildPricingRecommendation({
+        name: p.name,
+        currentPrice: p.revenue > 0 && p.soldQty > 0 ? Number((p.revenue / p.soldQty).toFixed(2)) : null,
+        soldQty: p.soldQty,
+        stock: p.stock,
+        days: windowDays,
+        maxAdjustmentPct: adjustmentCap,
+      })
+    )
+    .sort((a, b) => Math.abs(b.adjustmentPct) - Math.abs(a.adjustmentPct))
+    .slice(0, itemLimit);
+
+  return {
+    periodDays: windowDays,
+    generatedAt: new Date().toISOString(),
+    summary: {
+      recommendationCount: recommendations.length,
+      maxAdjustmentPct: adjustmentCap,
+    },
+    recommendations,
+  };
+}
+
 module.exports = {
   getBusinessInsights,
   getBusinessActions,
   getBusinessTrends,
+  getPricingRecommendations,
   toNumber,
   _internals: {
     computeStockoutDays,
     buildBusinessActions,
     buildRiskLevel,
     pctChange,
+    buildPricingRecommendation,
   },
 };

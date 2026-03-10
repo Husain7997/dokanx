@@ -52,8 +52,27 @@ async function getBusinessTrends(req, res, next) {
   }
 }
 
+async function getPricingRecommendations(req, res, next) {
+  try {
+    const data = await service.getPricingRecommendations({
+      shopId: req.shop?._id,
+      days: service.toNumber(req.query.days, 14),
+      limit: service.toNumber(req.query.limit, 10),
+      maxAdjustmentPct: service.toNumber(req.query.maxAdjustmentPct, 15),
+    });
+
+    res.json({
+      success: true,
+      data,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   getBusinessInsights,
   getBusinessActions,
   getBusinessTrends,
+  getPricingRecommendations,
 };

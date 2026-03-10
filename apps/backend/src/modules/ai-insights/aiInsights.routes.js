@@ -32,4 +32,13 @@ router.get(
   controller.getBusinessTrends
 );
 
+router.get(
+  "/pricing/recommendations",
+  protect,
+  tenantGuard,
+  allowRoles("OWNER", "ADMIN", "STAFF"),
+  validateQuery(validator.validateBusinessInsightsQuery),
+  controller.getPricingRecommendations
+);
+
 module.exports = router;
