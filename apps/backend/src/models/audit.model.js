@@ -14,35 +14,7 @@ const auditSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-
-// module.exports = mongoose.model("AuditLog", auditSchema);
-
-
 module.exports =
   mongoose.models.AuditLog ||
   mongoose.model("AuditLog", auditSchema);
-
-
-exports.createAudit = async ({
-  action,
-  performedBy = null,
-  targetType,
-  targetId,
-  req,
-  meta = {}
-}) => {
-  try {
-    await Audit.create({
-      action,
-      performedBy,
-      targetType,
-      targetId,
-      meta,
-      ip: req.ip,
-      userAgent: req.headers["user-agent"]
-    });
-  } catch (err) {
-    console.error("AUDIT ERROR:", err.message);
-  }
-};
 

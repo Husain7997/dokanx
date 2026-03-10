@@ -1,0 +1,131 @@
+﻿{
+  "info": {
+    "name": "DokanX Ads Campaigns (Facebook/Google/YouTube)",
+    "_postman_id": "9587c785-003f-4ea4-8c3a-6960802f56f4",
+    "description": "Tenant-safe ad campaign workflow + AI suggestions + approval + guardrails",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create Ad Campaign",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" },
+          { "key": "Idempotency-Key", "value": "ads-campaign-{{timestamp}}", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Eid Soap Promo\",\n  \"objective\": \"SALES\",\n  \"platforms\": {\n    \"facebook\": { \"enabled\": true, \"accountId\": \"fb-account-1\" },\n    \"google\": { \"enabled\": true, \"accountId\": \"google-account-1\" },\n    \"youtube\": { \"enabled\": false }\n  },\n  \"budget\": {\n    \"daily\": 1500,\n    \"lifetime\": 30000,\n    \"currency\": \"BDT\"\n  },\n  \"audience\": {\n    \"locations\": [\"Dhaka\"],\n    \"interests\": [\"grocery\"],\n    \"ageMin\": 20,\n    \"ageMax\": 45,\n    \"gender\": \"ALL\",\n    \"frequencyCapPerUserPerDay\": 3\n  },\n  \"smartBidding\": {\n    \"goalType\": \"SALES\",\n    \"strategy\": \"MAX_CONVERSIONS\"\n  },\n  \"couponTracking\": {\n    \"enabled\": true,\n    \"couponCode\": \"EID10\"\n  },\n  \"guardrail\": {\n    \"dailySpendLimit\": 1500,\n    \"anomalyThresholdPct\": 50\n  },\n  \"productIds\": [\"{{productId}}\"]\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/ads/campaigns", "host": ["{{baseUrl}}"], "path": ["ads", "campaigns"] }
+      }
+    },
+    {
+      "name": "List Ad Campaigns",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }],
+        "url": {
+          "raw": "{{baseUrl}}/ads/campaigns?status=DRAFT&platform=facebook&limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["ads", "campaigns"],
+          "query": [
+            { "key": "status", "value": "DRAFT" },
+            { "key": "platform", "value": "facebook" },
+            { "key": "limit", "value": "20" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get AI Copy/Banner Suggestion",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }],
+        "url": { "raw": "{{baseUrl}}/ads/campaigns/{{campaignId}}/ai-suggestion", "host": ["{{baseUrl}}"], "path": ["ads", "campaigns", "{{campaignId}}", "ai-suggestion"] }
+      }
+    },
+    {
+      "name": "Get Audience Recommendation",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }],
+        "url": { "raw": "{{baseUrl}}/ads/campaigns/{{campaignId}}/audience-recommendation?days=30", "host": ["{{baseUrl}}"], "path": ["ads", "campaigns", "{{campaignId}}", "audience-recommendation"], "query": [{ "key": "days", "value": "30" }] }
+      }
+    },
+    {
+      "name": "Sync Product Feed",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }],
+        "url": { "raw": "{{baseUrl}}/ads/campaigns/{{campaignId}}/feed/sync", "host": ["{{baseUrl}}"], "path": ["ads", "campaigns", "{{campaignId}}", "feed", "sync"] }
+      }
+    },
+    {
+      "name": "Upsert Daily Metrics",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"date\": \"2026-03-11\",\n  \"spend\": 1200,\n  \"impressions\": 50000,\n  \"reach\": 18000,\n  \"clicks\": 920,\n  \"conversions\": 40,\n  \"revenue\": 18000,\n  \"couponOrders\": 12\n}" },
+        "url": { "raw": "{{baseUrl}}/ads/campaigns/{{campaignId}}/metrics", "host": ["{{baseUrl}}"], "path": ["ads", "campaigns", "{{campaignId}}", "metrics"] }
+      }
+    },
+    {
+      "name": "Get Smart Bidding Recommendation",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }],
+        "url": { "raw": "{{baseUrl}}/ads/campaigns/{{campaignId}}/bidding/recommendation?days=14", "host": ["{{baseUrl}}"], "path": ["ads", "campaigns", "{{campaignId}}", "bidding", "recommendation"], "query": [{ "key": "days", "value": "14" }] }
+      }
+    },
+    {
+      "name": "Check Daily Guardrail",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }],
+        "url": { "raw": "{{baseUrl}}/ads/campaigns/{{campaignId}}/guardrail/check", "host": ["{{baseUrl}}"], "path": ["ads", "campaigns", "{{campaignId}}", "guardrail", "check"] }
+      }
+    },
+    {
+      "name": "Update Frequency Cap",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"frequencyCapPerUserPerDay\": 4\n}" },
+        "url": { "raw": "{{baseUrl}}/ads/campaigns/{{campaignId}}/frequency-cap", "host": ["{{baseUrl}}"], "path": ["ads", "campaigns", "{{campaignId}}", "frequency-cap"] }
+      }
+    },
+    {
+      "name": "Request Launch Approval",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Ready for Eid paid launch\"\n}" },
+        "url": { "raw": "{{baseUrl}}/ads/campaigns/{{campaignId}}/approval/request", "host": ["{{baseUrl}}"], "path": ["ads", "campaigns", "{{campaignId}}", "approval", "request"] }
+      }
+    },
+    {
+      "name": "Approve Launch",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{checkerToken}}", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"checkerComment\": \"Approved for publishing\"\n}" },
+        "url": { "raw": "{{baseUrl}}/ads/campaigns/{{campaignId}}/approval/approve", "host": ["{{baseUrl}}"], "path": ["ads", "campaigns", "{{campaignId}}", "approval", "approve"] }
+      }
+    }
+  ]
+}

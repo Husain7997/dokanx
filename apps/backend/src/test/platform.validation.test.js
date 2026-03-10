@@ -11,6 +11,7 @@ const behaviorValidator = require("../modules/behavior/behavior.validator");
 const supplierValidator = require("../modules/supplier-marketplace/supplierMarketplace.validator");
 const aiInsightsValidator = require("../modules/ai-insights/aiInsights.validator");
 const assistantValidator = require("../modules/merchant-assistant/merchantAssistant.validator");
+const adsValidator = require("../modules/ads/adsCampaign.validator");
 
 function createMockRes() {
   const res = {
@@ -322,6 +323,54 @@ describe("Platform Validation - Merchant Assistant", () => {
     });
     expect(result.valid).toBe(false);
     expect(result.errors).toContain("status must be IN_PROGRESS, RESOLVED or CANCELLED");
+  });
+});
+
+describe("Platform Validation - Ads Campaign", () => {
+  it("should reject campaign create payload without enabled platform", () => {
+    const result = adsValidator.validateCreateCampaignBody({
+      name: "Promo Campaign",
+      objective: "SALES",
+      platforms: {
+        facebook: { enabled: false },
+        google: { enabled: false },
+        youtube: { enabled: false },
+      },
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("At least one platform must be enabled");
+  });
+
+  it("should reject invalid ads query platform filter", () => {
+    const result = adsValidator.validateListCampaignsQuery({
+      platform: "tiktok",
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("platform must be facebook, google or youtube");
+  });
+
+  it("should reject invalid campaign status body", () => {
+    const result = adsValidator.validateCampaignStatusBody({
+      status: "OPEN",
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("status must be DRAFT, QUEUED, ACTIVE, PAUSED, COMPLETED or FAILED");
+  });
+
+  it("should reject invalid frequency cap payload", () => {
+    const result = adsValidator.validateFrequencyCapBody({
+      frequencyCapPerUserPerDay: 0,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("frequencyCapPerUserPerDay must be between 1 and 30");
+  });
+
+  it("should reject invalid metrics payload", () => {
+    const result = adsValidator.validateMetricUpsertBody({
+      spend: -1,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("spend must be a non-negative number");
   });
 });
 
