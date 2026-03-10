@@ -1,0 +1,48 @@
+{
+  "info": {
+    "name": "DokanX Phase 8 AI Business Actions",
+    "_postman_id": "94fe7ac8-69fa-4aa6-af20-28cb2d0a3b98",
+    "description": "Phase 8 Step 2 - Actionable business insights",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get Actionable Insights (7 days)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/insights/business/actions?days=7&limit=5&maxActions=10",
+          "host": ["{{baseUrl}}"],
+          "path": ["insights", "business", "actions"],
+          "query": [
+            { "key": "days", "value": "7" },
+            { "key": "limit", "value": "5" },
+            { "key": "maxActions", "value": "10" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Actionable Insights (30 days)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/insights/business/actions?days=30&limit=10&maxActions=15",
+          "host": ["{{baseUrl}}"],
+          "path": ["insights", "business", "actions"],
+          "query": [
+            { "key": "days", "value": "30" },
+            { "key": "limit", "value": "10" },
+            { "key": "maxActions", "value": "15" }
+          ]
+        }
+      }
+    }
+  ]
+}

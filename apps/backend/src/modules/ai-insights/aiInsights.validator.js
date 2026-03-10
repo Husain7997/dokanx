@@ -15,6 +15,13 @@ function validateBusinessInsightsQuery(input) {
     }
   }
 
+  if (input.maxActions !== undefined) {
+    const maxActions = Number(input.maxActions);
+    if (!Number.isFinite(maxActions) || maxActions < 1 || maxActions > 25) {
+      errors.push("maxActions must be between 1 and 25");
+    }
+  }
+
   return { valid: errors.length === 0, errors };
 }
 

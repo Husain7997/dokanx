@@ -225,8 +225,17 @@ describe("Platform Validation - AI Insights", () => {
     const result = aiInsightsValidator.validateBusinessInsightsQuery({
       days: 14,
       limit: 5,
+      maxActions: 10,
     });
     expect(result.valid).toBe(true);
+  });
+
+  it("should reject invalid maxActions", () => {
+    const result = aiInsightsValidator.validateBusinessInsightsQuery({
+      maxActions: 100,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("maxActions must be between 1 and 25");
   });
 });
 

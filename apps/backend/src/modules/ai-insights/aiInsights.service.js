@@ -12,6 +12,24 @@ function computeStockoutDays({ stock, soldQty, days }) {
   return Number((Number(stock || 0) / velocity).toFixed(1));
 }
 
+function buildRiskLevel(estimatedDays) {
+  if (!Number.isFinite(estimatedDays)) return "LOW";
+  if (estimatedDays <= 3) return "CRITICAL";
+  if (estimatedDays <= 7) return "HIGH";
+  if (estimatedDays <= 14) return "MEDIUM";
+  return "LOW";
+}
+
+function buildActionPriority(level) {
+  const priorityMap = {
+    CRITICAL: 100,
+    HIGH: 80,
+    MEDIUM: 60,
+    LOW: 20,
+  };
+  return priorityMap[level] || 10;
+}
+
 async function getTopSellingProducts({ shopId, sinceDate, limit }) {
   const rows = await Order.aggregate([
     {
@@ -111,10 +129,95 @@ async function getBusinessInsights({
   };
 }
 
+function buildBusinessActions({
+  periodDays,
+  topProducts = [],
+  stockRisk = [],
+  maxActions = 10,
+}) {
+  const actions = [];
+
+  for (const item of stockRisk) {
+    const riskLevel = buildRiskLevel(item.estimatedStockoutDays);
+    if (riskLevel === "LOW") continue;
+
+    actions.push({
+      type: "RESTOCK",
+      priority: buildActionPriority(riskLevel),
+      riskLevel,
+      productId: item.productId,
+      productName: item.name,
+      message: `${item.name} may run out in ${item.estimatedStockoutDays} days. Plan replenishment.`,
+      meta: {
+        estimatedStockoutDays: item.estimatedStockoutDays,
+        currentStock: item.stock,
+        soldQty: item.soldQty,
+      },
+    });
+  }
+
+  for (const item of topProducts.slice(0, 3)) {
+    if (!Number.isFinite(item.stock) || item.stock > 0) continue;
+
+    actions.push({
+      type: "PRICE_REVIEW",
+      priority: 70,
+      riskLevel: "HIGH",
+      productId: item.productId,
+      productName: item.name,
+      message: `${item.name} is a top seller but currently out of stock. Review price and supply.`,
+      meta: {
+        soldQty: Number(item.soldQty || 0),
+        revenue: Number(item.revenue || 0),
+      },
+    });
+  }
+
+  return actions
+    .sort((a, b) => b.priority - a.priority)
+    .slice(0, maxActions);
+}
+
+async function getBusinessActions({
+  shopId,
+  days = 7,
+  limit = 5,
+  maxActions = 10,
+}) {
+  const insights = await getBusinessInsights({
+    shopId,
+    days,
+    limit,
+  });
+
+  const actions = buildBusinessActions({
+    periodDays: insights.periodDays,
+    topProducts: insights.topProducts,
+    stockRisk: insights.stockRisk,
+    maxActions,
+  });
+
+  return {
+    periodDays: insights.periodDays,
+    generatedAt: insights.generatedAt,
+    summary: {
+      actionCount: actions.length,
+      primaryAction: actions[0]?.message || "No immediate action required",
+    },
+    actions,
+    context: {
+      topProducts: insights.topProducts.slice(0, 3),
+    },
+  };
+}
+
 module.exports = {
   getBusinessInsights,
+  getBusinessActions,
   toNumber,
   _internals: {
     computeStockoutDays,
+    buildBusinessActions,
+    buildRiskLevel,
   },
 };

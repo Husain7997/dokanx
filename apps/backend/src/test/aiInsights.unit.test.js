@@ -18,4 +18,22 @@ describe("AI Insights Helpers", () => {
     });
     expect(days).toBeNull();
   });
+
+  it("should build prioritized business actions from stock risk", () => {
+    const actions = insightsService._internals.buildBusinessActions({
+      periodDays: 7,
+      topProducts: [
+        { productId: "p1", name: "Napa", soldQty: 20, revenue: 1000, stock: 0 },
+      ],
+      stockRisk: [
+        { productId: "p2", name: "Lux Soap", stock: 5, soldQty: 20, estimatedStockoutDays: 1.8 },
+        { productId: "p3", name: "Rice", stock: 15, soldQty: 20, estimatedStockoutDays: 10 },
+      ],
+      maxActions: 5,
+    });
+
+    expect(actions.length).toBeGreaterThan(0);
+    expect(actions[0].type).toBe("RESTOCK");
+    expect(["CRITICAL", "HIGH", "MEDIUM"]).toContain(actions[0].riskLevel);
+  });
 });
