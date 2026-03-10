@@ -1,4 +1,4 @@
-export const riskRegistry = {
+const riskRegistry = {
   duplicateEventBus: false,
   duplicateLockManager: false,
   ledgerMutationOutsideEngine: false,
@@ -6,3 +6,5 @@ export const riskRegistry = {
   circularDependencyDetected: false,
   tenantLeakRisk: false
 };
+
+module.exports = { riskRegistry };

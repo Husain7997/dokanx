@@ -8,6 +8,7 @@ const catalogValidator = require("../modules/catalog/catalog.validator");
 const creditValidator = require("../modules/credit/credit.validator");
 const discoveryValidator = require("../modules/discovery/discovery.validator");
 const behaviorValidator = require("../modules/behavior/behavior.validator");
+const supplierValidator = require("../modules/supplier-marketplace/supplierMarketplace.validator");
 
 function createMockRes() {
   const res = {
@@ -46,6 +47,24 @@ describe("Platform Validation - Catalog", () => {
     });
     expect(result.valid).toBe(false);
     expect(result.errors).toContain("action must be ACCEPT, EDIT or IGNORE");
+  });
+
+  it("should reject search query when all filters are missing", () => {
+    const result = catalogValidator.validateSearchQuery({});
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(
+      "At least one of q, barcode, brand or category is required"
+    );
+  });
+
+  it("should reject invalid global product create payload", () => {
+    const result = catalogValidator.validateCreateGlobalProduct({
+      name: "",
+      aliases: [1, 2],
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("name is required");
+    expect(result.errors).toContain("aliases must be an array of strings");
   });
 });
 
@@ -96,8 +115,18 @@ describe("Platform Validation - Discovery", () => {
       lng: 90.4,
       radiusKm: 10,
       limit: 20,
+      sortBy: "relevance",
     });
     expect(result.valid).toBe(true);
+  });
+
+  it("should reject invalid discovery sortBy", () => {
+    const result = discoveryValidator.validateSearchQuery({
+      q: "napa",
+      sortBy: "best",
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("sortBy must be relevance, price_asc or distance_asc");
   });
 });
 
@@ -117,6 +146,52 @@ describe("Platform Validation - Behavior", () => {
       limit: 50,
     });
     expect(result.valid).toBe(true);
+  });
+});
+
+describe("Platform Validation - Supplier Marketplace", () => {
+  it("should reject supplier offers query when minPrice is greater than maxPrice", () => {
+    const result = supplierValidator.validateSupplierOffersQuery({
+      minPrice: 100,
+      maxPrice: 50,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("minPrice cannot be greater than maxPrice");
+  });
+
+  it("should accept valid supplier search query", () => {
+    const result = supplierValidator.validateSupplierSearchQuery({
+      q: "pharma",
+      category: "Medicine",
+      lat: 23.8,
+      lng: 90.4,
+      radiusKm: 10,
+      limit: 20,
+    });
+    expect(result.valid).toBe(true);
+  });
+
+  it("should reject invalid supplier offer payload", () => {
+    const result = supplierValidator.validateCreateOrUpdateOfferBody({
+      title: "",
+      wholesalePrice: -1,
+      minOrderQty: 0,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("title is required");
+    expect(result.errors).toContain("wholesalePrice must be a non-negative number");
+    expect(result.errors).toContain("minOrderQty must be at least 1");
+  });
+
+  it("should reject invalid bulk order payload", () => {
+    const result = supplierValidator.validateCreateBulkOrderBody({
+      supplierId: "",
+      items: [{ offerId: "", quantity: 0 }],
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("supplierId is required");
+    expect(result.errors).toContain("items[0].offerId is required");
+    expect(result.errors).toContain("items[0].quantity must be at least 1");
   });
 });
 

@@ -49,11 +49,12 @@ async function previewImport(req, res, next) {
 
 async function confirmImport(req, res, next) {
   try {
-    const batch = await service.confirmImport({
+    const result = await service.confirmImport({
       shopId: req.shop._id,
       batchId: req.params.batchId,
       idempotencyKey: req.headers["idempotency-key"] || null,
     });
+    const batch = result.batch;
 
     await createAudit({
       action: "PRODUCT_IMPORT_BATCH_CONFIRMED",
@@ -69,6 +70,24 @@ async function confirmImport(req, res, next) {
       status: batch.status,
       summary: batch.summary,
       confirmedAt: batch.confirmedAt,
+      idempotencyReplay: result.idempotencyReplay,
+      replayedFromBatchId: result.replayedFromBatchId,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function errorReport(req, res, next) {
+  try {
+    const report = await service.getBatchErrorReport({
+      shopId: req.shop._id,
+      batchId: req.params.batchId,
+    });
+
+    res.json({
+      success: true,
+      ...report,
     });
   } catch (err) {
     next(err);
@@ -79,4 +98,5 @@ module.exports = {
   uploadExcel,
   previewImport,
   confirmImport,
+  errorReport,
 };

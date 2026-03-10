@@ -31,6 +31,7 @@ const creditRoutes = require("../modules/credit/credit.routes");
 const discoveryRoutes = require("../modules/discovery/discovery.routes");
 const behaviorRoutes = require("../modules/behavior/behavior.routes");
 const catalogRoutes = require("../modules/catalog/catalog.routes");
+const supplierMarketplaceRoutes = require("../modules/supplier-marketplace/supplierMarketplace.routes");
 
 router.use("/", meRoutes);
 router.use("/platform", platformRoutes);
@@ -69,5 +70,6 @@ router.use("/catalog", catalogRoutes);
 router.use("/credit", creditRoutes);
 router.use("/search", discoveryRoutes);
 router.use("/behavior", behaviorRoutes);
+router.use("/suppliers", supplierMarketplaceRoutes);
 
 module.exports = router;

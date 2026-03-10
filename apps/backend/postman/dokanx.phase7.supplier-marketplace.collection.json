@@ -1,0 +1,101 @@
+{
+  "info": {
+    "name": "DokanX Phase 7 Supplier Marketplace",
+    "_postman_id": "d0f6f308-a863-4068-adc8-3f91f2f28656",
+    "description": "Phase 7 Step 1 - Supplier marketplace read APIs",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Search Suppliers",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/suppliers/search?q=pharma&category=Medicine&lat=23.8103&lng=90.4125&radiusKm=20&limit=20",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "suppliers",
+            "search"
+          ],
+          "query": [
+            {
+              "key": "q",
+              "value": "pharma"
+            },
+            {
+              "key": "category",
+              "value": "Medicine"
+            },
+            {
+              "key": "lat",
+              "value": "23.8103"
+            },
+            {
+              "key": "lng",
+              "value": "90.4125"
+            },
+            {
+              "key": "radiusKm",
+              "value": "20"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Supplier Offers",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/suppliers/{{supplierId}}/offers?category=Medicine&minPrice=10&maxPrice=200&limit=30",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "suppliers",
+            "{{supplierId}}",
+            "offers"
+          ],
+          "query": [
+            {
+              "key": "category",
+              "value": "Medicine"
+            },
+            {
+              "key": "minPrice",
+              "value": "10"
+            },
+            {
+              "key": "maxPrice",
+              "value": "200"
+            },
+            {
+              "key": "limit",
+              "value": "30"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

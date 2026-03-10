@@ -1,4 +1,4 @@
-export const architectureMap = {
+const architectureMap = {
   layers: {
     api: "controllers + routes",
     application: "services + use-cases",
@@ -14,3 +14,5 @@ export const architectureMap = {
     financialIsSingleSourceOfTruth: true
   }
 };
+
+module.exports = { architectureMap };

@@ -2,6 +2,36 @@ const XLSX = require("xlsx");
 const Product = require("@/models/product.model");
 const ProductImportBatch = require("./models/productImportBatch.model");
 
+const BRAND_HINTS = [
+  "Unilever",
+  "ACI",
+  "Square Pharma",
+  "Square",
+  "Pran",
+  "RFL",
+  "Bashundhara",
+];
+
+const BRAND_PRODUCT_HINTS = [
+  { keyword: "lux", brand: "Unilever" },
+  { keyword: "dove", brand: "Unilever" },
+  { keyword: "sunsilk", brand: "Unilever" },
+  { keyword: "napa", brand: "Square Pharma" },
+  { keyword: "seclo", brand: "Square Pharma" },
+  { keyword: "aci", brand: "ACI" },
+];
+
+const CATEGORY_RULES = [
+  { keyword: "soap", category: "Beauty Soap" },
+  { keyword: "shampoo", category: "Hair Care" },
+  { keyword: "biscuit", category: "Snacks" },
+  { keyword: "noodle", category: "Instant Noodles" },
+  { keyword: "oil", category: "Cooking Oil" },
+  { keyword: "paracetamol", category: "Pharma" },
+  { keyword: "tablet", category: "Pharma" },
+  { keyword: "capsule", category: "Pharma" },
+];
+
 const HEADER_ALIASES = {
   name: ["name", "product", "product name", "item", "item name"],
   brand: ["brand", "company", "manufacturer"],
@@ -32,8 +62,35 @@ function asNumber(value) {
   return Number.isFinite(n) ? n : NaN;
 }
 
+function detectBrandFromText(value) {
+  const text = String(value || "").toLowerCase();
+
+  for (const item of BRAND_PRODUCT_HINTS) {
+    if (text.includes(item.keyword)) {
+      return item.brand;
+    }
+  }
+
+  for (const hint of BRAND_HINTS) {
+    if (text.includes(hint.toLowerCase())) {
+      return hint;
+    }
+  }
+  return "";
+}
+
+function detectCategoryFromText(value) {
+  const text = String(value || "").toLowerCase();
+  for (const rule of CATEGORY_RULES) {
+    if (text.includes(rule.keyword)) {
+      return rule.category;
+    }
+  }
+  return "General";
+}
+
 function mapRows(rawRows) {
-  return rawRows.map((row, idx) => {
+  const mappedRows = rawRows.map((row, idx) => {
     const mapped = {
       rowNumber: idx + 2,
       name: "",
@@ -57,6 +114,14 @@ function mapRows(rawRows) {
       mapped[canonical] = clean;
     }
 
+    if (!mapped.brand && mapped.name) {
+      mapped.brand = detectBrandFromText(mapped.name);
+    }
+
+    if (!mapped.category && mapped.name) {
+      mapped.category = detectCategoryFromText(mapped.name);
+    }
+
     if (!mapped.name) mapped.errors.push("Missing product name");
     if (!Number.isFinite(mapped.price) || mapped.price < 0) {
       mapped.errors.push("Invalid price");
@@ -65,6 +130,23 @@ function mapRows(rawRows) {
 
     return mapped;
   });
+
+  const seenInFile = new Set();
+
+  for (const row of mappedRows) {
+    const dedupeKey = row.barcode
+      ? `barcode:${row.barcode.toLowerCase()}`
+      : `name:${normalizeKey(row.name)}`;
+
+    if (seenInFile.has(dedupeKey)) {
+      row.errors.push("Duplicate row in file");
+      continue;
+    }
+
+    seenInFile.add(dedupeKey);
+  }
+
+  return mappedRows;
 }
 
 function parseExcelBuffer(buffer) {
@@ -162,7 +244,11 @@ async function confirmImport({
   }
 
   if (batch.status === "CONFIRMED") {
-    return batch;
+    return {
+      batch,
+      idempotencyReplay: false,
+      replayedFromBatchId: null,
+    };
   }
 
   if (idempotencyKey) {
@@ -171,7 +257,13 @@ async function confirmImport({
       idempotencyKey,
       status: "CONFIRMED",
     });
-    if (existing) return existing;
+    if (existing) {
+      return {
+        batch: existing,
+        idempotencyReplay: true,
+        replayedFromBatchId: existing._id.toString(),
+      };
+    }
   }
 
   let importedRows = 0;
@@ -217,11 +309,52 @@ async function confirmImport({
   batch.summary.skippedRows = skippedRows;
 
   await batch.save();
-  return batch;
+  return {
+    batch,
+    idempotencyReplay: false,
+    replayedFromBatchId: null,
+  };
+}
+
+async function getBatchErrorReport({ shopId, batchId }) {
+  const batch = await ProductImportBatch.findOne({
+    _id: batchId,
+    shopId,
+  }).lean();
+
+  if (!batch) {
+    throw new Error("Import batch not found");
+  }
+
+  const errorRows = (batch.mappedRows || [])
+    .filter(row => Array.isArray(row.errors) && row.errors.length > 0)
+    .map(row => ({
+      rowNumber: row.rowNumber,
+      name: row.name || "",
+      brand: row.brand || "",
+      category: row.category || "",
+      price: row.price,
+      barcode: row.barcode || "",
+      errors: row.errors || [],
+    }));
+
+  return {
+    batchId: batch._id,
+    status: batch.status,
+    totalRows: batch.summary?.totalRows || 0,
+    invalidRows: errorRows.length,
+    errorRows,
+  };
 }
 
 module.exports = {
   createUploadBatch,
   getBatchPreview,
   confirmImport,
+  getBatchErrorReport,
+  _internals: {
+    mapRows,
+    detectBrandFromText,
+    detectCategoryFromText,
+  },
 };

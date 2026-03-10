@@ -1,0 +1,124 @@
+{
+  "info": {
+    "name": "DokanX Phase 6 Catalog Import",
+    "_postman_id": "94873ec7-939e-4f35-bb59-f8056047718c",
+    "description": "Phase 6 - Excel distributor catalog import",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Upload Excel Catalog",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": ""
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/catalog/import-excel/upload",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "catalog",
+            "import-excel",
+            "upload"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Preview Import",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/catalog/import-excel/preview/{{batchId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "catalog",
+            "import-excel",
+            "preview",
+            "{{batchId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Confirm Import",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotencyKey}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/catalog/import-excel/confirm/{{batchId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "catalog",
+            "import-excel",
+            "confirm",
+            "{{batchId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Import Error Report",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/catalog/import-excel/errors/{{batchId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "catalog",
+            "import-excel",
+            "errors",
+            "{{batchId}}"
+          ]
+        }
+      }
+    }
+  ]
+}

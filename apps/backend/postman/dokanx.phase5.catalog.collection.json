@@ -1,0 +1,101 @@
+{
+  "info": {
+    "name": "DokanX Phase 5 Catalog",
+    "_postman_id": "fe9f8478-e8fa-4449-a82d-4a0742456688",
+    "description": "Phase 5 - Global Product Catalog APIs",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Search Global Catalog",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/catalog/search?q=lux soap&limit=20",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "catalog",
+            "search"
+          ],
+          "query": [
+            {
+              "key": "q",
+              "value": "lux soap"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Import Global Product To Shop",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"globalProductId\": \"{{globalProductId}}\",\n  \"price\": 70,\n  \"stock\": 25\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/catalog/import",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "catalog",
+            "import"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Create Global Product",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Lux Soap 100g\",\n  \"brand\": \"Unilever\",\n  \"category\": \"Soap\",\n  \"barcode\": \"8900000000012\",\n  \"aliases\": [\"Lux Bar Soap\", \"Lux 100gm\"]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/catalog/global-product",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "catalog",
+            "global-product"
+          ]
+        }
+      }
+    }
+  ]
+}

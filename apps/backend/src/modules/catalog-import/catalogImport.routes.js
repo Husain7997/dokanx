@@ -40,4 +40,13 @@ router.post(
   controller.confirmImport
 );
 
+router.get(
+  "/import-excel/errors/:batchId",
+  protect,
+  tenantGuard,
+  role("OWNER"),
+  checkShopOwnership,
+  controller.errorReport
+);
+
 module.exports = router;

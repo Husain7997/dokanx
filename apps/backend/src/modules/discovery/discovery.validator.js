@@ -33,6 +33,31 @@ function validateSearchQuery(input) {
     }
   }
 
+  if (input.category !== undefined && typeof input.category !== "string") {
+    errors.push("category must be a string");
+  }
+
+  if (input.minStock !== undefined) {
+    const minStock = Number(input.minStock);
+    if (!Number.isFinite(minStock) || minStock < 0) {
+      errors.push("minStock must be a non-negative number");
+    }
+  }
+
+  if (input.maxPrice !== undefined) {
+    const maxPrice = Number(input.maxPrice);
+    if (!Number.isFinite(maxPrice) || maxPrice < 0) {
+      errors.push("maxPrice must be a non-negative number");
+    }
+  }
+
+  if (input.sortBy !== undefined) {
+    const sortBy = String(input.sortBy).toLowerCase();
+    if (!["relevance", "price_asc", "distance_asc"].includes(sortBy)) {
+      errors.push("sortBy must be relevance, price_asc or distance_asc");
+    }
+  }
+
   return { valid: errors.length === 0, errors };
 }
 

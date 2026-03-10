@@ -1,0 +1,59 @@
+{
+  "info": {
+    "name": "DokanX Phase 4 Discovery Ranking",
+    "_postman_id": "e9093c65-f3ba-4f33-b053-9e48c84f0c64",
+    "description": "Enhanced discovery filters and ranking",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Search Products (Relevance)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/search/products?q=rice&lat=23.8103&lng=90.4125&radiusKm=10&limit=20&category=Grocery&minStock=1&sortBy=relevance",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "search",
+            "products"
+          ],
+          "query": [
+            { "key": "q", "value": "rice" },
+            { "key": "lat", "value": "23.8103" },
+            { "key": "lng", "value": "90.4125" },
+            { "key": "radiusKm", "value": "10" },
+            { "key": "limit", "value": "20" },
+            { "key": "category", "value": "Grocery" },
+            { "key": "minStock", "value": "1" },
+            { "key": "sortBy", "value": "relevance" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Search Products (Price Asc)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/search/products?q=soap&maxPrice=100&sortBy=price_asc",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "search",
+            "products"
+          ],
+          "query": [
+            { "key": "q", "value": "soap" },
+            { "key": "maxPrice", "value": "100" },
+            { "key": "sortBy", "value": "price_asc" }
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -10,8 +10,8 @@ const CreditAccount = require("../modules/credit/credit.account.model");
 const CreditLedger = require("../modules/credit/credit.ledger.model");
 const CreditPolicy = require("../modules/credit/credit.policy.model");
 const BehaviorSignal = require("../modules/behavior/behaviorSignal.model");
-const CatalogGlobalProduct = require("../modules/catalog/catalogGlobalProduct.model");
-const CatalogDecision = require("../modules/catalog/catalogDecision.model");
+const CatalogGlobalProduct = require("../modules/catalog/models/catalogGlobalProduct.model");
+const CatalogDecision = require("../modules/catalog/models/catalogDecision.model");
 
 const DRY_RUN = String(process.env.DRY_RUN || "false").toLowerCase() === "true";
 

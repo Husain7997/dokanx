@@ -1,0 +1,68 @@
+{
+  "info": {
+    "name": "DokanX Phase 7 Supplier Marketplace Write",
+    "_postman_id": "9cb01a4c-3468-4118-950d-31a75b06e84a",
+    "description": "Phase 7 Step 2 - Supplier marketplace write APIs",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create Supplier Offer",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Lux Soap 100g Carton\",\n  \"productName\": \"Lux Soap 100g\",\n  \"brand\": \"Unilever\",\n  \"category\": \"Beauty Soap\",\n  \"unit\": \"pcs\",\n  \"wholesalePrice\": 58,\n  \"minOrderQty\": 12,\n  \"availableQty\": 500,\n  \"leadTimeDays\": 2\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/suppliers/{{supplierId}}/offers",
+          "host": ["{{baseUrl}}"],
+          "path": ["suppliers", "{{supplierId}}", "offers"]
+        }
+      }
+    },
+    {
+      "name": "Update Supplier Offer",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Lux Soap 100g Carton\",\n  \"productName\": \"Lux Soap 100g\",\n  \"brand\": \"Unilever\",\n  \"category\": \"Beauty Soap\",\n  \"unit\": \"pcs\",\n  \"wholesalePrice\": 56,\n  \"minOrderQty\": 12,\n  \"availableQty\": 700,\n  \"leadTimeDays\": 1,\n  \"isActive\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/suppliers/{{supplierId}}/offers/{{offerId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["suppliers", "{{supplierId}}", "offers", "{{offerId}}"]
+        }
+      }
+    },
+    {
+      "name": "Create Bulk Order Request",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" },
+          { "key": "Idempotency-Key", "value": "{{idempotencyKey}}", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"supplierId\": \"{{supplierId}}\",\n  \"items\": [\n    { \"offerId\": \"{{offerId1}}\", \"quantity\": 10 },\n    { \"offerId\": \"{{offerId2}}\", \"quantity\": 15 }\n  ],\n  \"notes\": \"Urgent replenishment for weekend sales\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/suppliers/bulk-orders",
+          "host": ["{{baseUrl}}"],
+          "path": ["suppliers", "bulk-orders"]
+        }
+      }
+    }
+  ]
+}

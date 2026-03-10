@@ -14,6 +14,12 @@ const schema = new mongoose.Schema(
       index: true,
     },
 
+    slug: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+
     aliases: {
       type: [String],
       default: [],
@@ -22,6 +28,13 @@ const schema = new mongoose.Schema(
     brand: {
       type: String,
       default: "",
+      index: true,
+    },
+
+    brandId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Brand",
+      default: null,
       index: true,
     },
 
@@ -35,6 +48,27 @@ const schema = new mongoose.Schema(
       type: String,
       default: "",
       sparse: true,
+      index: true,
+    },
+
+    images: {
+      type: [String],
+      default: [],
+    },
+
+    description: {
+      type: String,
+      default: "",
+    },
+
+    attributes: {
+      type: Object,
+      default: {},
+    },
+
+    popularityScore: {
+      type: Number,
+      default: 0,
       index: true,
     },
 
@@ -73,7 +107,13 @@ const schema = new mongoose.Schema(
 );
 
 schema.index({ normalizedName: 1, brand: 1, category: 1 });
-schema.index({ canonicalName: "text", aliases: "text", brand: "text", category: "text" });
+
+schema.index({
+  canonicalName: "text",
+  aliases: "text",
+  brand: "text",
+  category: "text",
+});
 
 module.exports =
   mongoose.models.CatalogGlobalProduct ||
