@@ -1,0 +1,46 @@
+{
+  "info": {
+    "name": "DokanX Phase 8 AI Business Insights",
+    "_postman_id": "e43f51d4-c894-4ce4-b677-a8526fd4ebd3",
+    "description": "Phase 8 Step 1 - Read-only business insights API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get Business Insights (7 days)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/insights/business?days=7&limit=5",
+          "host": ["{{baseUrl}}"],
+          "path": ["insights", "business"],
+          "query": [
+            { "key": "days", "value": "7" },
+            { "key": "limit", "value": "5" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Business Insights (30 days)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/insights/business?days=30&limit=10",
+          "host": ["{{baseUrl}}"],
+          "path": ["insights", "business"],
+          "query": [
+            { "key": "days", "value": "30" },
+            { "key": "limit", "value": "10" }
+          ]
+        }
+      }
+    }
+  ]
+}

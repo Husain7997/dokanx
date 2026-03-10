@@ -125,10 +125,68 @@ async function createBulkOrderRequest(req, res, next) {
   }
 }
 
+async function listBulkOrderRequests(req, res, next) {
+  try {
+    const data = await service.listBulkOrderRequests({
+      shopId: req.shop?._id,
+      mode: req.query.mode || "buyer",
+      supplierId: req.query.supplierId || "",
+      status: req.query.status || "",
+      limit: service.toNumber(req.query.limit, 50),
+    });
+
+    res.json({
+      success: true,
+      count: data.length,
+      data,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function updateBulkOrderStatus(req, res, next) {
+  try {
+    const action = String(req.body.action || "").toUpperCase();
+    const result = await service.updateBulkOrderStatus({
+      orderId: req.params.orderId,
+      actorShopId: req.shop?._id,
+      actorUserId: req.user?._id || null,
+      action,
+      note: req.body.note || "",
+    });
+
+    const auditActionMap = {
+      ACCEPT: "SUPPLIER_BULK_ORDER_ACCEPTED",
+      REJECT: "SUPPLIER_BULK_ORDER_REJECTED",
+      FULFILL: "SUPPLIER_BULK_ORDER_FULFILLED",
+      CANCEL: "SUPPLIER_BULK_ORDER_CANCELLED",
+    };
+
+    await createAudit({
+      action: auditActionMap[action] || "SUPPLIER_BULK_ORDER_STATUS_UPDATED",
+      performedBy: req.user?._id || null,
+      targetType: "BulkOrderRequest",
+      targetId: result.order._id,
+      req,
+    });
+
+    res.status(200).json({
+      success: true,
+      idempotencyReplay: result.idempotencyReplay,
+      data: result.order,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   searchSuppliers,
   getSupplierOffers,
   createSupplierOffer,
   updateSupplierOffer,
   createBulkOrderRequest,
+  listBulkOrderRequests,
+  updateBulkOrderStatus,
 };

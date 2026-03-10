@@ -413,11 +413,197 @@ async function createBulkOrderRequest({
   }
 }
 
+async function getSellerScopeSupplierIds({ shopId, supplierId = null }) {
+  const filter = {
+    createdByShop: shopId,
+    isActive: true,
+    ...(supplierId ? { _id: supplierId } : {}),
+  };
+
+  const suppliers = await Supplier.find(filter).select("_id").lean();
+  return suppliers.map(s => s._id);
+}
+
+async function listBulkOrderRequests({
+  shopId,
+  mode = "buyer",
+  supplierId = "",
+  status = "",
+  limit = 50,
+}) {
+  const normalizedMode = String(mode || "buyer").toLowerCase();
+  const query = {};
+
+  if (normalizedMode === "seller") {
+    const ids = await getSellerScopeSupplierIds({
+      shopId,
+      supplierId: supplierId || null,
+    });
+
+    if (!ids.length) return [];
+    query.supplierId = { $in: ids };
+  } else {
+    query.shopId = shopId;
+    if (supplierId) query.supplierId = supplierId;
+  }
+
+  if (status) {
+    query.status = String(status).toUpperCase();
+  }
+
+  const rows = await BulkOrderRequest.find(query)
+    .sort({ createdAt: -1 })
+    .limit(Math.min(Math.max(Number(limit) || 50, 1), 200))
+    .lean();
+
+  return rows.map(order => ({
+    _id: order._id,
+    shopId: order.shopId,
+    supplierId: order.supplierId,
+    status: order.status,
+    totalAmount: order.totalAmount,
+    lines: order.lines || [],
+    notes: order.notes || "",
+    acceptedAt: order.acceptedAt || null,
+    rejectedAt: order.rejectedAt || null,
+    cancelledAt: order.cancelledAt || null,
+    fulfilledAt: order.fulfilledAt || null,
+    createdAt: order.createdAt,
+    updatedAt: order.updatedAt,
+  }));
+}
+
+async function resolveActorScope({ order, actorShopId }) {
+  const isBuyer = isSameId(order.shopId, actorShopId);
+
+  const supplier = await Supplier.findOne({
+    _id: order.supplierId,
+    isActive: true,
+  }).select("createdByShop").lean();
+
+  const isSeller = Boolean(supplier?.createdByShop) && isSameId(supplier.createdByShop, actorShopId);
+  return { isBuyer, isSeller };
+}
+
+function getTargetStatusForAction(action) {
+  const map = {
+    ACCEPT: "ACCEPTED",
+    REJECT: "REJECTED",
+    FULFILL: "FULFILLED",
+    CANCEL: "CANCELLED",
+  };
+  return map[action] || null;
+}
+
+function assertAllowedTransition({ currentStatus, action }) {
+  const transitions = {
+    PENDING: ["ACCEPT", "REJECT", "CANCEL"],
+    ACCEPTED: ["FULFILL"],
+    REJECTED: [],
+    CANCELLED: [],
+    FULFILLED: [],
+  };
+
+  const allowed = transitions[currentStatus] || [];
+  if (!allowed.includes(action)) {
+    const err = new Error(`Invalid transition from ${currentStatus} using ${action}`);
+    err.statusCode = 409;
+    throw err;
+  }
+}
+
+async function updateBulkOrderStatus({
+  orderId,
+  actorShopId,
+  actorUserId,
+  action,
+  note = "",
+}) {
+  const order = await BulkOrderRequest.findById(orderId);
+  if (!order) {
+    const err = new Error("Bulk order request not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const normalizedAction = String(action || "").toUpperCase();
+  const targetStatus = getTargetStatusForAction(normalizedAction);
+  if (!targetStatus) {
+    const err = new Error("Unsupported lifecycle action");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const scope = await resolveActorScope({
+    order,
+    actorShopId,
+  });
+
+  if (!scope.isBuyer && !scope.isSeller) {
+    const err = new Error("Bulk order access denied for this tenant");
+    err.statusCode = 403;
+    throw err;
+  }
+
+  if (["ACCEPT", "REJECT", "FULFILL"].includes(normalizedAction) && !scope.isSeller) {
+    const err = new Error("Only supplier tenant can perform this action");
+    err.statusCode = 403;
+    throw err;
+  }
+
+  if (normalizedAction === "CANCEL" && !scope.isBuyer) {
+    const err = new Error("Only buyer tenant can cancel bulk order");
+    err.statusCode = 403;
+    throw err;
+  }
+
+  if (order.status === targetStatus) {
+    return {
+      order,
+      idempotencyReplay: true,
+    };
+  }
+
+  assertAllowedTransition({
+    currentStatus: order.status,
+    action: normalizedAction,
+  });
+
+  const previousStatus = order.status;
+  order.status = targetStatus;
+
+  const now = new Date();
+  if (targetStatus === "ACCEPTED") order.acceptedAt = now;
+  if (targetStatus === "REJECTED") order.rejectedAt = now;
+  if (targetStatus === "CANCELLED") order.cancelledAt = now;
+  if (targetStatus === "FULFILLED") order.fulfilledAt = now;
+
+  order.statusHistory = order.statusHistory || [];
+  order.statusHistory.push({
+    fromStatus: previousStatus,
+    toStatus: targetStatus,
+    action: normalizedAction,
+    actorShopId: actorShopId || null,
+    actorUserId: actorUserId || null,
+    note: String(note || "").trim(),
+    at: now,
+  });
+
+  await order.save();
+
+  return {
+    order,
+    idempotencyReplay: false,
+  };
+}
+
 module.exports = {
   searchSuppliers,
   listSupplierOffers,
   createSupplierOffer,
   updateSupplierOffer,
   createBulkOrderRequest,
+  listBulkOrderRequests,
+  updateBulkOrderStatus,
   toNumber,
 };

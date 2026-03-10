@@ -9,6 +9,7 @@ const creditValidator = require("../modules/credit/credit.validator");
 const discoveryValidator = require("../modules/discovery/discovery.validator");
 const behaviorValidator = require("../modules/behavior/behavior.validator");
 const supplierValidator = require("../modules/supplier-marketplace/supplierMarketplace.validator");
+const aiInsightsValidator = require("../modules/ai-insights/aiInsights.validator");
 
 function createMockRes() {
   const res = {
@@ -192,6 +193,40 @@ describe("Platform Validation - Supplier Marketplace", () => {
     expect(result.errors).toContain("supplierId is required");
     expect(result.errors).toContain("items[0].offerId is required");
     expect(result.errors).toContain("items[0].quantity must be at least 1");
+  });
+
+  it("should reject invalid bulk order lifecycle action", () => {
+    const result = supplierValidator.validateBulkOrderStatusBody({
+      action: "SHIP",
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("action must be ACCEPT, REJECT, FULFILL or CANCEL");
+  });
+
+  it("should reject invalid bulk order query mode", () => {
+    const result = supplierValidator.validateBulkOrdersQuery({
+      mode: "all",
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("mode must be buyer or seller");
+  });
+});
+
+describe("Platform Validation - AI Insights", () => {
+  it("should reject invalid days window", () => {
+    const result = aiInsightsValidator.validateBusinessInsightsQuery({
+      days: 365,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("days must be between 1 and 90");
+  });
+
+  it("should accept valid insights query", () => {
+    const result = aiInsightsValidator.validateBusinessInsightsQuery({
+      days: 14,
+      limit: 5,
+    });
+    expect(result.valid).toBe(true);
   });
 });
 

@@ -1,0 +1,105 @@
+{
+  "info": {
+    "name": "DokanX Phase 7 Supplier Order Lifecycle",
+    "_postman_id": "24766f2b-cf40-4c9d-8b58-e45f4621245f",
+    "description": "Phase 7 Step 3 - Supplier bulk order lifecycle status transitions",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "List Bulk Orders (Buyer View)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/suppliers/bulk-orders?mode=buyer&status=PENDING&limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["suppliers", "bulk-orders"],
+          "query": [
+            { "key": "mode", "value": "buyer" },
+            { "key": "status", "value": "PENDING" },
+            { "key": "limit", "value": "20" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "List Bulk Orders (Seller View)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/suppliers/bulk-orders?mode=seller&status=ACCEPTED&limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["suppliers", "bulk-orders"],
+          "query": [
+            { "key": "mode", "value": "seller" },
+            { "key": "status", "value": "ACCEPTED" },
+            { "key": "limit", "value": "20" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Accept Bulk Order",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"ACCEPT\",\n  \"note\": \"Order accepted by supplier\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/suppliers/bulk-orders/{{orderId}}/status",
+          "host": ["{{baseUrl}}"],
+          "path": ["suppliers", "bulk-orders", "{{orderId}}", "status"]
+        }
+      }
+    },
+    {
+      "name": "Fulfill Bulk Order",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"FULFILL\",\n  \"note\": \"Dispatched from supplier warehouse\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/suppliers/bulk-orders/{{orderId}}/status",
+          "host": ["{{baseUrl}}"],
+          "path": ["suppliers", "bulk-orders", "{{orderId}}", "status"]
+        }
+      }
+    },
+    {
+      "name": "Cancel Bulk Order (Buyer)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"CANCEL\",\n  \"note\": \"Buyer cancelled request\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/suppliers/bulk-orders/{{orderId}}/status",
+          "host": ["{{baseUrl}}"],
+          "path": ["suppliers", "bulk-orders", "{{orderId}}", "status"]
+        }
+      }
+    }
+  ]
+}

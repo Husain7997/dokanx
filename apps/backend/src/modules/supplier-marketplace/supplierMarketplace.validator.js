@@ -204,6 +204,61 @@ function validateCreateBulkOrderBody(input) {
   return { valid: errors.length === 0, errors };
 }
 
+function validateBulkOrdersQuery(input) {
+  const errors = [];
+
+  if (input.mode !== undefined) {
+    const mode = String(input.mode).toLowerCase();
+    if (!["buyer", "seller"].includes(mode)) {
+      errors.push("mode must be buyer or seller");
+    }
+  }
+
+  if (input.status !== undefined) {
+    const status = String(input.status).toUpperCase();
+    if (!["PENDING", "ACCEPTED", "REJECTED", "CANCELLED", "FULFILLED"].includes(status)) {
+      errors.push("status must be PENDING, ACCEPTED, REJECTED, CANCELLED or FULFILLED");
+    }
+  }
+
+  if (input.limit !== undefined) {
+    const limit = Number(input.limit);
+    if (!Number.isFinite(limit) || limit < 1 || limit > 200) {
+      errors.push("limit must be between 1 and 200");
+    }
+  }
+
+  if (input.supplierId !== undefined && typeof input.supplierId !== "string") {
+    errors.push("supplierId must be a string");
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+function validateBulkOrderIdParam(input) {
+  const errors = [];
+  const orderId = String(input.orderId || "").trim();
+  if (!orderId) {
+    errors.push("orderId is required");
+  }
+  return { valid: errors.length === 0, errors };
+}
+
+function validateBulkOrderStatusBody(input) {
+  const errors = [];
+  const action = String(input.action || "").toUpperCase();
+
+  if (!["ACCEPT", "REJECT", "FULFILL", "CANCEL"].includes(action)) {
+    errors.push("action must be ACCEPT, REJECT, FULFILL or CANCEL");
+  }
+
+  if (input.note !== undefined && typeof input.note !== "string") {
+    errors.push("note must be a string");
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
 module.exports = {
   validateSupplierSearchQuery,
   validateSupplierOffersQuery,
@@ -211,4 +266,7 @@ module.exports = {
   validateOfferIdParam,
   validateCreateOrUpdateOfferBody,
   validateCreateBulkOrderBody,
+  validateBulkOrdersQuery,
+  validateBulkOrderIdParam,
+  validateBulkOrderStatusBody,
 };

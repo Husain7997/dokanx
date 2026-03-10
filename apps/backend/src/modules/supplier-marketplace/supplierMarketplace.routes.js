@@ -53,4 +53,23 @@ router.post(
   controller.createBulkOrderRequest
 );
 
+router.get(
+  "/bulk-orders",
+  protect,
+  tenantGuard,
+  allowRoles("OWNER", "ADMIN", "STAFF"),
+  validateQuery(validator.validateBulkOrdersQuery),
+  controller.listBulkOrderRequests
+);
+
+router.patch(
+  "/bulk-orders/:orderId/status",
+  protect,
+  tenantGuard,
+  allowRoles("OWNER", "ADMIN", "STAFF"),
+  validateParams(validator.validateBulkOrderIdParam),
+  validateBody(validator.validateBulkOrderStatusBody),
+  controller.updateBulkOrderStatus
+);
+
 module.exports = router;
