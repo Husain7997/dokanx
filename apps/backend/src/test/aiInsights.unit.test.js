@@ -70,4 +70,66 @@ describe("AI Insights Helpers", () => {
     expect(rec.adjustmentPct).toBeLessThan(0);
     expect(rec.suggestedPrice).toBeLessThan(50);
   });
+
+  it("should compute positive reorder quantity when stock cover is below reorder point", () => {
+    const gap = insightsService._internals.computeDemandGap({
+      stock: 8,
+      dailyDemand: 3,
+      leadTimeDays: 4,
+      bufferDays: 3,
+    });
+
+    expect(gap.stockCoverDays).toBeLessThanOrEqual(gap.reorderPointDays);
+    expect(gap.reorderQty).toBeGreaterThan(0);
+  });
+
+  it("should prioritize supplier score with higher reliability and lower lead-time", () => {
+    const high = insightsService._internals.scoreSupplierForReorder({
+      leadTimeDays: 2,
+      wholesalePrice: 120,
+      availableQty: 100,
+      reliabilityScore: 90,
+    });
+    const low = insightsService._internals.scoreSupplierForReorder({
+      leadTimeDays: 6,
+      wholesalePrice: 120,
+      availableQty: 100,
+      reliabilityScore: 55,
+    });
+
+    expect(high).toBeGreaterThan(low);
+  });
+
+  it("should keep suggested price above margin floor when cost signal exists", () => {
+    const advisory = insightsService._internals.buildMarginAwareRecommendation({
+      productName: "Paracetamol",
+      currentPrice: 12,
+      estimatedCost: 10,
+      targetMarginPct: 20,
+      competitorAvgPrice: 13,
+      demandTrendPct: 5,
+      maxAdjustmentPct: 15,
+    });
+
+    expect(advisory.suggestedPrice).toBeGreaterThanOrEqual(12);
+    expect(advisory.confidence).toMatch(/MEDIUM|HIGH/);
+  });
+
+  it("should raise fraud score when payout and credit risk signals are elevated", () => {
+    const high = insightsService._internals.buildFraudScore({
+      payoutFailureRate: 40,
+      payoutAmountSpikePct: 80,
+      highRiskCreditRatio: 50,
+      overdueExposure: 60,
+    });
+    const low = insightsService._internals.buildFraudScore({
+      payoutFailureRate: 2,
+      payoutAmountSpikePct: 0,
+      highRiskCreditRatio: 5,
+      overdueExposure: 5,
+    });
+
+    expect(high).toBeGreaterThan(low);
+    expect(insightsService._internals.toSeverity(high)).toMatch(/MEDIUM|HIGH/);
+  });
 });

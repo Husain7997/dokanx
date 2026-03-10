@@ -1,0 +1,28 @@
+{
+  "info": {
+    "name": "DokanX Phase 8 Fraud Anomaly Alerts",
+    "_postman_id": "5d9e14c2-00a0-4557-96b7-c2f20f7c6581",
+    "description": "Read-only fraud anomaly alerts tied to payout and credit risk signals",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get Fraud Anomaly Alerts",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/insights/fraud/anomalies?days=30&limit=10",
+          "host": ["{{baseUrl}}"],
+          "path": ["insights", "fraud", "anomalies"],
+          "query": [
+            { "key": "days", "value": "30" },
+            { "key": "limit", "value": "10" }
+          ]
+        }
+      }
+    }
+  ]
+}

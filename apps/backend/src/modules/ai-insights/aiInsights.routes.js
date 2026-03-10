@@ -41,4 +41,31 @@ router.get(
   controller.getPricingRecommendations
 );
 
+router.get(
+  "/pricing/margin-advisory",
+  protect,
+  tenantGuard,
+  allowRoles("OWNER", "ADMIN", "STAFF"),
+  validateQuery(validator.validateBusinessInsightsQuery),
+  controller.getMarginAwarePricingAdvisory
+);
+
+router.get(
+  "/fraud/anomalies",
+  protect,
+  tenantGuard,
+  allowRoles("OWNER", "ADMIN", "STAFF"),
+  validateQuery(validator.validateBusinessInsightsQuery),
+  controller.getFraudAnomalyAlerts
+);
+
+router.get(
+  "/reorder/suggestions",
+  protect,
+  tenantGuard,
+  allowRoles("OWNER", "ADMIN", "STAFF"),
+  validateQuery(validator.validateBusinessInsightsQuery),
+  controller.getDemandAwareReorderSuggestions
+);
+
 module.exports = router;

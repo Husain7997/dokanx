@@ -1,0 +1,29 @@
+{
+  "info": {
+    "name": "DokanX Phase 8 Demand-Aware Reorder Suggestions",
+    "_postman_id": "4f199664-e610-435f-95d4-b524f8c8bc22",
+    "description": "Lead-time aware reorder suggestions with supplier ranking",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get Reorder Suggestions",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/insights/reorder/suggestions?days=14&limit=10&supplierCandidates=3",
+          "host": ["{{baseUrl}}"],
+          "path": ["insights", "reorder", "suggestions"],
+          "query": [
+            { "key": "days", "value": "14" },
+            { "key": "limit", "value": "10" },
+            { "key": "supplierCandidates", "value": "3" }
+          ]
+        }
+      }
+    }
+  ]
+}

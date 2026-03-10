@@ -1,0 +1,29 @@
+{
+  "info": {
+    "name": "DokanX Phase 7 Supplier Reliability",
+    "_postman_id": "9b6b0adf-a70f-4e49-a22f-97ac1689f556",
+    "description": "Supplier SLA scoring and fulfillment reliability ranking",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get Supplier Reliability Scoreboard",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/suppliers/reliability/scoreboard?days=90&limit=20&category=Medicine",
+          "host": ["{{baseUrl}}"],
+          "path": ["suppliers", "reliability", "scoreboard"],
+          "query": [
+            { "key": "days", "value": "90" },
+            { "key": "limit", "value": "20" },
+            { "key": "category", "value": "Medicine" }
+          ]
+        }
+      }
+    }
+  ]
+}

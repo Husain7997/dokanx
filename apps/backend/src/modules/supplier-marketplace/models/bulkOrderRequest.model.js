@@ -140,6 +140,8 @@ bulkOrderRequestSchema.index(
 );
 bulkOrderRequestSchema.index({ shopId: 1, status: 1, createdAt: -1 });
 bulkOrderRequestSchema.index({ supplierId: 1, status: 1, createdAt: -1 });
+bulkOrderRequestSchema.index({ shopId: 1, createdAt: -1 });
+bulkOrderRequestSchema.index({ supplierId: 1, createdAt: -1 });
 
 module.exports =
   mongoose.models.BulkOrderRequest ||

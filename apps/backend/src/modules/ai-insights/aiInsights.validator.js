@@ -29,6 +29,20 @@ function validateBusinessInsightsQuery(input) {
     }
   }
 
+  if (input.targetMarginPct !== undefined) {
+    const targetMarginPct = Number(input.targetMarginPct);
+    if (!Number.isFinite(targetMarginPct) || targetMarginPct < 5 || targetMarginPct > 60) {
+      errors.push("targetMarginPct must be between 5 and 60");
+    }
+  }
+
+  if (input.supplierCandidates !== undefined) {
+    const supplierCandidates = Number(input.supplierCandidates);
+    if (!Number.isFinite(supplierCandidates) || supplierCandidates < 1 || supplierCandidates > 5) {
+      errors.push("supplierCandidates must be between 1 and 5");
+    }
+  }
+
   return { valid: errors.length === 0, errors };
 }
 

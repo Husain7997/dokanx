@@ -10,6 +10,7 @@ const discoveryValidator = require("../modules/discovery/discovery.validator");
 const behaviorValidator = require("../modules/behavior/behavior.validator");
 const supplierValidator = require("../modules/supplier-marketplace/supplierMarketplace.validator");
 const aiInsightsValidator = require("../modules/ai-insights/aiInsights.validator");
+const assistantValidator = require("../modules/merchant-assistant/merchantAssistant.validator");
 
 function createMockRes() {
   const res = {
@@ -210,6 +211,14 @@ describe("Platform Validation - Supplier Marketplace", () => {
     expect(result.valid).toBe(false);
     expect(result.errors).toContain("mode must be buyer or seller");
   });
+
+  it("should reject invalid reliability days window", () => {
+    const result = supplierValidator.validateSupplierReliabilityQuery({
+      days: 2,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("days must be between 7 and 365");
+  });
 });
 
 describe("Platform Validation - AI Insights", () => {
@@ -244,6 +253,75 @@ describe("Platform Validation - AI Insights", () => {
     });
     expect(result.valid).toBe(false);
     expect(result.errors).toContain("maxAdjustmentPct must be between 1 and 30");
+  });
+
+  it("should reject invalid supplierCandidates", () => {
+    const result = aiInsightsValidator.validateBusinessInsightsQuery({
+      supplierCandidates: 10,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("supplierCandidates must be between 1 and 5");
+  });
+
+  it("should reject invalid targetMarginPct", () => {
+    const result = aiInsightsValidator.validateBusinessInsightsQuery({
+      targetMarginPct: 2,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("targetMarginPct must be between 5 and 60");
+  });
+});
+
+describe("Platform Validation - Merchant Assistant", () => {
+  it("should reject empty assistant message", () => {
+    const result = assistantValidator.validateOpsAssistantBody({
+      message: "",
+      channel: "WHATSAPP",
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("message is required");
+  });
+
+  it("should reject unsupported channel", () => {
+    const result = assistantValidator.validateOpsAssistantBody({
+      message: "আজকের sales",
+      channel: "SMS",
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("channel must be WHATSAPP or VOICE");
+  });
+
+  it("should accept valid assistant payload", () => {
+    const result = assistantValidator.validateOpsAssistantBody({
+      message: "low stock দেখাও",
+      channel: "VOICE",
+    });
+    expect(result.valid).toBe(true);
+  });
+
+  it("should reject invalid contact request role", () => {
+    const result = assistantValidator.validateCreateContactRequestBody({
+      message: "Need callback",
+      targetRole: "FINANCE",
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("targetRole must be ADMIN, STAFF or SUPPORT");
+  });
+
+  it("should reject invalid contact request query status", () => {
+    const result = assistantValidator.validateContactRequestQuery({
+      status: "OPEN",
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("status must be QUEUED, IN_PROGRESS, RESOLVED or CANCELLED");
+  });
+
+  it("should reject invalid contact request status payload", () => {
+    const result = assistantValidator.validateContactRequestStatusBody({
+      status: "OPEN",
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("status must be IN_PROGRESS, RESOLVED or CANCELLED");
   });
 });
 

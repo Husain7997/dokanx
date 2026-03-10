@@ -1,0 +1,125 @@
+{
+  "info": {
+    "name": "DokanX Phase 8 Bengali WhatsApp/Voice Assistant",
+    "_postman_id": "2feaf373-b524-4b64-b46f-c2e2e7eb4f24",
+    "description": "Read-only merchant operations assistant API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Assistant Query - WhatsApp",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"channel\": \"WHATSAPP\",\n  \"message\": \"আজকের sales বলুন\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/assistant/ops/query",
+          "host": ["{{baseUrl}}"],
+          "path": ["assistant", "ops", "query"]
+        }
+      }
+    },
+    {
+      "name": "Assistant Query - Voice",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"channel\": \"VOICE\",\n  \"message\": \"low stock দেখাও\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/assistant/ops/query",
+          "host": ["{{baseUrl}}"],
+          "path": ["assistant", "ops", "query"]
+        }
+      }
+    },
+    {
+      "name": "Assistant Query - Contact Admin Draft",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"channel\": \"WHATSAPP\",\n  \"message\": \"Please contact admin regarding payout issue\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/assistant/ops/query",
+          "host": ["{{baseUrl}}"],
+          "path": ["assistant", "ops", "query"]
+        }
+      }
+    },
+    {
+      "name": "Create Contact Request",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" },
+          { "key": "Idempotency-Key", "value": "assistant-contact-{{timestamp}}", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": \"Please call me about payout issue\",\n  \"targetRole\": \"ADMIN\",\n  \"channel\": \"WHATSAPP\",\n  \"priority\": \"HIGH\",\n  \"sourceIntent\": \"CONTACT_SUPPORT\",\n  \"callbackPhone\": \"01700000000\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/assistant/contact-requests",
+          "host": ["{{baseUrl}}"],
+          "path": ["assistant", "contact-requests"]
+        }
+      }
+    },
+    {
+      "name": "List Contact Requests",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/assistant/contact-requests?status=QUEUED&targetRole=ADMIN&limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["assistant", "contact-requests"],
+          "query": [
+            { "key": "status", "value": "QUEUED" },
+            { "key": "targetRole", "value": "ADMIN" },
+            { "key": "limit", "value": "20" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Update Contact Request Status",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"IN_PROGRESS\",\n  \"note\": \"Assigned to support agent\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/assistant/contact-requests/{{requestId}}/status",
+          "host": ["{{baseUrl}}"],
+          "path": ["assistant", "contact-requests", "{{requestId}}", "status"]
+        }
+      }
+    }
+  ]
+}

@@ -15,6 +15,15 @@ router.get(
 );
 
 router.get(
+  "/reliability/scoreboard",
+  protect,
+  tenantGuard,
+  allowRoles("OWNER", "ADMIN", "STAFF"),
+  validateQuery(validator.validateSupplierReliabilityQuery),
+  controller.getSupplierReliabilityScoreboard
+);
+
+router.get(
   "/:supplierId/offers",
   protect,
   tenantGuard,

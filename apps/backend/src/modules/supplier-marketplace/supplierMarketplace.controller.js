@@ -46,6 +46,29 @@ async function getSupplierOffers(req, res, next) {
   }
 }
 
+async function getSupplierReliabilityScoreboard(req, res, next) {
+  try {
+    const data = await service.getSupplierReliabilityScoreboard({
+      q: req.query.q || "",
+      category: req.query.category || "",
+      area: req.query.area || "",
+      lat: service.toNumber(req.query.lat),
+      lng: service.toNumber(req.query.lng),
+      radiusKm: service.toNumber(req.query.radiusKm, 25),
+      days: service.toNumber(req.query.days, 90),
+      limit: service.toNumber(req.query.limit, 20),
+    });
+
+    res.json({
+      success: true,
+      count: data.length,
+      data,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function createSupplierOffer(req, res, next) {
   try {
     const offer = await service.createSupplierOffer({
@@ -184,6 +207,7 @@ async function updateBulkOrderStatus(req, res, next) {
 module.exports = {
   searchSuppliers,
   getSupplierOffers,
+  getSupplierReliabilityScoreboard,
   createSupplierOffer,
   updateSupplierOffer,
   createBulkOrderRequest,

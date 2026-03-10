@@ -27,6 +27,37 @@ function buildOfferScore({ price, availableQty, leadTimeDays }) {
   return Number((priceScore + stockScore + leadTimeScore).toFixed(2));
 }
 
+function buildFulfillmentSpeedScore(avgFulfillmentHours) {
+  if (!Number.isFinite(avgFulfillmentHours)) return 45;
+  if (avgFulfillmentHours <= 24) return 100;
+  if (avgFulfillmentHours <= 48) return 85;
+  if (avgFulfillmentHours <= 72) return 70;
+  if (avgFulfillmentHours <= 120) return 55;
+  return 35;
+}
+
+function buildReliabilityScore({
+  fulfillmentRate = 0,
+  acceptanceRate = 0,
+  avgFulfillmentHours = null,
+  verified = false,
+  ratingAverage = 0,
+}) {
+  const speedScore = buildFulfillmentSpeedScore(avgFulfillmentHours);
+  const verificationBonus = verified ? 5 : 0;
+  const ratingBonus = Math.min((Number(ratingAverage || 0) / 5) * 5, 5);
+
+  return Number(
+    (
+      Number(fulfillmentRate || 0) * 0.45 +
+      Number(acceptanceRate || 0) * 0.35 +
+      speedScore * 0.15 +
+      verificationBonus +
+      ratingBonus
+    ).toFixed(2)
+  );
+}
+
 async function getNearbySuppliers({ lat, lng, radiusKm = 25, limit = 500, query = {} }) {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return [];
 
@@ -212,6 +243,169 @@ async function listSupplierOffers({
     },
     offers,
   };
+}
+
+async function getSupplierReliabilityScoreboard({
+  q = "",
+  category = "",
+  area = "",
+  lat = null,
+  lng = null,
+  radiusKm = 25,
+  days = 90,
+  limit = 20,
+}) {
+  const regex = parseRegexQuery(q);
+  const categoryRegex = parseRegexQuery(category);
+  const areaRegex = parseRegexQuery(area);
+  const itemLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
+  const windowDays = Math.min(Math.max(Number(days) || 90, 7), 365);
+  const sinceDate = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+
+  const baseQuery = {
+    isActive: true,
+    ...(categoryRegex ? { categories: categoryRegex } : {}),
+    ...(areaRegex ? { coverageAreas: areaRegex } : {}),
+    ...(regex
+      ? {
+          $or: [
+            { name: regex },
+            { companyName: regex },
+            { categories: regex },
+            { brands: regex },
+          ],
+        }
+      : {}),
+  };
+
+  let suppliers = [];
+  if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    const nearby = await getNearbySuppliers({
+      lat,
+      lng,
+      radiusKm,
+      limit: itemLimit * 10,
+      query: baseQuery,
+    });
+    suppliers = nearby.map(s => ({
+      _id: s._id,
+      name: s.name,
+      slug: s.slug,
+      isVerified: Boolean(s.isVerified),
+      ratingAverage: Number(s.ratingAverage || 0),
+      ratingCount: Number(s.ratingCount || 0),
+    }));
+  } else {
+    suppliers = await Supplier.find(baseQuery)
+      .sort({ isVerified: -1, ratingAverage: -1, createdAt: -1 })
+      .limit(itemLimit * 10)
+      .select("_id name slug isVerified ratingAverage ratingCount")
+      .lean();
+  }
+
+  if (!suppliers.length) return [];
+  const supplierIds = suppliers.map(s => s._id);
+
+  const aggregateRows = await BulkOrderRequest.aggregate([
+    {
+      $match: {
+        supplierId: { $in: supplierIds },
+        createdAt: { $gte: sinceDate },
+      },
+    },
+    {
+      $group: {
+        _id: "$supplierId",
+        totalOrders: { $sum: 1 },
+        fulfilledOrders: {
+          $sum: {
+            $cond: [{ $eq: ["$status", "FULFILLED"] }, 1, 0],
+          },
+        },
+        acceptedOrders: {
+          $sum: {
+            $cond: [
+              { $in: ["$status", ["ACCEPTED", "FULFILLED"]] },
+              1,
+              0,
+            ],
+          },
+        },
+        rejectedOrders: {
+          $sum: {
+            $cond: [{ $eq: ["$status", "REJECTED"] }, 1, 0],
+          },
+        },
+        cancelledOrders: {
+          $sum: {
+            $cond: [{ $eq: ["$status", "CANCELLED"] }, 1, 0],
+          },
+        },
+        avgFulfillmentMs: {
+          $avg: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: ["$status", "FULFILLED"] },
+                  { $ne: ["$fulfilledAt", null] },
+                ],
+              },
+              { $subtract: ["$fulfilledAt", "$createdAt"] },
+              null,
+            ],
+          },
+        },
+      },
+    },
+  ]);
+
+  const metricsMap = new Map(aggregateRows.map(r => [String(r._id), r]));
+
+  return suppliers
+    .map(supplier => {
+      const row = metricsMap.get(String(supplier._id));
+      const totalOrders = Number(row?.totalOrders || 0);
+      const fulfilledOrders = Number(row?.fulfilledOrders || 0);
+      const acceptedOrders = Number(row?.acceptedOrders || 0);
+      const rejectedOrders = Number(row?.rejectedOrders || 0);
+      const cancelledOrders = Number(row?.cancelledOrders || 0);
+      const avgFulfillmentHours = Number.isFinite(row?.avgFulfillmentMs)
+        ? Number((row.avgFulfillmentMs / (1000 * 60 * 60)).toFixed(1))
+        : null;
+      const fulfillmentRate =
+        totalOrders > 0 ? Number(((fulfilledOrders / totalOrders) * 100).toFixed(2)) : 0;
+      const acceptanceRate =
+        totalOrders > 0 ? Number(((acceptedOrders / totalOrders) * 100).toFixed(2)) : 0;
+
+      return {
+        supplierId: supplier._id,
+        supplierName: supplier.name,
+        supplierSlug: supplier.slug || "",
+        isVerified: Boolean(supplier.isVerified),
+        ratingAverage: Number(supplier.ratingAverage || 0),
+        ratingCount: Number(supplier.ratingCount || 0),
+        periodDays: windowDays,
+        metrics: {
+          totalOrders,
+          fulfilledOrders,
+          acceptedOrders,
+          rejectedOrders,
+          cancelledOrders,
+          fulfillmentRate,
+          acceptanceRate,
+          avgFulfillmentHours,
+        },
+        reliabilityScore: buildReliabilityScore({
+          fulfillmentRate,
+          acceptanceRate,
+          avgFulfillmentHours,
+          verified: supplier.isVerified,
+          ratingAverage: supplier.ratingAverage,
+        }),
+      };
+    })
+    .sort((a, b) => b.reliabilityScore - a.reliabilityScore)
+    .slice(0, itemLimit);
 }
 
 function isSameId(left, right) {
@@ -600,10 +794,15 @@ async function updateBulkOrderStatus({
 module.exports = {
   searchSuppliers,
   listSupplierOffers,
+  getSupplierReliabilityScoreboard,
   createSupplierOffer,
   updateSupplierOffer,
   createBulkOrderRequest,
   listBulkOrderRequests,
   updateBulkOrderStatus,
   toNumber,
+  _internals: {
+    buildFulfillmentSpeedScore,
+    buildReliabilityScore,
+  },
 };

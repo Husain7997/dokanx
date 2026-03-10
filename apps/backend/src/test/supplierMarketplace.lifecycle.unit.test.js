@@ -110,3 +110,25 @@ describe("Supplier Marketplace Bulk Order Lifecycle", () => {
     ).rejects.toMatchObject({ statusCode: 409 });
   });
 });
+
+describe("Supplier Marketplace Reliability Helpers", () => {
+  it("should give better score to faster fulfillment", () => {
+    const fast = service._internals.buildReliabilityScore({
+      fulfillmentRate: 80,
+      acceptanceRate: 90,
+      avgFulfillmentHours: 20,
+      verified: true,
+      ratingAverage: 4.5,
+    });
+
+    const slow = service._internals.buildReliabilityScore({
+      fulfillmentRate: 80,
+      acceptanceRate: 90,
+      avgFulfillmentHours: 140,
+      verified: true,
+      ratingAverage: 4.5,
+    });
+
+    expect(fast).toBeGreaterThan(slow);
+  });
+});

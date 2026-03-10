@@ -1,0 +1,30 @@
+{
+  "info": {
+    "name": "DokanX Phase 9 Margin-Aware Pricing Advisory",
+    "_postman_id": "f093f317-4308-4d83-9382-ab2d57057d54",
+    "description": "Cost + competitor + demand-trend based pricing advisory",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get Margin-Aware Pricing Advisory",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/insights/pricing/margin-advisory?days=28&limit=10&targetMarginPct=18&maxAdjustmentPct=15",
+          "host": ["{{baseUrl}}"],
+          "path": ["insights", "pricing", "margin-advisory"],
+          "query": [
+            { "key": "days", "value": "28" },
+            { "key": "limit", "value": "10" },
+            { "key": "targetMarginPct", "value": "18" },
+            { "key": "maxAdjustmentPct", "value": "15" }
+          ]
+        }
+      }
+    }
+  ]
+}
