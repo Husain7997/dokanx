@@ -23,4 +23,13 @@ router.get(
   controller.getBusinessActions
 );
 
+router.get(
+  "/business/trends",
+  protect,
+  tenantGuard,
+  allowRoles("OWNER", "ADMIN", "STAFF"),
+  validateQuery(validator.validateBusinessInsightsQuery),
+  controller.getBusinessTrends
+);
+
 module.exports = router;

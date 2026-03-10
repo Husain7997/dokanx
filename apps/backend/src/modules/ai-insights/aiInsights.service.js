@@ -78,6 +78,54 @@ async function getTopSellingProducts({ shopId, sinceDate, limit }) {
   return rows;
 }
 
+async function getPeriodMetrics({ shopId, fromDate, toDate }) {
+  const rows = await Order.aggregate([
+    {
+      $match: {
+        shopId,
+        status: { $in: ["CONFIRMED", "SHIPPED", "DELIVERED"] },
+        createdAt: { $gte: fromDate, $lt: toDate },
+      },
+    },
+    { $unwind: "$items" },
+    {
+      $group: {
+        _id: null,
+        orderCount: { $addToSet: "$_id" },
+        revenue: {
+          $sum: { $multiply: ["$items.quantity", "$items.price"] },
+        },
+        soldQty: { $sum: "$items.quantity" },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        orderCount: { $size: "$orderCount" },
+        revenue: 1,
+        soldQty: 1,
+      },
+    },
+  ]);
+
+  const metric = rows[0] || { orderCount: 0, revenue: 0, soldQty: 0 };
+  return {
+    orderCount: Number(metric.orderCount || 0),
+    revenue: Number(metric.revenue || 0),
+    soldQty: Number(metric.soldQty || 0),
+  };
+}
+
+function pctChange(current, previous) {
+  const c = Number(current || 0);
+  const p = Number(previous || 0);
+  if (p === 0) {
+    if (c === 0) return 0;
+    return 100;
+  }
+  return Number((((c - p) / p) * 100).toFixed(2));
+}
+
 async function getBusinessInsights({
   shopId,
   days = 7,
@@ -211,13 +259,71 @@ async function getBusinessActions({
   };
 }
 
+async function getBusinessTrends({
+  shopId,
+  days = 7,
+  limit = 5,
+}) {
+  const windowDays = Math.min(Math.max(Number(days) || 7, 1), 90);
+  const itemLimit = Math.min(Math.max(Number(limit) || 5, 1), 20);
+
+  const now = new Date();
+  const currentFrom = new Date(now.getTime() - windowDays * 24 * 60 * 60 * 1000);
+  const previousFrom = new Date(currentFrom.getTime() - windowDays * 24 * 60 * 60 * 1000);
+
+  const [currentMetrics, previousMetrics] = await Promise.all([
+    getPeriodMetrics({ shopId, fromDate: currentFrom, toDate: now }),
+    getPeriodMetrics({ shopId, fromDate: previousFrom, toDate: currentFrom }),
+  ]);
+
+  const [currentTop, previousTop] = await Promise.all([
+    getTopSellingProducts({ shopId, sinceDate: currentFrom, limit: itemLimit }),
+    getTopSellingProducts({ shopId, sinceDate: previousFrom, limit: itemLimit * 3 }),
+  ]);
+
+  const previousMap = new Map(previousTop.map(p => [String(p.productId), p]));
+
+  const topMovers = currentTop
+    .map(p => {
+      const prev = previousMap.get(String(p.productId));
+      const prevSold = Number(prev?.soldQty || 0);
+      const currSold = Number(p.soldQty || 0);
+      return {
+        productId: p.productId,
+        name: p.name,
+        currentSoldQty: currSold,
+        previousSoldQty: prevSold,
+        soldQtyChangePct: pctChange(currSold, prevSold),
+      };
+    })
+    .sort((a, b) => b.soldQtyChangePct - a.soldQtyChangePct)
+    .slice(0, itemLimit);
+
+  const trendSummary = {
+    orderCountChangePct: pctChange(currentMetrics.orderCount, previousMetrics.orderCount),
+    revenueChangePct: pctChange(currentMetrics.revenue, previousMetrics.revenue),
+    soldQtyChangePct: pctChange(currentMetrics.soldQty, previousMetrics.soldQty),
+  };
+
+  return {
+    periodDays: windowDays,
+    generatedAt: now.toISOString(),
+    current: currentMetrics,
+    previous: previousMetrics,
+    trendSummary,
+    topMovers,
+  };
+}
+
 module.exports = {
   getBusinessInsights,
   getBusinessActions,
+  getBusinessTrends,
   toNumber,
   _internals: {
     computeStockoutDays,
     buildBusinessActions,
     buildRiskLevel,
+    pctChange,
   },
 };

@@ -35,7 +35,25 @@ async function getBusinessActions(req, res, next) {
   }
 }
 
+async function getBusinessTrends(req, res, next) {
+  try {
+    const data = await service.getBusinessTrends({
+      shopId: req.shop?._id,
+      days: service.toNumber(req.query.days, 7),
+      limit: service.toNumber(req.query.limit, 5),
+    });
+
+    res.json({
+      success: true,
+      data,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   getBusinessInsights,
   getBusinessActions,
+  getBusinessTrends,
 };

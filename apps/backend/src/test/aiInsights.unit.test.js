@@ -36,4 +36,10 @@ describe("AI Insights Helpers", () => {
     expect(actions[0].type).toBe("RESTOCK");
     expect(["CRITICAL", "HIGH", "MEDIUM"]).toContain(actions[0].riskLevel);
   });
+
+  it("should compute percentage change with zero-safe behavior", () => {
+    expect(insightsService._internals.pctChange(10, 5)).toBe(100);
+    expect(insightsService._internals.pctChange(0, 0)).toBe(0);
+    expect(insightsService._internals.pctChange(5, 0)).toBe(100);
+  });
 });

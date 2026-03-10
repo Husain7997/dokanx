@@ -1,0 +1,46 @@
+{
+  "info": {
+    "name": "DokanX Phase 8 AI Business Trends",
+    "_postman_id": "98363858-985c-47b4-94cd-6774f255f9e7",
+    "description": "Phase 8 Step 3 - Trend comparison insights",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get Business Trends (7 days)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/insights/business/trends?days=7&limit=5",
+          "host": ["{{baseUrl}}"],
+          "path": ["insights", "business", "trends"],
+          "query": [
+            { "key": "days", "value": "7" },
+            { "key": "limit", "value": "5" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Business Trends (14 days)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/insights/business/trends?days=14&limit=10",
+          "host": ["{{baseUrl}}"],
+          "path": ["insights", "business", "trends"],
+          "query": [
+            { "key": "days", "value": "14" },
+            { "key": "limit", "value": "10" }
+          ]
+        }
+      }
+    }
+  ]
+}
