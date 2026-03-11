@@ -1,3 +1,5 @@
+const WarehouseStock = require("../modules/warehouse/models/warehouseStock.model");
+
 async function allocateWarehouse(product, qty) {
 
   const stocks =

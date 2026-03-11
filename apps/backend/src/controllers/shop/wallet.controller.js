@@ -18,7 +18,8 @@ async (req, res, next) => {
 });
 
     res.json({
-      message: t(req.lang, "wallet.topped_up"),
+      success: true,
+      message: t("wallet.topped_up", req.lang),
       data: result,
     });
 
@@ -44,8 +45,9 @@ async (req, res, next) => {
     });
 
     res.json({
+      success: true,
       message:
-        t(req.lang, "wallet.transfer_success"),
+        t("wallet.transfer_success", req.lang),
     });
 
   } catch (err) {

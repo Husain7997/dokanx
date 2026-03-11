@@ -92,6 +92,20 @@ const supportTicketSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
+    slaBreachedAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+    escalationLevel: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    lastEscalatedAt: {
+      type: Date,
+      default: null,
+    },
     resolutionNote: {
       type: String,
       default: "",

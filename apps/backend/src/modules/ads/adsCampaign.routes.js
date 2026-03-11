@@ -1,42 +1,40 @@
 const router = require("express").Router();
-const { protect, allowRoles } = require("@/middlewares");
-const { tenantGuard } = require("@/api/middleware/tenantGuard");
+const { tenantAccess } = require("@/middlewares/accessPolicy.middleware");
 const { validateBody, validateQuery, validateParams } = require("@/middlewares/validateRequest");
 const controller = require("./adsCampaign.controller");
 const validator = require("./adsCampaign.validator");
 
 router.post(
   "/campaigns",
-  protect,
-  tenantGuard,
-  allowRoles("OWNER", "ADMIN"),
+  ...tenantAccess("OWNER", "ADMIN"),
   validateBody(validator.validateCreateCampaignBody),
   controller.createCampaign
 );
 
 router.get(
   "/campaigns",
-  protect,
-  tenantGuard,
-  allowRoles("OWNER", "ADMIN", "STAFF"),
+  ...tenantAccess("OWNER", "ADMIN", "STAFF"),
   validateQuery(validator.validateListCampaignsQuery),
   controller.listCampaigns
 );
 
 router.get(
   "/campaigns/:campaignId",
-  protect,
-  tenantGuard,
-  allowRoles("OWNER", "ADMIN", "STAFF"),
+  ...tenantAccess("OWNER", "ADMIN", "STAFF"),
   validateParams(validator.validateCampaignIdParam),
   controller.getCampaignById
 );
 
+router.get(
+  "/campaigns/:campaignId/sync-status",
+  ...tenantAccess("OWNER", "ADMIN", "STAFF"),
+  validateParams(validator.validateCampaignIdParam),
+  controller.getCampaignSyncStatus
+);
+
 router.put(
   "/campaigns/:campaignId",
-  protect,
-  tenantGuard,
-  allowRoles("OWNER", "ADMIN"),
+  ...tenantAccess("OWNER", "ADMIN"),
   validateParams(validator.validateCampaignIdParam),
   validateBody(validator.validateUpdateCampaignBody),
   controller.updateCampaign
@@ -44,9 +42,7 @@ router.put(
 
 router.patch(
   "/campaigns/:campaignId/status",
-  protect,
-  tenantGuard,
-  allowRoles("OWNER", "ADMIN"),
+  ...tenantAccess("OWNER", "ADMIN"),
   validateParams(validator.validateCampaignIdParam),
   validateBody(validator.validateCampaignStatusBody),
   controller.updateCampaignStatus
@@ -54,18 +50,14 @@ router.patch(
 
 router.get(
   "/campaigns/:campaignId/ai-suggestion",
-  protect,
-  tenantGuard,
-  allowRoles("OWNER", "ADMIN", "STAFF"),
+  ...tenantAccess("OWNER", "ADMIN", "STAFF"),
   validateParams(validator.validateCampaignIdParam),
   controller.getAiCreativeSuggestion
 );
 
 router.get(
   "/campaigns/:campaignId/audience-recommendation",
-  protect,
-  tenantGuard,
-  allowRoles("OWNER", "ADMIN", "STAFF"),
+  ...tenantAccess("OWNER", "ADMIN", "STAFF"),
   validateParams(validator.validateCampaignIdParam),
   validateQuery(validator.validateAudienceSuggestionQuery),
   controller.getAudienceRecommendation
@@ -73,18 +65,14 @@ router.get(
 
 router.post(
   "/campaigns/:campaignId/feed/sync",
-  protect,
-  tenantGuard,
-  allowRoles("OWNER", "ADMIN"),
+  ...tenantAccess("OWNER", "ADMIN"),
   validateParams(validator.validateCampaignIdParam),
   controller.syncProductFeed
 );
 
 router.post(
   "/campaigns/:campaignId/metrics",
-  protect,
-  tenantGuard,
-  allowRoles("OWNER", "ADMIN", "STAFF"),
+  ...tenantAccess("OWNER", "ADMIN", "STAFF"),
   validateParams(validator.validateCampaignIdParam),
   validateBody(validator.validateMetricUpsertBody),
   controller.upsertMetric
@@ -92,9 +80,7 @@ router.post(
 
 router.get(
   "/campaigns/:campaignId/bidding/recommendation",
-  protect,
-  tenantGuard,
-  allowRoles("OWNER", "ADMIN", "STAFF"),
+  ...tenantAccess("OWNER", "ADMIN", "STAFF"),
   validateParams(validator.validateCampaignIdParam),
   validateQuery(validator.validateAudienceSuggestionQuery),
   controller.getBiddingRecommendation
@@ -102,18 +88,14 @@ router.get(
 
 router.get(
   "/campaigns/:campaignId/guardrail/check",
-  protect,
-  tenantGuard,
-  allowRoles("OWNER", "ADMIN", "STAFF"),
+  ...tenantAccess("OWNER", "ADMIN", "STAFF"),
   validateParams(validator.validateCampaignIdParam),
   controller.checkGuardrail
 );
 
 router.put(
   "/campaigns/:campaignId/frequency-cap",
-  protect,
-  tenantGuard,
-  allowRoles("OWNER", "ADMIN"),
+  ...tenantAccess("OWNER", "ADMIN"),
   validateParams(validator.validateCampaignIdParam),
   validateBody(validator.validateFrequencyCapBody),
   controller.updateFrequencyCap
@@ -121,9 +103,7 @@ router.put(
 
 router.post(
   "/campaigns/:campaignId/approval/request",
-  protect,
-  tenantGuard,
-  allowRoles("OWNER", "ADMIN"),
+  ...tenantAccess("OWNER", "ADMIN"),
   validateParams(validator.validateCampaignIdParam),
   validateBody(validator.validateLaunchApprovalRequestBody),
   controller.requestLaunchApproval
@@ -131,9 +111,7 @@ router.post(
 
 router.post(
   "/campaigns/:campaignId/approval/approve",
-  protect,
-  tenantGuard,
-  allowRoles("OWNER", "ADMIN"),
+  ...tenantAccess("OWNER", "ADMIN"),
   validateParams(validator.validateCampaignIdParam),
   validateBody(validator.validateLaunchApprovalDecisionBody),
   controller.approveLaunch
@@ -141,9 +119,7 @@ router.post(
 
 router.post(
   "/campaigns/:campaignId/approval/reject",
-  protect,
-  tenantGuard,
-  allowRoles("OWNER", "ADMIN"),
+  ...tenantAccess("OWNER", "ADMIN"),
   validateParams(validator.validateCampaignIdParam),
   validateBody(validator.validateLaunchApprovalDecisionBody),
   controller.rejectLaunch

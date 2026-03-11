@@ -30,6 +30,11 @@ taxAmount: {
     totalAmount: { type: Number, required: true },
     commission: { type: Number, default: 0 },
     netAmount: { type: Number, required: true },
+    settlementRuleSnapshot: {
+      routingDestination: { type: String, default: "" },
+      commissionRate: { type: Number, default: 0 },
+      source: { type: String, default: "" },
+    },
 
     orderCount: { type: Number, required: true },
 

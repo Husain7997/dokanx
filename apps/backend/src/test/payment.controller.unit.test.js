@@ -28,11 +28,16 @@ jest.mock("../utils/idempotency", () => ({
   ensureIdempotent: jest.fn(),
 }));
 
+jest.mock("../modules/billing/billingExecution.service", () => ({
+  resolveBillingSnapshot: jest.fn(),
+}));
+
 const { addJob, t } = require("@/core/infrastructure");
 const Order = require("../models/order.model");
 const PaymentAttempt = require("../models/paymentAttempt.model");
 const paymentService = require("../services/payment.service");
 const { ensureIdempotent } = require("../utils/idempotency");
+const { resolveBillingSnapshot } = require("../modules/billing/billingExecution.service");
 const controller = require("../controllers/payment.controller");
 
 describe("payment.controller", () => {
@@ -47,12 +52,26 @@ describe("payment.controller", () => {
       totalAmount: 120,
     });
     PaymentAttempt.findOne.mockResolvedValue(null);
-    PaymentAttempt.create.mockResolvedValue({ _id: "attempt-1" });
+    resolveBillingSnapshot.mockResolvedValue({
+      commission: { amount: 6, rate: 5 },
+      routing: { destination: "PLATFORM_WALLET", source: "default" },
+    });
+    PaymentAttempt.create.mockResolvedValue({
+      _id: "attempt-1",
+      billingSnapshot: {
+        commission: { amount: 6, rate: 5 },
+        routing: { destination: "PLATFORM_WALLET", source: "default" },
+      },
+    });
 
     const json = jest.fn();
     const req = {
       params: { orderId: "order-1" },
       lang: "en",
+      body: {
+        paymentMethod: "bkash",
+        hasOwnGateway: true,
+      },
     };
     const res = {
       status: jest.fn(() => ({ json })),
@@ -62,9 +81,24 @@ describe("payment.controller", () => {
     await controller.initiatePayment(req, res, next);
 
     expect(addJob).toHaveBeenCalledWith("settlement", { orderId: "order-1" });
+    expect(resolveBillingSnapshot).toHaveBeenCalledWith({
+      tenantId: "shop-1",
+      orderChannel: "ONLINE",
+      paymentMethod: "BKASH",
+      amount: 120,
+      hasOwnGateway: true,
+    });
     expect(t).toHaveBeenCalledWith("common.updated", "en");
     expect(res.status).toHaveBeenCalledWith(201);
-    expect(json).toHaveBeenCalledTimes(1);
+    expect(json).toHaveBeenCalledWith({
+      message: "updated",
+      providerPaymentId: "pay_order-1",
+      attemptId: "attempt-1",
+      billing: {
+        commission: { amount: 6, rate: 5 },
+        routing: { destination: "PLATFORM_WALLET", source: "default" },
+      },
+    });
     expect(next).not.toHaveBeenCalled();
   });
 
@@ -88,5 +122,40 @@ describe("payment.controller", () => {
       message: "duplicate",
     });
     expect(paymentService.handlePaymentWebhook).not.toHaveBeenCalled();
+  });
+
+  it("should return webhook success payload", async () => {
+    ensureIdempotent.mockResolvedValue(true);
+    paymentService.handlePaymentWebhook.mockResolvedValue({
+      ok: true,
+      billing: {
+        routingDestination: "MERCHANT_DIRECT",
+      },
+    });
+
+    const json = jest.fn();
+    const req = {
+      headers: { "idempotency-key": "evt-1" },
+      body: { providerPaymentId: "pay-1" },
+    };
+    const res = {
+      json,
+    };
+
+    await controller.paymentWebhook(req, res);
+
+    expect(ensureIdempotent).toHaveBeenCalledWith("evt-1", "payment");
+    expect(paymentService.handlePaymentWebhook).toHaveBeenCalledWith({
+      providerPaymentId: "pay-1",
+    });
+    expect(json).toHaveBeenCalledWith({
+      success: true,
+      result: {
+        ok: true,
+        billing: {
+          routingDestination: "MERCHANT_DIRECT",
+        },
+      },
+    });
   });
 });

@@ -1,5 +1,6 @@
 const SupportTicket = require("./models/supportTicket.model");
 const SupportQuickReply = require("./models/quickReply.model");
+const { notificationDispatcher, logger } = require("@/core/infrastructure");
 
 const TEAM_BY_CATEGORY = {
   ORDER: "ORDER_OPS",
@@ -42,6 +43,29 @@ function autoAssignTeam(category = "GENERAL") {
   return TEAM_BY_CATEGORY[normalizeCategory(category)] || "SUPPORT";
 }
 
+async function findLeastLoadedAssignee({ shopId, team }) {
+  const [row] = await SupportTicket.aggregate([
+    {
+      $match: {
+        shopId,
+        assignedTeam: team,
+        assignedTo: { $ne: null },
+        status: { $in: ["ASSIGNED", "IN_PROGRESS", "OPEN"] },
+      },
+    },
+    {
+      $group: {
+        _id: "$assignedTo",
+        openCount: { $sum: 1 },
+      },
+    },
+    { $sort: { openCount: 1, _id: 1 } },
+    { $limit: 1 },
+  ]);
+
+  return row?._id || null;
+}
+
 async function createTicket({
   shopId,
   createdBy,
@@ -54,6 +78,11 @@ async function createTicket({
 }) {
   const normalizedCategory = normalizeCategory(category);
   const normalizedPriority = normalizePriority(priority);
+  const assignedTeam = autoAssignTeam(normalizedCategory);
+  const assignedTo = await findLeastLoadedAssignee({
+    shopId,
+    team: assignedTeam,
+  });
 
   return SupportTicket.create({
     shopId,
@@ -63,8 +92,9 @@ async function createTicket({
     description: String(description || "").trim(),
     category: normalizedCategory,
     priority: normalizedPriority,
-    status: "OPEN",
-    assignedTeam: autoAssignTeam(normalizedCategory),
+    status: assignedTo ? "ASSIGNED" : "OPEN",
+    assignedTeam,
+    assignedTo,
     orderId: orderId || null,
     slaDueAt: getSlaDueAt(normalizedPriority),
     comments: [],
@@ -168,12 +198,161 @@ async function listQuickReplies({ shopId, category = null }) {
   return SupportQuickReply.find(query).sort({ createdAt: -1 }).lean();
 }
 
+async function getSupportAnalytics({ shopId, now = new Date() }) {
+  const baseQuery = { shopId };
+  const [statusAgg, priorityAgg, ratingAgg, overdueCount, teamAgg] = await Promise.all([
+    SupportTicket.aggregate([
+      { $match: baseQuery },
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]),
+    SupportTicket.aggregate([
+      { $match: baseQuery },
+      { $group: { _id: "$priority", count: { $sum: 1 } } },
+    ]),
+    SupportTicket.aggregate([
+      {
+        $match: {
+          ...baseQuery,
+          satisfactionRating: { $ne: null },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          avgRating: { $avg: "$satisfactionRating" },
+          ratedCount: { $sum: 1 },
+        },
+      },
+    ]),
+    SupportTicket.countDocuments({
+      ...baseQuery,
+      status: { $in: ["OPEN", "ASSIGNED", "IN_PROGRESS"] },
+      slaDueAt: { $lt: now },
+    }),
+    SupportTicket.aggregate([
+      { $match: baseQuery },
+      { $group: { _id: "$assignedTeam", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]),
+  ]);
+
+  return {
+    statusBreakdown: statusAgg,
+    priorityBreakdown: priorityAgg,
+    averageRating: Number((ratingAgg[0]?.avgRating || 0).toFixed?.(2) || 0),
+    ratedCount: Number(ratingAgg[0]?.ratedCount || 0),
+    overdueOpenTickets: overdueCount,
+    teamBreakdown: teamAgg,
+  };
+}
+
+async function getAgentLeaderboard({ shopId }) {
+  return SupportTicket.aggregate([
+    {
+      $match: {
+        shopId,
+        assignedTo: { $ne: null },
+      },
+    },
+    {
+      $group: {
+        _id: "$assignedTo",
+        totalTickets: { $sum: 1 },
+        resolvedTickets: {
+          $sum: {
+            $cond: [{ $in: ["$status", ["RESOLVED", "CLOSED"]] }, 1, 0],
+          },
+        },
+        avgRating: { $avg: "$satisfactionRating" },
+      },
+    },
+    {
+      $project: {
+        totalTickets: 1,
+        resolvedTickets: 1,
+        avgRating: { $ifNull: ["$avgRating", 0] },
+      },
+    },
+    { $sort: { resolvedTickets: -1, avgRating: -1, totalTickets: -1 } },
+    { $limit: 20 },
+  ]);
+}
+
+async function listSlaBreaches({ shopId, now = new Date(), limit = 50 }) {
+  return SupportTicket.find({
+    shopId,
+    status: { $in: ["OPEN", "ASSIGNED", "IN_PROGRESS"] },
+    slaDueAt: { $lt: now },
+  })
+    .sort({ slaDueAt: 1 })
+    .limit(Math.min(Math.max(Number(limit) || 50, 1), 200))
+    .lean();
+}
+
+async function runSlaEscalation({ shopId, now = new Date() }) {
+  const tickets = await SupportTicket.find({
+    shopId,
+    status: { $in: ["OPEN", "ASSIGNED", "IN_PROGRESS"] },
+    slaDueAt: { $lt: now },
+  }).limit(100);
+
+  const escalated = [];
+  for (const ticket of tickets) {
+    const nextLevel = Number(ticket.escalationLevel || 0) + 1;
+    ticket.escalationLevel = nextLevel;
+    ticket.slaBreachedAt = ticket.slaBreachedAt || now;
+    ticket.lastEscalatedAt = now;
+    ticket.comments.push({
+      authorId: null,
+      authorRole: "SYSTEM",
+      message: `SLA breached. Escalation level ${nextLevel} triggered.`,
+      createdAt: now,
+    });
+    await ticket.save();
+
+    const recipientId = ticket.assignedTo || ticket.createdBy || null;
+    if (recipientId) {
+      try {
+        await notificationDispatcher.dispatch({
+          tenantId: String(shopId),
+          userId: String(recipientId),
+          message: `Support ticket "${ticket.subject}" breached SLA. Escalation level ${nextLevel}.`,
+          language: "en",
+        });
+      } catch (err) {
+        logger.warn({ err: err.message, ticketId: ticket._id }, "SLA escalation notification failed");
+      }
+    }
+
+    escalated.push(ticket);
+  }
+
+  return escalated;
+}
+
+async function buildTicketExportRows({ shopId, filters = {} }) {
+  const rows = await listTickets({ shopId, filters });
+  return rows.map(row => ({
+    ticketId: String(row._id || ""),
+    subject: String(row.subject || ""),
+    category: String(row.category || ""),
+    priority: String(row.priority || ""),
+    status: String(row.status || ""),
+    assignedTeam: String(row.assignedTeam || ""),
+    assignedTo: String(row.assignedTo || ""),
+    satisfactionRating: Number(row.satisfactionRating || 0),
+    slaDueAt: row.slaDueAt || "",
+    createdAt: row.createdAt || "",
+  }));
+}
+
 module.exports = {
   _internals: {
     autoAssignTeam,
     getSlaDueAt,
     normalizePriority,
     normalizeCategory,
+    findLeastLoadedAssignee,
   },
   createTicket,
   listTickets,
@@ -183,4 +362,9 @@ module.exports = {
   rateTicket,
   createQuickReply,
   listQuickReplies,
+  getSupportAnalytics,
+  getAgentLeaderboard,
+  listSlaBreaches,
+  runSlaEscalation,
+  buildTicketExportRows,
 };

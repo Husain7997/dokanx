@@ -14,21 +14,47 @@ dotenv.config({
   quiet: true,
 });
 
-if (!process.env.MONGO_URI_TEST) {
-  throw new Error("MONGO_URI_TEST missing. Check .env.test");
-}
-
 jest.setTimeout(30000);
 
+const shouldSkipDb =
+  process.env.TEST_SKIP_DB === "true" ||
+  process.env.TEST_USE_DB === "false";
+const dbOptional =
+  process.env.TEST_DB_OPTIONAL !== "false";
+
+global.__TEST_DB_AVAILABLE = false;
+
 beforeAll(async () => {
+  if (shouldSkipDb) {
+    return;
+  }
+
+  if (!process.env.MONGO_URI_TEST) {
+    if (dbOptional) {
+      return;
+    }
+    throw new Error("MONGO_URI_TEST missing. Check .env.test");
+  }
+
   if (mongoose.connection.readyState !== 1) {
-    await mongoose.connect(process.env.MONGO_URI_TEST, {
-      serverSelectionTimeoutMS: 15000,
-      socketTimeoutMS: 45000,
-      maxPoolSize: 5,
-    });
-    if (process.env.TEST_LOG_CONNECTIONS === "true") {
-      console.log("MongoDB connected (test)");
+    try {
+      await mongoose.connect(process.env.MONGO_URI_TEST, {
+        serverSelectionTimeoutMS: 15000,
+        socketTimeoutMS: 45000,
+        maxPoolSize: 5,
+      });
+      global.__TEST_DB_AVAILABLE = true;
+      if (process.env.TEST_LOG_CONNECTIONS === "true") {
+        console.log("MongoDB connected (test)");
+      }
+    } catch (err) {
+      if (!dbOptional) {
+        throw err;
+      }
+      global.__TEST_DB_AVAILABLE = false;
+      if (process.env.TEST_LOG_CONNECTIONS === "true") {
+        console.warn(`MongoDB test connection skipped: ${err.message}`);
+      }
     }
   }
 });

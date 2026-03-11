@@ -40,7 +40,16 @@ function validateMergeBody(body = {}) {
   return { valid: true, errors: [] };
 }
 
+function validateApplyCouponBody(body = {}) {
+  const code = String(body.code || "").trim();
+  return {
+    valid: Boolean(code),
+    errors: code ? [] : ["code is required"],
+  };
+}
+
 module.exports = {
   validateSaveCartBody,
   validateMergeBody,
+  validateApplyCouponBody,
 };

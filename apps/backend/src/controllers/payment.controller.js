@@ -6,6 +6,7 @@ const Payment = require("../models/payment.model");
 const PaymentAttempt = require("../models/paymentAttempt.model");
 const paymentService = require("../services/payment.service");
 const { ensureIdempotent } = require("../utils/idempotency");
+const { resolveBillingSnapshot } = require("../modules/billing/billingExecution.service");
 
 exports.initiatePayment = async (req, res, next) => {
   try {
@@ -17,6 +18,7 @@ exports.initiatePayment = async (req, res, next) => {
     }
 
     const providerPaymentId = `pay_${order._id}`;
+    const orderShopId = order.shopId || order.shop;
 
     let attempt = await PaymentAttempt.findOne({
       order: order._id,
@@ -26,15 +28,24 @@ exports.initiatePayment = async (req, res, next) => {
     if (!attempt) {
       await addJob("settlement", { orderId: order._id });
 
+      const billingSnapshot = await resolveBillingSnapshot({
+        tenantId: orderShopId,
+        orderChannel: "ONLINE",
+        paymentMethod: String(req.body?.paymentMethod || "UNKNOWN").trim().toUpperCase(),
+        amount: order.totalAmount,
+        hasOwnGateway: Boolean(req.body?.hasOwnGateway),
+      });
+
       attempt = await PaymentAttempt.create({
         order: order._id,
-        shopId: order.shop,
+        shopId: orderShopId,
         amount: order.totalAmount,
         provider: "sandbox",
         gateway: "sandbox",
         providerPaymentId: `pay_${new mongoose.Types.ObjectId()}`,
         status: "PENDING",
         processed: false,
+        billingSnapshot,
       });
     }
 
@@ -42,6 +53,7 @@ exports.initiatePayment = async (req, res, next) => {
       message: t("common.updated", req.lang),
       providerPaymentId,
       attemptId: attempt._id,
+      billing: attempt.billingSnapshot || null,
     });
   } catch (err) {
     return next(err);

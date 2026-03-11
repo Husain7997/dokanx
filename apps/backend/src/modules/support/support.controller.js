@@ -1,5 +1,6 @@
 const { logger } = require("@/core/infrastructure");
 const response = require("@/utils/controllerResponse");
+const { toCSV } = require("@/utils/csv.util");
 const service = require("./support.service");
 
 function resolveShopId(req) {
@@ -154,6 +155,77 @@ exports.listQuickReplies = async (req, res, next) => {
 
     return response.updated(res, req, rows);
   } catch (err) {
+    return next(err);
+  }
+};
+
+exports.analytics = async (req, res, next) => {
+  try {
+    const shopId = resolveShopId(req);
+    if (!shopId) return response.failure(res, "Shop context missing", 400);
+
+    const data = await service.getSupportAnalytics({ shopId });
+    return response.updated(res, req, data);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+exports.agentLeaderboard = async (req, res, next) => {
+  try {
+    const shopId = resolveShopId(req);
+    if (!shopId) return response.failure(res, "Shop context missing", 400);
+
+    const data = await service.getAgentLeaderboard({ shopId });
+    return response.updated(res, req, data);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+exports.slaBreaches = async (req, res, next) => {
+  try {
+    const shopId = resolveShopId(req);
+    if (!shopId) return response.failure(res, "Shop context missing", 400);
+
+    const data = await service.listSlaBreaches({
+      shopId,
+      limit: req.query.limit || 50,
+    });
+    return response.updated(res, req, data);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+exports.runSlaEscalation = async (req, res, next) => {
+  try {
+    const shopId = resolveShopId(req);
+    if (!shopId) return response.failure(res, "Shop context missing", 400);
+
+    const data = await service.runSlaEscalation({ shopId });
+    return response.updated(res, req, data);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+exports.exportTicketsCSV = async (req, res, next) => {
+  try {
+    const shopId = resolveShopId(req);
+    if (!shopId) return response.failure(res, "Shop context missing", 400);
+
+    const rows = await service.buildTicketExportRows({
+      shopId,
+      filters: req.query,
+    });
+
+    const csv = toCSV(rows);
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", 'attachment; filename="support-tickets.csv"');
+    return res.send(csv);
+  } catch (err) {
+    logger.error({ err: err.message }, "Export support tickets failed");
     return next(err);
   }
 };

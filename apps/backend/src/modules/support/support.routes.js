@@ -61,4 +61,35 @@ router.get(
   controller.listQuickReplies
 );
 
+router.get(
+  "/analytics",
+  ...tenantAccess("OWNER", "ADMIN", "STAFF"),
+  controller.analytics
+);
+
+router.get(
+  "/export/tickets",
+  ...tenantAccess("OWNER", "ADMIN", "STAFF"),
+  validateQuery(validator.validateTicketQuery),
+  controller.exportTicketsCSV
+);
+
+router.get(
+  "/analytics/agents",
+  ...tenantAccess("OWNER", "ADMIN", "STAFF"),
+  controller.agentLeaderboard
+);
+
+router.get(
+  "/sla/breaches",
+  ...tenantAccess("OWNER", "ADMIN", "STAFF"),
+  controller.slaBreaches
+);
+
+router.post(
+  "/sla/run",
+  ...tenantAccess("OWNER", "ADMIN", "STAFF"),
+  controller.runSlaEscalation
+);
+
 module.exports = router;

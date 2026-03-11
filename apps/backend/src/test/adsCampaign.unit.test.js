@@ -4,12 +4,21 @@ jest.mock("../modules/ads/models/adsCampaign.model", () => ({
   find: jest.fn(),
 }));
 
+jest.mock("../modules/ads/models/adsSyncTask.model", () => ({
+  find: jest.fn(),
+}));
+
 const AdCampaign = require("../modules/ads/models/adsCampaign.model");
+const AdsSyncTask = require("../modules/ads/models/adsSyncTask.model");
 const adsService = require("../modules/ads/adsCampaign.service");
 
 describe("Ads Campaign Service", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    AdCampaign.findOne.mockReset();
+    AdCampaign.create.mockReset();
+    AdCampaign.find.mockReset();
+    AdsSyncTask.find.mockReset();
   });
 
   it("should replay idempotent campaign create", async () => {
@@ -69,5 +78,38 @@ describe("Ads Campaign Service", () => {
     const a = adsService._internals.hashFeed(input);
     const b = adsService._internals.hashFeed(input);
     expect(a).toBe(b);
+  });
+
+  it("should return sync status summary for enabled platforms", async () => {
+    AdCampaign.findOne.mockReturnValueOnce({
+      lean: async () => ({
+        _id: "camp-1",
+        shopId: "shop-1",
+        status: "QUEUED",
+        platforms: {
+          facebook: { enabled: true, syncStatus: "PENDING", lastError: "" },
+          google: { enabled: false, syncStatus: "NOT_SYNCED", lastError: "" },
+          youtube: { enabled: true, syncStatus: "SYNCED", lastError: "" },
+        },
+      }),
+    });
+    AdsSyncTask.find.mockReturnValueOnce({
+      sort: () => ({
+        lean: async () => [
+          { platform: "facebook", status: "PENDING", attempts: 1, maxAttempts: 5 },
+          { platform: "youtube", status: "SYNCED", attempts: 1, maxAttempts: 5 },
+        ],
+      }),
+    });
+
+    const result = await adsService.getCampaignSyncStatus({
+      shopId: "shop-1",
+      campaignId: "camp-1",
+    });
+
+    expect(result.summary.totalEnabled).toBe(2);
+    expect(result.summary.pending).toBe(1);
+    expect(result.summary.synced).toBe(1);
+    expect(result.summary.failed).toBe(0);
   });
 });

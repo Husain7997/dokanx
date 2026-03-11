@@ -10,5 +10,7 @@ router.get("/", controller.getCart);
 router.put("/", validateBody(validator.validateSaveCartBody), controller.saveCart);
 router.delete("/", controller.clearCart);
 router.post("/merge", validateBody(validator.validateMergeBody), controller.mergeCart);
+router.post("/coupon", validateBody(validator.validateApplyCouponBody), controller.applyCoupon);
+router.delete("/coupon", controller.removeCoupon);
 
 module.exports = router;

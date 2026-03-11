@@ -61,6 +61,14 @@ const cartSchema = new mongoose.Schema(
       itemCount: { type: Number, default: 0 },
       quantity: { type: Number, default: 0 },
       subtotal: { type: Number, default: 0 },
+      discountTotal: { type: Number, default: 0 },
+      grandTotal: { type: Number, default: 0 },
+    },
+    appliedCoupon: {
+      code: { type: String, default: "" },
+      type: { type: String, default: "" },
+      discountValue: { type: Number, default: 0 },
+      appliedAt: { type: Date, default: null },
     },
   },
   { timestamps: true }

@@ -64,6 +64,22 @@ async function getCampaignById(req, res, next) {
   }
 }
 
+async function getCampaignSyncStatus(req, res, next) {
+  try {
+    const data = await service.getCampaignSyncStatus({
+      shopId: req.shop?._id,
+      campaignId: req.params.campaignId,
+    });
+
+    res.json({
+      success: true,
+      data,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function updateCampaign(req, res, next) {
   try {
     const data = await service.updateCampaign({
@@ -293,6 +309,7 @@ module.exports = {
   createCampaign,
   listCampaigns,
   getCampaignById,
+  getCampaignSyncStatus,
   updateCampaign,
   updateCampaignStatus,
   getAiCreativeSuggestion,

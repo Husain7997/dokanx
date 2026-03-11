@@ -252,10 +252,12 @@ exports.getProductInventory = async (req, res) => {
 
   if (!inventory)
     return res.status(404).json({
+      success: false,
       message: "Inventory not found",
     });
 
   res.json({
+    success: true,
     available: inventory.stock,
     reserved: inventory.reserved,
   });

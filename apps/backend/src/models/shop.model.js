@@ -95,6 +95,17 @@ const shopSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+
+    themeRef: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ShopTheme",
+      default: null,
+    },
+
+    themeOverrides: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
   },
   {
     timestamps: true,

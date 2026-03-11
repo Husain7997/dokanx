@@ -6,6 +6,8 @@ const { protect } = require("../middlewares");
 const role = require("../middlewares/role.middleware");
 const checkShopOwnership = require("../middlewares/checkShopOwnership");
 const { tenantGuard } = require("@/api/middleware/tenantGuard");
+const { validateBody, validateParams } = require("../middlewares/validateRequest");
+const validator = require("../validators/productCheckout.validator");
 
 router.post(
   "/smart-suggest",
@@ -13,6 +15,7 @@ router.post(
   tenantGuard,
   role("OWNER"),
   checkShopOwnership,
+  validateBody(validator.validateSmartSuggestBody),
   productController.smartSuggest
 );
 
@@ -22,15 +25,17 @@ router.post(
   tenantGuard,
   role("OWNER"),
   checkShopOwnership,
+  validateBody(validator.validateProductCreateBody),
   productController.createProduct
 );
 
-router.get("/shop/:shopId", productController.getProductsByShop);
+router.get("/shop/:shopId", validateParams(validator.validateShopIdParam), productController.getProductsByShop);
 
 router.get(
   "/:productId/inventory",
   protect,
   tenantGuard,
+  validateParams(validator.validateProductIdParam),
   productController.getProductInventory
 );
 

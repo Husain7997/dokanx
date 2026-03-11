@@ -12,6 +12,9 @@ const {logger} = require("@/core/infrastructure");
 const { t } =
   require('@/core/infrastructure');
 const { addJob } = require("@/core/infrastructure");
+const { triggerFirstPurchaseFlow } = require("@/modules/marketing/marketingTrigger.service");
+const cartService = require("@/modules/cart/cart.service");
+const marketingService = require("@/modules/marketing/marketing.service");
 exports.placeOrder = async (req, res) => {
 
   const session = await mongoose.startSession();
@@ -21,14 +24,61 @@ exports.placeOrder = async (req, res) => {
     let order;
 
     await session.withTransaction(async () => {
+      const shopId = req.shop?._id || req.shop;
+      let subtotal = Number(req.body.totalAmount || 0);
+      let discountTotal = 0;
+      let finalAmount = subtotal;
+      let appliedCoupon = {
+        code: "",
+        type: "",
+        discountValue: 0,
+      };
+
+      if (req.body.couponCode) {
+        const couponResult = await marketingService.evaluateCoupon({
+          shopId,
+          code: req.body.couponCode,
+          cartSubtotal: subtotal,
+          shippingFee: Number(req.body.shippingFee || 0),
+          itemCount: Array.isArray(req.body.items)
+            ? req.body.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
+            : 0,
+        });
+
+        if (!couponResult.valid) {
+          throw new Error(couponResult.reason || "Coupon invalid");
+        }
+
+        discountTotal = Number(couponResult.effect.discountValue || 0);
+        finalAmount = Math.max(0, subtotal - discountTotal);
+        appliedCoupon = {
+          code: couponResult.coupon.code,
+          type: couponResult.coupon.type,
+          discountValue: discountTotal,
+        };
+      }
 
       order = await CheckoutEngine.checkout({
         shopId: req.shop,
         user: req.user,
         items: req.body.items,
-        totalAmount: req.body.totalAmount,
+        totalAmount: finalAmount,
         session
       });
+      order.pricing = {
+        subtotal,
+        discountTotal,
+        grandTotal: finalAmount,
+      };
+      order.appliedCoupon = appliedCoupon;
+      await order.save({ session });
+
+      if (req.user?._id) {
+        await cartService.clearCart({
+          shopId,
+          userId: req.user._id,
+        });
+      }
 await addJob("settlement", { orderId: order._id });
       await publishEvent({
         type: "ORDER_CREATED",
@@ -40,6 +90,11 @@ await addJob("settlement", { orderId: order._id });
 
     logger.info("Order created", {
       orderId: order._id
+    });
+
+    await triggerFirstPurchaseFlow({
+      order,
+      logger,
     });
 
     res.status(201).json({

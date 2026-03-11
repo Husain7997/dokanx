@@ -43,6 +43,21 @@ const paymentAttemptSchema = new mongoose.Schema(
       index: true,
     },
 
+    billingSnapshot: {
+      orderChannel: { type: String, default: "ONLINE" },
+      paymentMethod: { type: String, default: "UNKNOWN" },
+      routing: {
+        destination: { type: String, default: "" },
+        gatewayKey: { type: String, default: "" },
+        source: { type: String, default: "" },
+      },
+      commission: {
+        rate: { type: Number, default: 0 },
+        amount: { type: Number, default: 0 },
+        source: { type: String, default: "" },
+      },
+    },
+
     processedAt: Date,
     webhookEventId: {
   type: String,

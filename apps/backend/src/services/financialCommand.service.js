@@ -24,15 +24,17 @@ async function executeFinancial({
   shopId,
   idempotencyKey,
   amount,
-  reason
+  reason,
+  entries
 }) {
   return FinancialEngine.execute({
     tenantId: shopId,
     idempotencyKey: String(idempotencyKey),
-    entries: buildEntries(reason, amount)
+    entries: Array.isArray(entries) && entries.length ? entries : buildEntries(reason, amount)
   });
 }
 
 module.exports = {
+  buildEntries,
   executeFinancial
 };

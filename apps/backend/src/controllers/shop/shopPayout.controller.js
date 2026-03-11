@@ -10,7 +10,10 @@ exports.requestPayout = async (req, res) => {
       userId: req.user.id,
     });
 
-    res.status(201).json(payout);
+    res.status(201).json({
+      success: true,
+      data: payout,
+    });
   } catch (err) {
     res.status(400).json({
       success: false,

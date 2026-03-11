@@ -1,5 +1,9 @@
 const FinancePeriod = require('../../models/FinancePeriod');
 const ReconciliationReport = require('../../models/ReconciliationReport');
+const {
+  runPlatformCommissionReconciliation,
+  listPlatformCommissionReconciliations,
+} = require('@/services/platformCommissionReconciliation.service');
 
 exports.lockPeriod = async (req, res) => {
   const { period } = req.body;
@@ -18,9 +22,22 @@ exports.lockPeriod = async (req, res) => {
 };
 
 exports.reconciliationReports = async (req, res) => {
-  const data = await ReconciliationReport.find()
+  const type = String(req.query.type || '').trim().toUpperCase();
+  const query = type ? { type } : {};
+
+  const data = await ReconciliationReport.find(query)
     .sort({ date: -1 })
     .limit(30);
 
+  res.json({ data });
+};
+
+exports.runPlatformCommissionReconciliation = async (req, res) => {
+  const row = await runPlatformCommissionReconciliation(req.body?.date || new Date());
+  res.json({ message: 'Platform commission reconciliation completed', data: row });
+};
+
+exports.platformCommissionReconciliationReports = async (req, res) => {
+  const data = await listPlatformCommissionReconciliations(req.query.limit || 30);
   res.json({ data });
 };

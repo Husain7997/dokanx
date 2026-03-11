@@ -73,4 +73,34 @@ describe("auth.controller", () => {
       message: "Invalid refresh token",
     });
   });
+
+  it("should reject session listing without authenticated user", async () => {
+    const json = jest.fn();
+    const res = {
+      status: jest.fn(() => ({ json })),
+    };
+
+    await controller.listSessions({ user: null }, res);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(json).toHaveBeenCalledWith({
+      success: false,
+      message: "Unauthorized",
+    });
+  });
+
+  it("should reject revoke-session without authenticated user", async () => {
+    const json = jest.fn();
+    const res = {
+      status: jest.fn(() => ({ json })),
+    };
+
+    await controller.revokeSession({ user: null, params: { sessionId: "sess-1" } }, res);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(json).toHaveBeenCalledWith({
+      success: false,
+      message: "Unauthorized",
+    });
+  });
 });

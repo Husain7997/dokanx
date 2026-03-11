@@ -5,6 +5,8 @@ const mongoose = require('mongoose');
 const Settlement = require('../../models/settlement.model');
 const FinancePeriod = require('../../models/FinancePeriod');
 const Finance = require('../../models/Finance');
+const Ledger = require('@/modules/ledger/ledger.model');
+const platformCommissionReport = require("@/modules/billing/platformCommissionReport.service");
 const { logger } = require("@/core/infrastructure");
 /**
  * KPI SUMMARY
@@ -14,8 +16,8 @@ exports.kpiSummary = async (req, res) => {
     {
       $group: {
         _id: null,
-        totalRevenue: { $sum: '$grossAmount' },
-        totalCommission: { $sum: '$platformFee' },
+        totalRevenue: { $sum: '$totalAmount' },
+        totalCommission: { $sum: '$commission' },
         totalPayout: { $sum: '$netPayout' },
         totalSettlements: { $sum: 1 }
       }
@@ -35,7 +37,7 @@ exports.revenueVsPayout = async (req, res) => {
         _id: {
           day: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }
         },
-        revenue: { $sum: '$grossAmount' },
+        revenue: { $sum: '$totalAmount' },
         payout: { $sum: '$netPayout' }
       }
     },
@@ -53,7 +55,7 @@ exports.topShops = async (req, res) => {
     {
       $group: {
         _id: '$shopId',
-        revenue: { $sum: '$grossAmount' }
+        revenue: { $sum: '$totalAmount' }
       }
     },
     { $sort: { revenue: -1 } },
@@ -136,4 +138,64 @@ exports.exportSettlementsCSV = async (req, res) => {
   );
 
   res.send(csv);
+};
+
+exports.platformCommissionSummary = async (req, res) => {
+  try {
+    const result = await platformCommissionReport.getCommissionReconciliation({
+      from: req.query.from || null,
+      to: req.query.to || null,
+    });
+
+    res.json({
+      data: {
+        settlementCommission: result.settlementCommission,
+        merchantDirectCount: result.merchantDirectCount,
+        platformWalletCount: Math.max(0, result.settlementCount - result.merchantDirectCount),
+        ledgerCommission: result.ledgerCommission,
+        ledgerRecords: result.ledgerEntries,
+        difference: result.difference,
+        status: result.status,
+      }
+    });
+  } catch (err) {
+    logger.error({ err: err.message }, "Platform commission summary failed");
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.platformCommissionEntries = async (req, res) => {
+  try {
+    const data = await platformCommissionReport.listCommissionEntries({
+      from: req.query.from || null,
+      to: req.query.to || null,
+      limit: req.query.limit || 50,
+    });
+
+    res.json({ data });
+  } catch (err) {
+    logger.error({ err: err.message }, "Platform commission entries failed");
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.exportPlatformCommissionCSV = async (req, res) => {
+  try {
+    const rows = await platformCommissionReport.buildCommissionExportRows({
+      from: req.query.from || null,
+      to: req.query.to || null,
+      limit: req.query.limit || 1000,
+    });
+
+    const csv = toCSV(rows);
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="platform-commission.csv"'
+    );
+    res.send(csv);
+  } catch (err) {
+    logger.error({ err: err.message }, "Platform commission export failed");
+    res.status(500).json({ error: err.message });
+  }
 };

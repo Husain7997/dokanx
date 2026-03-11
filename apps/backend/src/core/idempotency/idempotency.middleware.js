@@ -7,7 +7,9 @@ module.exports = async (req,res,next)=>{
 
   if(!key)
     return res.status(400).json({
-      error:"Idempotency-Key required"
+      success: false,
+      error:"Idempotency-Key required",
+      message: "Idempotency-Key required",
     });
 
   const existing =

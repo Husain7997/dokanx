@@ -34,7 +34,7 @@ exports.createSettlement = async (req, res) => {
     res.json(settlement);
   } catch (err) {
     logger.error({ err: err.message }, "Create settlement failed");
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, error: err.message, message: err.message });
   }
 };
 
@@ -43,12 +43,12 @@ exports.payoutSettlement = async (req, res) => {
     const { settlementId } = req.params;
     const settlement = await Settlement.findById(settlementId);
     if (!settlement) {
-      return res.status(404).json({ error: "Settlement not found" });
+      return res.status(404).json({ success: false, error: "Settlement not found", message: "Settlement not found" });
     }
     const result = await processPayout({ shopId: settlement.shopId });
     res.json(result);
   } catch (err) {
     logger.error({ err: err.message }, "Settlement payout failed");
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, error: err.message, message: err.message });
   }
 };

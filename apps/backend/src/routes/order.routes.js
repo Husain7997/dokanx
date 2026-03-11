@@ -5,6 +5,8 @@ const { protect, allowRoles } = require("../middlewares");
 const checkUserNotBlocked = require("../middlewares/checkUserNotBlocked");
 const optionalAuth = require("../middlewares/optionalAuth.middleware");
 const { canUpdateOrderStatus } = require("../middlewares/orderRole.guard");
+const { validateBody } = require("../middlewares/validateRequest");
+const orderValidator = require("../validators/order.validator");
 
 const {
   updateOrderStatus,
@@ -17,6 +19,7 @@ router.post(
   optionalAuth,
   checkUserNotBlocked,
   allowRoles("CUSTOMER"),
+  validateBody(orderValidator.validatePlaceOrderBody),
   placeOrder
 );
 
@@ -25,6 +28,7 @@ router.patch(
   protect,
   checkUserNotBlocked,
   allowRoles("OWNER", "ADMIN", "CUSTOMER"),
+  validateBody(orderValidator.validateOrderStatusBody),
   canUpdateOrderStatus,
   updateOrderStatus
 );

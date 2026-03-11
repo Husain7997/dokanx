@@ -8,12 +8,15 @@ const { redisRateLimiter } =
 
 const { protect } =
   require("@/middlewares");
+const { validateBody } = require("@/middlewares/validateRequest");
+const validator = require("@/validators/productCheckout.validator");
 
 router.use(protect);
 
 router.post(
   "/",
   redisRateLimiter({ scope: "checkout", limit: 30, windowSec: 60 }),
+  validateBody(validator.validateCheckoutBody),
   ctrl.checkout
 );
 

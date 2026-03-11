@@ -37,6 +37,12 @@ const merchantAssistantRoutes = require("../modules/merchant-assistant/merchantA
 const adsCampaignRoutes = require("../modules/ads/adsCampaign.routes");
 const cartRoutes = require("../modules/cart/cart.routes");
 const supportRoutes = require("../modules/support/support.routes");
+const marketingRoutes = require("../modules/marketing/marketing.routes");
+const courierRoutes = require("../modules/courier/courier.routes");
+const warehouseRoutes = require("../modules/warehouse/warehouse.routes");
+const backupRoutes = require("../modules/backup/backup.routes");
+const billingRoutes = require("../modules/billing/billing.routes");
+const themeRoutes = require("../modules/theme/theme.routes");
 
 router.use("/", meRoutes);
 router.use("/platform", platformRoutes);
@@ -81,5 +87,11 @@ router.use("/assistant", merchantAssistantRoutes);
 router.use("/ads", adsCampaignRoutes);
 router.use("/cart", cartRoutes);
 router.use("/support", supportRoutes);
+router.use("/marketing", marketingRoutes);
+router.use("/courier", courierRoutes);
+router.use("/warehouse", warehouseRoutes);
+router.use("/admin/backups", backupRoutes);
+router.use("/admin/billing", billingRoutes);
+router.use("/themes", themeRoutes);
 
 module.exports = router;

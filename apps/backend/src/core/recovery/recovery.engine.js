@@ -6,7 +6,7 @@ const Settlement =
   require("@/models/settlement.model");
 const PaymentAttempt =
   require("@/models/paymentAttempt.model");
-const { eventBus } = require("@/core/infrastructure");
+const { eventBus, logger } = require("@/core/infrastructure");
 
 function buildRecoveryEntries(diff) {
   const amount = Math.abs(diff || 0);
@@ -28,13 +28,13 @@ function buildRecoveryEntries(diff) {
 }
 
 async function repairLedger() {
-  console.log("Checking ledger integrity...");
+  logger.info("Checking ledger integrity");
 
   const issues =
     await ledgerAudit.findInconsistencies();
 
   for (const issue of issues) {
-    console.log("Ledger mismatch:", issue);
+    logger.warn({ issue }, "Ledger mismatch detected");
     const entries = buildRecoveryEntries(issue.diff);
     if (!entries) continue;
 
@@ -47,7 +47,7 @@ async function repairLedger() {
 }
 
 async function repairSettlement() {
-  console.log("Checking settlements...");
+  logger.info("Checking settlements");
 
   const stuck =
     await Settlement.find({
@@ -58,7 +58,7 @@ async function repairSettlement() {
     });
 
   for (const s of stuck) {
-    console.log("Fixing stuck settlement", s._id);
+    logger.warn({ settlementId: s._id }, "Fixing stuck settlement");
     s.status = "FAILED";
     await s.save();
 
@@ -69,7 +69,7 @@ async function repairSettlement() {
 }
 
 async function repairPayments() {
-  console.log("Checking payments...");
+  logger.info("Checking payments");
 
   const stuck =
     await PaymentAttempt.find({
@@ -81,7 +81,7 @@ async function repairPayments() {
     });
 
   for (const pay of stuck) {
-    console.log("Retrying payment", pay._id);
+    logger.warn({ paymentAttemptId: pay._id }, "Retrying stuck payment");
     eventBus.emit("PAYMENT_RETRY", {
       attemptId: pay._id
     });
@@ -89,11 +89,11 @@ async function repairPayments() {
 }
 
 exports.runRecovery = async () => {
-  console.log("\nDokanX Auto Recovery Running...\n");
+  logger.info("DokanX auto recovery running");
 
   await repairLedger();
   await repairSettlement();
   await repairPayments();
 
-  console.log("\nRecovery completed\n");
+  logger.info("Recovery completed");
 };

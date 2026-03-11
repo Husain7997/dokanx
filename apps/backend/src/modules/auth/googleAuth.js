@@ -1,9 +1,10 @@
 const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const User = require("../../models/user.model");
+const { logger } = require("@/core/infrastructure");
 
 if (!process.env.GOOGLE_CLIENT_ID) {
-  console.log("Google OAuth disabled");
+  logger.info("Google OAuth disabled");
 } else {
   passport.use(
     new GoogleStrategy(

@@ -213,6 +213,77 @@ async function getCampaignById({
   return mapCampaign(campaign);
 }
 
+async function getCampaignSyncStatus({
+  shopId,
+  campaignId,
+}) {
+  const campaign = await AdCampaign.findOne({
+    _id: campaignId,
+    shopId,
+  }).lean();
+
+  if (!campaign) {
+    const err = new Error("Ad campaign not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const tasks = await AdsSyncTask.find({
+    campaignId,
+    shopId,
+  })
+    .sort({ createdAt: 1 })
+    .lean();
+
+  const tasksByPlatform = new Map(tasks.map(task => [task.platform, task]));
+  const platforms = ["facebook", "google", "youtube"]
+    .filter(platform => Boolean(campaign.platforms?.[platform]?.enabled))
+    .map(platform => {
+      const task = tasksByPlatform.get(platform) || null;
+      const platformState = campaign.platforms?.[platform] || {};
+      return {
+        platform,
+        enabled: true,
+        syncStatus: String(platformState.syncStatus || "NOT_SYNCED"),
+        externalCampaignId: String(platformState.externalCampaignId || "").trim(),
+        lastSyncAt: platformState.lastSyncAt || null,
+        lastError: String(platformState.lastError || "").trim(),
+        task: task
+          ? {
+            status: task.status,
+            attempts: Number(task.attempts || 0),
+            maxAttempts: Number(task.maxAttempts || 0),
+            nextRetryAt: task.nextRetryAt || null,
+            lockedAt: task.lockedAt || null,
+            lastError: String(task.lastError || "").trim(),
+          }
+          : null,
+      };
+    });
+
+  const summary = platforms.reduce(
+    (acc, platformRow) => {
+      if (platformRow.syncStatus === "SYNCED") acc.synced += 1;
+      if (platformRow.syncStatus === "PENDING") acc.pending += 1;
+      if (platformRow.syncStatus === "FAILED") acc.failed += 1;
+      return acc;
+    },
+    {
+      totalEnabled: platforms.length,
+      synced: 0,
+      pending: 0,
+      failed: 0,
+    }
+  );
+
+  return {
+    campaignId: campaign._id,
+    campaignStatus: campaign.status,
+    summary,
+    platforms,
+  };
+}
+
 async function updateCampaign({
   shopId,
   campaignId,
@@ -1095,6 +1166,7 @@ module.exports = {
   createCampaign,
   listCampaigns,
   getCampaignById,
+  getCampaignSyncStatus,
   updateCampaign,
   updateCampaignStatus,
   getAiCreativeSuggestion,
