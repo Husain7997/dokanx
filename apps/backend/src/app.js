@@ -21,6 +21,10 @@ const requestContext =
 
 const languageMiddleware =
   require("./middlewares/language.middleware");
+const tenantResolution =
+  require("./middlewares/tenantResolution.middleware");
+const panicMode =
+  require("./middlewares/panicMode.middleware");
 
 const httpLogger =
   require("./middlewares/httpLogger");
@@ -54,6 +58,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.use(tenantResolution.resolveTenant);
 app.use(requestContext);
 app.use(languageMiddleware);
 app.use(httpLogger);
@@ -82,6 +87,7 @@ app.use("/", healthRoutes);
 
 app.use(rateLimiter);
 app.use(gateway);
+app.use(panicMode.enforcePanicMode);
 
 /*
 |--------------------------------------------------------------------------

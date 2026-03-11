@@ -1,7 +1,9 @@
-const Shop = require("../models/shop.model");
+const { logger } = require("@/core/infrastructure");
+
 module.exports = async (req, res, next) => {
   try {
     const shop = req.shop;
+    const user = req.user;
 
     if (!shop) {
       return res.status(404).json({
@@ -10,33 +12,39 @@ module.exports = async (req, res, next) => {
       });
     }
 
-    if (!req.user) {
+    if (!user) {
       return res.status(401).json({
         success: false,
         message: "Unauthorized",
       });
     }
 
-    // ✅ Owner validation
-    if (shop.owner.toString() !== req.user._id.toString()) {
+    const ownerId = shop.owner?._id || shop.owner || null;
+    if (!ownerId) {
+      logger.warn({ shopId: shop._id || null }, "Shop owner metadata missing during ownership check");
       return res.status(403).json({
         success: false,
         message: "Shop ownership mismatch",
       });
     }
 
-    // ✅ Active shop check
- if (shop.isActive === false || shop.status === "SUSPENDED") {
-  return res.status(403).json({
-    success: false,
-    message: "Shop is suspended",
-  });
-}
+    if (String(ownerId) !== String(user._id)) {
+      return res.status(403).json({
+        success: false,
+        message: "Shop ownership mismatch",
+      });
+    }
+
+    if (shop.isActive === false || shop.status === "SUSPENDED") {
+      return res.status(403).json({
+        success: false,
+        message: "Shop is suspended",
+      });
+    }
 
     next();
   } catch (error) {
-    console.error("SHOP OWNERSHIP ERROR:", error);
-
+    logger.error({ err: error.message }, "Shop ownership validation failed");
     return res.status(500).json({
       success: false,
       message: "Ownership validation failed",

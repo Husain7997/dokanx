@@ -1,10 +1,10 @@
 const express = require("express");
 const router = express.Router();
 
-const { protect } = require("../middlewares");
-const allowRoles = require("../middlewares/allowRoles");
+const { protect, allowRoles } = require("../middlewares");
 
 const adminController = require("../controllers/admin.controller");
+const systemController = require("../controllers/admin/system.controller");
 
 // ❗❗ খুব গুরুত্বপূর্ণ: function হিসেবে পাঠাচ্ছি
 router.get("/users",
@@ -46,6 +46,18 @@ router.get("/audit-logs",
   protect,
   allowRoles("admin"),
   adminController.getAuditLogs
+);
+
+router.get("/system/panic-mode",
+  protect,
+  allowRoles("admin"),
+  systemController.getPanicMode
+);
+
+router.put("/system/panic-mode",
+  protect,
+  allowRoles("admin"),
+  systemController.updatePanicMode
 );
 
 module.exports = router;

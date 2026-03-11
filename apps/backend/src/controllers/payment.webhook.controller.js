@@ -4,31 +4,23 @@ const {
 
 const {
   publishEvent,
+  logger,
 } = require("@/core/infrastructure");
 
 exports.gatewayWebhook = async (req, res) => {
   try {
-
     const providerPaymentId = req.body.payment_id;
     const webhookEventId = req.body.event_id;
     const orderId = req.body.order_id;
 
-    /* ---------------- DEV BYPASS ---------------- */
-
-    if (process.env.NODE_ENV === "development") {
-      console.log("✅ DEV webhook bypass");
-    } else {
+    if (process.env.NODE_ENV !== "development") {
       // verifySignature(req);
     }
-
-    /* ---------------- PROCESS PAYMENT ---------------- */
 
     await processSuccessfulPayment({
       providerPaymentId,
       webhookEventId,
     });
-
-    /* ---------------- EVENT ---------------- */
 
     await publishEvent({
       type: "PAYMENT_SUCCESS",
@@ -37,11 +29,8 @@ exports.gatewayWebhook = async (req, res) => {
     });
 
     res.json({ received: true });
-
   } catch (err) {
-
-    console.error("WEBHOOK ERROR", err);
-
+    logger.error({ err: err.message }, "Gateway webhook processing failed");
     res.status(200).json({
       received: true,
     });

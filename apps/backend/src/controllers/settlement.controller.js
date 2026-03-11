@@ -3,6 +3,7 @@ const Shop = require("../models/shop.model");
 const ShopWallet = require("../models/ShopWallet");
 const { processSettlement } = require("../services/settlement.service");
 const { processPayout } = require("../services/payout.service");
+const { logger } = require("@/core/infrastructure");
 
 exports.createSettlement = async (req, res) => {
   try {
@@ -32,7 +33,7 @@ exports.createSettlement = async (req, res) => {
 
     res.json(settlement);
   } catch (err) {
-    console.error(err);
+    logger.error({ err: err.message }, "Create settlement failed");
     res.status(500).json({ error: err.message });
   }
 };
@@ -47,6 +48,7 @@ exports.payoutSettlement = async (req, res) => {
     const result = await processPayout({ shopId: settlement.shopId });
     res.json(result);
   } catch (err) {
+    logger.error({ err: err.message }, "Settlement payout failed");
     res.status(500).json({ error: err.message });
   }
 };

@@ -1,15 +1,10 @@
 const router = require("express").Router();
-const { protect, allowRoles } = require("@/middlewares");
-const checkShopOwnership = require("@/middlewares/checkShopOwnership");
-const { tenantGuard } = require("@/api/middleware/tenantGuard");
+const { ownerShopAccess } = require("@/middlewares/accessPolicy.middleware");
 const { validateBody, validateQuery, validateParams } = require("@/middlewares/validateRequest");
 const controller = require("./behavior.controller");
 const validator = require("./behavior.validator");
 
-router.use(protect);
-router.use(tenantGuard);
-router.use(allowRoles("OWNER", "ADMIN"));
-router.use(checkShopOwnership);
+router.use(...ownerShopAccess("OWNER", "ADMIN"));
 
 router.get("/customer/:customerId", validateParams(validator.validateCustomerParams), controller.getCustomerInsight);
 router.post("/scan", validateBody(validator.validateScanBody), controller.scanRisk);

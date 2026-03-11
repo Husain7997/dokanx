@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const Settlement = require('../../models/settlement.model');
 const FinancePeriod = require('../../models/FinancePeriod');
 const Finance = require('../../models/Finance');
+const { logger } = require("@/core/infrastructure");
 /**
  * KPI SUMMARY
  */
@@ -87,7 +88,7 @@ exports.listFinances = async (req, res) => {
     const finances = await Finance.find().sort({ createdAt: -1 });
     res.json({ data: finances });
   } catch (err) {
-    console.error(err);
+    logger.error({ err: err.message }, "List finances failed");
     res.status(500).json({ error: err.message });
   }
 };
@@ -104,6 +105,7 @@ exports.settleFinance = async (req, res) => {
 
     res.json({ message: "Finance settled", finance });
   } catch (err) {
+    logger.error({ err: err.message }, "Settle finance failed");
     res.status(500).json({ error: err.message });
   }
 };

@@ -7,7 +7,46 @@ const shopSchema = new mongoose.Schema(
       required: true,
     },
 
-    domain: String,
+    // Primary custom domain for a shop.
+    domain: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: "",
+    },
+
+    // Default DokanX subdomain, e.g. shop1.dokanx.com => shop1
+    subdomain: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: "",
+    },
+
+    // Extra mapped custom domains with verification metadata.
+    customDomains: [
+      {
+        domain: {
+          type: String,
+          trim: true,
+          lowercase: true,
+          required: true,
+        },
+        verifiedAt: {
+          type: Date,
+          default: null,
+        },
+        isPrimary: {
+          type: Boolean,
+          default: false,
+        },
+        sslStatus: {
+          type: String,
+          enum: ["PENDING", "ACTIVE", "FAILED"],
+          default: "PENDING",
+        },
+      },
+    ],
 
     owner: {
       type: mongoose.Schema.Types.ObjectId,
@@ -65,6 +104,9 @@ const shopSchema = new mongoose.Schema(
 
 shopSchema.index({ location: "2dsphere" });
 shopSchema.index({ name: 1, status: 1 });
+shopSchema.index({ subdomain: 1 }, { sparse: true });
+shopSchema.index({ domain: 1 }, { sparse: true });
+shopSchema.index({ "customDomains.domain": 1 }, { sparse: true });
 
 module.exports =
   mongoose.models.Shop ||

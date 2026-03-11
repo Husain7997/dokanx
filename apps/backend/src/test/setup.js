@@ -27,7 +27,9 @@ beforeAll(async () => {
       socketTimeoutMS: 45000,
       maxPoolSize: 5,
     });
-    console.log("MongoDB connected (test)");
+    if (process.env.TEST_LOG_CONNECTIONS === "true") {
+      console.log("MongoDB connected (test)");
+    }
   }
 });
 

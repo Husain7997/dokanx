@@ -35,6 +35,8 @@ const supplierMarketplaceRoutes = require("../modules/supplier-marketplace/suppl
 const aiInsightsRoutes = require("../modules/ai-insights/aiInsights.routes");
 const merchantAssistantRoutes = require("../modules/merchant-assistant/merchantAssistant.routes");
 const adsCampaignRoutes = require("../modules/ads/adsCampaign.routes");
+const cartRoutes = require("../modules/cart/cart.routes");
+const supportRoutes = require("../modules/support/support.routes");
 
 router.use("/", meRoutes);
 router.use("/platform", platformRoutes);
@@ -77,5 +79,7 @@ router.use("/suppliers", supplierMarketplaceRoutes);
 router.use("/insights", aiInsightsRoutes);
 router.use("/assistant", merchantAssistantRoutes);
 router.use("/ads", adsCampaignRoutes);
+router.use("/cart", cartRoutes);
+router.use("/support", supportRoutes);
 
 module.exports = router;

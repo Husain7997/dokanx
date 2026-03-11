@@ -2,7 +2,7 @@ const Product = require("../models/product.model");
 const Inventory = require("../models/Inventory.model");
 const { createAudit } = require("../utils/audit.util");
 const catalogService = require("@/modules/catalog/catalog.service");
-const { t } = require("@/core/infrastructure");
+const { t, logger } = require("@/core/infrastructure");
 
 function safeNumber(value, fallback = 0) {
   const n = Number(value);
@@ -56,7 +56,7 @@ exports.smartSuggest = async (req, res) => {
       prefill,
     });
   } catch (err) {
-    console.error("SMART SUGGEST ERROR:", err);
+    logger.error({ err: err.message }, "Smart suggest failed");
     res.status(500).json({
       success: false,
       message: "Smart suggestion failed",
@@ -216,7 +216,7 @@ exports.createProduct = async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("CREATE PRODUCT ERROR:", err);
+    logger.error({ err: err.message }, "Create product failed");
     res.status(500).json({
       success: false,
       message: "Product creation failed",
@@ -236,6 +236,7 @@ exports.getProductsByShop = async (req, res) => {
       data: products,
     });
   } catch (error) {
+    logger.error({ err: error.message }, "Failed to fetch products");
     res.status(500).json({
       success: false,
       message: "Failed to fetch products",

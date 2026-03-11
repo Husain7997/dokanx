@@ -8,9 +8,10 @@ const { startRecoveryWorker, stopRecoveryWorker } = require("./recovery.worker")
 const { startAIObserver } = require("@/core/ai/agents/ai.observer");
 const { startPhase2Workers, stopPhase2Workers } = require("@/workers/phase2");
 const { runInventoryReconciliation } = require("../inventory/reconciliation/reconciliation.worker");
+const { logger } = require("@/core/infrastructure");
 
 function registerWorkers() {
-  console.log("Registering workers...");
+  logger.info("Registering workers");
   const timers = [];
 
   timers.push(setInterval(processOutbox, 5000));

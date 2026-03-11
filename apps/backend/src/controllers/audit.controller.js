@@ -1,5 +1,6 @@
 const AuditLog = require("../models/audit.model");
-const { t } = require('@/core/infrastructure');
+const { logger } = require('@/core/infrastructure');
+const response = require("@/utils/controllerResponse");
 
 exports.getAuditLogs = async (req, res) => {
   try {
@@ -8,14 +9,9 @@ exports.getAuditLogs = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(100);
 
-    res.json({
-      message: t('common.updated', req.lang),
-      data: logs,
-    });
+    response.updated(res, req, logs);
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch audit logs",
-    });
+    logger.error({ err: error.message }, "Failed to fetch audit logs");
+    response.failure(res, "Failed to fetch audit logs", 500);
   }
 };

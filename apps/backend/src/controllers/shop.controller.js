@@ -1,20 +1,13 @@
 const Shop = require("../models/shop.model");
 const User = require("../models/user.model");
 const { createAudit } = require("../utils/audit.util");
-const jwt = require("jsonwebtoken");
-const { t } =
-  require('@/core/infrastructure');
-
-
+const { logger } = require("@/core/infrastructure");
+const response = require("@/utils/controllerResponse");
 
 exports.createShop = async (req, res) => {
   try {
-
     if (req.user.shopId) {
-      return res.status(400).json({
-        success: false,
-        message: "User already owns a shop",
-      });
+      return response.failure(res, "User already owns a shop", 400);
     }
 
     const shop = await Shop.create({
@@ -24,15 +17,10 @@ exports.createShop = async (req, res) => {
       locale: req.body.locale,
       owner: req.user._id,
       isActive: true,
+      status: "ACTIVE",
     });
-await User.findByIdAndUpdate(
-  req.user._id,
-  { shopId: shop._id }
-);
-res.status(201).json({
-  success: true,
-  shop
-});
+
+    await User.findByIdAndUpdate(req.user._id, { shopId: shop._id });
     req.user.shopId = shop._id;
     await req.user.save();
 
@@ -41,24 +29,17 @@ res.status(201).json({
       performedBy: req.user._id,
       targetType: "Shop",
       targetId: shop._id,
-      req
+      req,
     });
 
-    res.status(201).json({
-      success: true,
+    return response.success(res, {
       shop,
-    });
-
+    }, 201);
   } catch (err) {
-    console.error("CREATE SHOP ERROR:", err);
-
-    res.status(500).json({
-      success: false,
-      message: err.message,
-    });
+    logger.error({ err: err.message }, "Create shop failed");
+    return response.failure(res, err.message, 500);
   }
 };
-
 
 exports.updateOrderStatus = async (req, res) => {
   const { id } = req.params;
@@ -67,116 +48,106 @@ exports.updateOrderStatus = async (req, res) => {
   res.json({
     message: "Order status updated (stub)",
     orderId: id,
-    status
+    status,
   });
 };
-/**
- * GET MY SHOPS
- */
+
 exports.getMyShops = async (req, res) => {
   try {
     const shops = await Shop.find({ owner: req.user._id });
-
-    res.json({
-      message: t('common.updated', req.lang),
-      data: shops,
-    });
+    return response.updated(res, req, shops);
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch shops",
-    });
+    logger.warn({ err: error.message }, "Failed to fetch shops");
+    return response.failure(res, "Failed to fetch shops", 500);
   }
 };
+
 exports.approveShop = async (req, res) => {
   try {
     const shop = await Shop.findById(req.params.id);
 
     if (!shop) {
-      return res.status(404).json({
-        success: false,
-        message: "Shop not found",
-      });
+      return response.notFound(res, "Shop");
     }
+
+    shop.isActive = true;
+    shop.status = "ACTIVE";
+    await shop.save();
 
     await createAudit({
       action: "APPROVE_SHOP",
       performedBy: req.user._id,
       targetType: "Shop",
       targetId: shop._id,
-      req
+      req,
     });
-   
-    shop.isActive = true;
-    await shop.save();
 
-    res.json({
-      message: t('common.updated', req.lang),
-    
-    });
+    return response.updated(res, req, shop);
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Shop approve failed",
-    });
+    logger.error({ err: error.message }, "Shop approve failed");
+    return response.failure(res, "Shop approve failed", 500);
   }
-   
 };
 
 exports.suspendShop = async (req, res) => {
-  const shop = await Shop.findById(req.params.id);
+  try {
+    const shop = await Shop.findById(req.params.id);
 
-  if (!shop) {
-    return res.status(404).json({ message: "Shop not found" });
+    if (!shop) {
+      return response.notFound(res, "Shop");
+    }
+
+    shop.isActive = false;
+    shop.status = "SUSPENDED";
+    await shop.save();
+
+    await createAudit({
+      action: "SUSPEND_SHOP",
+      performedBy: req.user._id,
+      targetType: "Shop",
+      targetId: shop._id,
+      req,
+    });
+
+    return response.message(res, "Shop suspended", shop);
+  } catch (error) {
+    logger.error({ err: error.message }, "Shop suspend failed");
+    return response.failure(res, "Shop suspend failed", 500);
   }
-  
-  shop.isActive = false;
-  await shop.save();
-
-  res.json({
-    message: t('common.updated', req.lang),
-    message: "Shop suspended"
-  });
-  await createAudit({
-    action: "SUSPEND_SHOP",
-    performedBy: req.user._id,
-    targetType: "Shop",
-    targetId: shop._id,
-    req
-  });
 };
 
 exports.blockCustomer = async (req, res) => {
-  const { shopId, userId } = req.params;
+  try {
+    const { shopId, userId } = req.params;
 
-  const shop = await Shop.findById(shopId);
-  if (!shop) {
-    return res.status(404).json({ success: false, message: "Shop not found" });
+    const shop = await Shop.findById(shopId);
+    if (!shop) {
+      return response.notFound(res, "Shop");
+    }
+
+    if (String(shop.owner) !== String(req.user._id)) {
+      return response.failure(res, "Not your shop", 403);
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return response.notFound(res, "User");
+    }
+
+    user.isBlocked = true;
+    await user.save();
+
+    await createAudit({
+      performedBy: req.user._id,
+      action: "BLOCK_CUSTOMER",
+      targetType: "User",
+      targetId: user._id,
+      req,
+    });
+
+    return response.message(res, "Customer blocked", user);
+  } catch (error) {
+    logger.error({ err: error.message }, "Block customer failed");
+    return response.failure(res, "Customer block failed", 500);
   }
-
-  // owner ownership check
-  if (shop.owner.toString() !== req.user._id.toString()) {
-    return res.status(403).json({ success: false, message: "Not your shop" });
-  }
-
-  const user = await User.findById(userId);
-  // const t = req.t;
-
-if (!user)
-  return res.status(400).json({
-    msg: t("USER_NOT_FOUND"),
-  });
-
-  user.isBlocked = true;
-  await user.save();
-
-  await createAudit({
-    performedBy: req.user._id,
-    action: "BLOCK_CUSTOMER",
-    targetType: "User",
-    targetId: user._id,
-    req
-  });
-
-  res.json({ message: t('common.updated', req.lang), message: "Customer blocked" });
 };

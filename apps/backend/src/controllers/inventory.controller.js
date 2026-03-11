@@ -1,5 +1,5 @@
 const inventory = require("@/inventory");
-const { withLock } = require("@/core/infrastructure");
+const { withLock, logger } = require("@/core/infrastructure");
   const t = require('@/core/language').t;
 exports.adjustStock = async (req, res) => {
 
@@ -29,12 +29,10 @@ res.json({
 exports.lockTest = async (req, res) => {
 
   await withLock("test-lock", async () => {
-
-    console.log("LOCK ACQUIRED");
+    logger.info({ lock: "test-lock" }, "Inventory test lock acquired");
 
     await new Promise(r => setTimeout(r, 5000));
-
-    console.log("LOCK RELEASED");
+    logger.info({ lock: "test-lock" }, "Inventory test lock released");
 
   });
 

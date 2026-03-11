@@ -7,7 +7,7 @@ const {
 } = require('../../services/payout.service');
 const Shop = require('../../models/shop.model');
 const ShopWallet = require('../../models/ShopWallet');
-const { addJob } = require("@/core/infrastructure");
+const { addJob, logger } = require("@/core/infrastructure");
 
 exports.createShopPayout = async (req, res) => {
   try {
@@ -36,7 +36,7 @@ exports.createShopPayout = async (req, res) => {
       data: payout,
     });
   } catch (err) {
-    console.error('PAYOUT ERROR:', err);
+    logger.error({ err: err.message }, "Create shop payout failed");
     return res.status(500).json({
       success: false,
       message: err.message || 'Payout failed',

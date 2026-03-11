@@ -1,91 +1,225 @@
-const User = require("../../models/user.model");
 const bcrypt = require("bcryptjs");
-const generateToken = require("../../utils/generateToken");
-const { t } =
-  require('@/core/infrastructure');
-const jwt = require("jsonwebtoken");
-/**
- * ===============================
- * REGISTER
- * ===============================
- */
+const User = require("../../models/user.model");
+const { logger, t } = require("@/core/infrastructure");
+const {
+  signAccessToken,
+  issueRefreshToken,
+  rotateRefreshToken,
+  revokeRefreshToken,
+  revokeAllRefreshTokens,
+  listActiveSessions,
+  revokeSessionById,
+} = require("./auth.service");
+
+function sanitizeUser(user) {
+  if (!user) return null;
+  const raw = typeof user.toObject === "function" ? user.toObject() : { ...user };
+  delete raw.password;
+  return raw;
+}
+
+async function buildAuthResponse(user, req, status = 200) {
+  const accessToken = signAccessToken(user);
+  const refresh = await issueRefreshToken(user, req);
+
+  return {
+    status,
+    body: {
+      message: t("common.updated", req.lang),
+      success: true,
+      token: accessToken,
+      accessToken,
+      ...refresh,
+      user: sanitizeUser(user),
+    },
+  };
+}
+
 exports.register = async (req, res) => {
   try {
-    
     const { name, email, password, role } = req.body;
 
-    const existing = await User.findOne({ email });
-    if (existing)
+    const normalizedEmail = String(email || "").toLowerCase();
+    const existing = await User.findOne({ email: normalizedEmail });
+    if (existing) {
       return res.status(400).json({
-        message: t("auth.user_exists"),
+        success: false,
+        message: t("auth.user_exists", req.lang),
       });
+    }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await User.create({
       name,
-      email,
+      email: normalizedEmail,
       password: hashedPassword,
       role: role?.toUpperCase() || "CUSTOMER",
       shopId: null,
     });
 
-    const token = generateToken(user);
-
-    res.status(201).json({
-      message: t('common.updated', req.lang),
-      token,
-      user,
-    });
+    const payload = await buildAuthResponse(user, req, 201);
+    return res.status(payload.status).json(payload.body);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: err.message });
+    logger.error({ err: err.message }, "Auth register failed");
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   }
 };
 
-/**
- * ===============================
- * LOGIN
- * ===============================
- */
-
 exports.login = async (req, res) => {
-  const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
+    const normalizedEmail = String(email || "").toLowerCase();
 
-  // 1️⃣ find user WITH password
-  const user = await User
-    .findOne({ email })
-    .select("+password");
+    const user = await User.findOne({ email: normalizedEmail }).select("+password");
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid credentials",
+      });
+    }
 
-  if (!user)
-    return res.status(401).json({
-      message: "Invalid credentials",
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid credentials",
+      });
+    }
+
+    const payload = await buildAuthResponse(user, req, 200);
+    return res.json(payload.body);
+  } catch (err) {
+    logger.error({ err: err.message }, "Auth login failed");
+    return res.status(500).json({
+      success: false,
+      message: "Login failed",
     });
+  }
+};
 
-  // 2️⃣ compare password
-  const match = await bcrypt.compare(
-    password,
-    user.password
-  );
+exports.refresh = async (req, res) => {
+  try {
+    const refreshToken = req.body?.refreshToken;
+    if (!refreshToken) {
+      return res.status(400).json({
+        success: false,
+        message: "refreshToken is required",
+      });
+    }
 
-  if (!match)
-    return res.status(401).json({
-      message: "Invalid credentials",
+    const rotated = await rotateRefreshToken(refreshToken, req);
+    const user = await User.findById(rotated.userId);
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const accessToken = signAccessToken(user);
+    return res.json({
+      success: true,
+      token: accessToken,
+      accessToken,
+      refreshToken: rotated.refreshToken,
+      refreshTokenExpiresAt: rotated.refreshTokenExpiresAt,
+      user: sanitizeUser(user),
     });
+  } catch (err) {
+    logger.warn({ err: err.message }, "Refresh token exchange failed");
+    return res.status(err.statusCode || 401).json({
+      success: false,
+      message: err.message || "Refresh failed",
+    });
+  }
+};
 
-  // 3️⃣ generate token
-  const token = jwt.sign(
-    {
-      id: user._id,
-      role: user.role,
-      shopId: user.shopId || null,
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: "7d" }
-  );
+exports.logout = async (req, res) => {
+  try {
+    await revokeRefreshToken(req.body?.refreshToken);
+    return res.json({
+      success: true,
+      message: "Logged out",
+    });
+  } catch (err) {
+    logger.warn({ err: err.message }, "Logout failed");
+    return res.status(400).json({
+      success: false,
+      message: "Logout failed",
+    });
+  }
+};
 
-  res.json({
-    success: true,
-    token,
-  });
+exports.logoutAll = async (req, res) => {
+  try {
+    if (!req.user?._id) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    await revokeAllRefreshTokens(req.user._id);
+    return res.json({
+      success: true,
+      message: "Logged out from all devices",
+    });
+  } catch (err) {
+    logger.warn({ err: err.message }, "Logout-all failed");
+    return res.status(400).json({
+      success: false,
+      message: "Logout-all failed",
+    });
+  }
+};
+
+exports.listSessions = async (req, res) => {
+  try {
+    if (!req.user?._id) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const sessions = await listActiveSessions(req.user._id);
+    return res.json({
+      success: true,
+      data: sessions,
+    });
+  } catch (err) {
+    logger.warn({ err: err.message }, "List sessions failed");
+    return res.status(400).json({
+      success: false,
+      message: "List sessions failed",
+    });
+  }
+};
+
+exports.revokeSession = async (req, res) => {
+  try {
+    if (!req.user?._id) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    await revokeSessionById(req.user._id, req.params.sessionId);
+    return res.json({
+      success: true,
+      message: "Session revoked",
+    });
+  } catch (err) {
+    logger.warn({ err: err.message }, "Revoke session failed");
+    return res.status(err.statusCode || 400).json({
+      success: false,
+      message: err.message || "Revoke session failed",
+    });
+  }
 };
