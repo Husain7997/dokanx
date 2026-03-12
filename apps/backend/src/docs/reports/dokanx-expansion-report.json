@@ -1,0 +1,38 @@
+{
+  "generated_at": "2026-03-12T00:00:00.000Z",
+  "DokanXExpansionReport": {
+    "new_modules_created": [
+      "intelligence/product-knowledge-graph",
+      "intelligence/ai-brain",
+      "intelligence/search-ranking-engine",
+      "extensions/merchant-assistant",
+      "analytics"
+    ],
+    "modules_extended": [
+      "catalog via knowledge graph adapters",
+      "discovery via ranking engine compatibility layer",
+      "merchant assistant via advisory wrapper",
+      "automation via automationAI service",
+      "platform observability via intelligence metrics"
+    ],
+    "duplicate_modules_detected": [
+      "ai related logic across core/ai, brain, modules/ai-insights, intelligence",
+      "automation rules across marketing and automation domains",
+      "health/metrics paths across route layers"
+    ],
+    "integration_points": [
+      "platform/events/event.publisher",
+      "core/infrastructure.addJob",
+      "modules/catalog/catalog.service",
+      "modules/discovery/discovery.service",
+      "modules/merchant-assistant/merchantAssistant.service",
+      "modules/automation/automation.service"
+    ],
+    "performance_impact": {
+      "search_performance": "in-memory ranking path verified below 200ms in tests",
+      "api_performance": "new services are compute-light wrappers and read-only analytics helpers",
+      "worker_load": "new automation and telemetry hooks publish lightweight events/jobs only"
+    },
+    "architecture_risk_level": "LOW_TO_MODERATE"
+  }
+}

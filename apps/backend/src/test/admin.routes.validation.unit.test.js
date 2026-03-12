@@ -22,6 +22,10 @@ jest.mock("../controllers/admin/finance.controller", () => ({
 jest.mock("../controllers/admin/compliance.controller", () => ({
   lockPeriod: jest.fn((req, res) => res.json({ ok: true })),
   reconciliationReports: jest.fn((req, res) => res.json({ ok: true })),
+  runFinanceAssurance: jest.fn((req, res) => res.json({ ok: true })),
+  financeAssuranceDashboard: jest.fn((req, res) => res.json({ ok: true })),
+  financeExceptions: jest.fn((req, res) => res.json({ ok: true })),
+  updateFinanceException: jest.fn((req, res) => res.json({ ok: true })),
   runPlatformCommissionReconciliation: jest.fn((req, res) => res.json({ ok: true })),
   platformCommissionReconciliationReports: jest.fn((req, res) => res.json({ ok: true })),
 }));

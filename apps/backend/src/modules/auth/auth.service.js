@@ -155,7 +155,7 @@ async function revokeSessionById(userId, sessionId) {
     {
       $set: { revokedAt: new Date() },
     },
-    { new: true }
+    { returnDocument: "after" }
   );
 
   if (!session) {

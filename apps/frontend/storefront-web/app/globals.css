@@ -1,0 +1,10 @@
+@import "../../../packages/ui/src/styles.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}

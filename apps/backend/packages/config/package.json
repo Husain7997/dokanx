@@ -1,0 +1,11 @@
+{
+  "name": "@dokanx/config",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./tailwind-preset": "./tailwind-preset.ts",
+    "./tsconfig/nextjs": "./tsconfig/nextjs.json",
+    "./tsconfig/package": "./tsconfig/package.json"
+  }
+}

@@ -48,6 +48,14 @@
       }
     },
     {
+      "name": "Get Campaign Sync Status",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }],
+        "url": { "raw": "{{baseUrl}}/ads/campaigns/{{campaignId}}/sync-status", "host": ["{{baseUrl}}"], "path": ["ads", "campaigns", "{{campaignId}}", "sync-status"] }
+      }
+    },
+    {
       "name": "Get Audience Recommendation",
       "request": {
         "method": "GET",

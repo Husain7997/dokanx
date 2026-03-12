@@ -1,0 +1,15 @@
+{
+  "name": "@dokanx/api-client",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@dokanx/types": "workspace:*",
+    "@dokanx/utils": "workspace:*"
+  },
+  "peerDependencies": {
+    "typescript": "^5.8.0"
+  }
+}

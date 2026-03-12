@@ -45,7 +45,7 @@ exports.deleteTheme = async (req, res) => {
 
 exports.applyTheme = async (req, res) => {
   try {
-    const shopId = resolveShopId(req) || req.body.shopId || null;
+    const shopId = resolveShopId(req);
     if (!shopId) return response.failure(res, "Shop context missing", 400);
     const row = await service.applyThemeToShop({
       shopId,
@@ -60,7 +60,7 @@ exports.applyTheme = async (req, res) => {
 
 exports.resetTheme = async (req, res) => {
   try {
-    const shopId = resolveShopId(req) || req.body.shopId || null;
+    const shopId = resolveShopId(req);
     if (!shopId) return response.failure(res, "Shop context missing", 400);
     const row = await service.resetShopTheme(shopId);
     return response.updated(res, req, row);
@@ -71,7 +71,7 @@ exports.resetTheme = async (req, res) => {
 
 exports.previewTheme = async (req, res) => {
   try {
-    const shopId = resolveShopId(req) || req.body.shopId || null;
+    const shopId = resolveShopId(req);
     const row = await service.previewTheme({
       shopId,
       themeId: req.body.themeId,

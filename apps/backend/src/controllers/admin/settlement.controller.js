@@ -11,11 +11,11 @@ exports.triggerManualPayout = async (req, res) => {
   const { settlementId } = req.params;
   const settlement = await Settlement.findById(settlementId);
   if (!settlement) return res.status(404).json({ message: "Settlement not found" });
-  if (settlement.payoutStatus === "SUCCESS") return res.status(400).json({ message: "Already paid out" });
+  if (settlement.payoutRef) return res.status(400).json({ message: "Already paid out" });
   
   await addJob("settlement", { settlementId: settlement._id });
 
-  await triggerPayout(settlement.shopId);
+  await triggerPayout({ settlementId: settlement._id });
   res.json({ message: "Payout triggered" });
 };
 
@@ -23,7 +23,7 @@ exports.retryPayout = async (req, res) => {
   const { settlementId } = req.params;
   const settlement = await Settlement.findById(settlementId);
   if (!settlement) return res.status(404).json({ message: "Settlement not found" });
-  await triggerPayout(settlement.shopId, { forceRetry: true });
+  await triggerPayout({ settlementId: settlement._id }, { idempotencyKey: `retry_${settlement._id}` });
   res.json({ message: "Retry initiated" });
 };
 

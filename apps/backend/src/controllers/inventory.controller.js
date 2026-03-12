@@ -1,6 +1,8 @@
 const inventory = require("@/inventory");
 const { withLock, logger } = require("@/core/infrastructure");
-  const t = require('@/core/language').t;
+const inventoryAlertService = require("@/services/inventoryAlert.service");
+const t = require("@/core/language").t;
+
 exports.adjustStock = async (req, res, next) => {
   try {
     const { product, quantity, note } = req.body;
@@ -14,14 +16,14 @@ exports.adjustStock = async (req, res, next) => {
       meta: {
         userId: req.user._id,
         note,
-        referenceModel: "ManualAdjustment"
-      }
+        referenceModel: "ManualAdjustment",
+      },
     });
 
     res.json({
       success: true,
-      message: t('common.updated', req.lang),
-      ledger
+      message: t("common.updated", req.lang),
+      ledger,
     });
   } catch (err) {
     logger.error({ err: err.message }, "Inventory adjust failed");
@@ -29,17 +31,40 @@ exports.adjustStock = async (req, res, next) => {
   }
 };
 
+exports.getLowStockAlerts = async (req, res, next) => {
+  try {
+    const shopId = req.shop?._id || req.user?.shopId || null;
 
+    if (!shopId) {
+      return res.status(400).json({
+        success: false,
+        message: "Shop context missing",
+      });
+    }
+
+    const alerts = await inventoryAlertService.listLowStockAlerts({
+      shopId,
+      filters: req.query,
+    });
+
+    return res.json({
+      success: true,
+      message: t("common.updated", req.lang),
+      data: alerts,
+    });
+  } catch (err) {
+    logger.error({ err: err.message }, "Inventory alert lookup failed");
+    return next(err);
+  }
+};
 
 exports.lockTest = async (req, res) => {
-
   await withLock("test-lock", async () => {
     logger.info({ lock: "test-lock" }, "Inventory test lock acquired");
 
-    await new Promise(r => setTimeout(r, 5000));
+    await new Promise(resolve => setTimeout(resolve, 5000));
     logger.info({ lock: "test-lock" }, "Inventory test lock released");
-
   });
 
-  res.json({ success: true, message: t('common.updated', req.lang) });
+  res.json({ success: true, message: t("common.updated", req.lang) });
 };

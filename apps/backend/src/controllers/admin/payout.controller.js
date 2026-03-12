@@ -2,6 +2,7 @@ const {
   processPayout,
   retryFailedPayout,
   createAdminPayout: createAdminPayoutService,
+  createShopPayoutRequest,
   approvePayout,
   executePayout
 } = require('../../services/payout.service');
@@ -27,12 +28,16 @@ exports.createShopPayout = async (req, res) => {
       });
     }
 
-    const payout = await processPayout({ shopId: shop._id });
+    const payout = await createShopPayoutRequest({
+      shopId: shop._id,
+      amount: wallet.withdrawable_balance || wallet.available_balance || wallet.balance || 0,
+      userId: req.user.id,
+    });
 
     await addJob("settlement", { shopId: shop._id });
 
-    return res.status(200).json({
-      message: "Payout processed",
+    return res.status(201).json({
+      message: "Payout requested",
       data: payout,
     });
   } catch (err) {

@@ -9,6 +9,8 @@ function requirePositive(field, value, errors) {
   }
 }
 
+const { isValidOrderStatus } = require("@/domain/orderStatus");
+
 function validateSettlementCreateBody(body = {}) {
   const errors = [];
   requireNonEmpty("shopId", body.shopId, errors);
@@ -60,7 +62,7 @@ function validateCreateShopBody(body = {}) {
 function validateShopStatusBody(body = {}) {
   const errors = [];
   const status = String(body.status || "").trim().toUpperCase();
-  if (!["PLACED", "PAYMENT_PENDING", "PAYMENT_FAILED", "CONFIRMED", "SHIPPED", "DELIVERED", "CANCELLED", "REFUNDED"].includes(status)) {
+  if (!isValidOrderStatus(status)) {
     errors.push("status is invalid");
   }
   return { valid: errors.length === 0, errors };

@@ -6,13 +6,18 @@ const walletService =
 const { t } =
   require("@/core/infrastructure");
 
+function resolveShopId(req) {
+  return req.shop?._id || req.user?.shopId || req.user?._id || null;
+}
+
 exports.topupWallet =
 async (req, res, next) => {
   try {
+    const shopId = resolveShopId(req);
 
     const result =
       await walletService.creditWallet({
-  shopId: req.user._id,
+  shopId,
   amount: req.body.amount,
   referenceId: `manual-topup-${Date.now()}`
 });
@@ -31,9 +36,10 @@ async (req, res, next) => {
 exports.transferWallet =
 async (req, res, next) => {
   try {
+    const shopId = resolveShopId(req);
 
     await walletService.debitWallet({
-      shopId: req.user._id,
+      shopId,
       amount: req.body.amount,
       referenceId: `transfer-${Date.now()}`,
     });

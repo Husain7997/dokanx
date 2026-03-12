@@ -1,12 +1,3 @@
-const transitions = {
-  PLACED: ["CONFIRMED", "CANCELLED"],
-  CONFIRMED: ["SHIPPED", "CANCELLED"],
-  SHIPPED: ["DELIVERED"],
-  DELIVERED: [],
-  CANCELLED: [],
-  REFUNDED: []
-};
+const { canTransitionOrderStatus } = require("@/domain/orderStatus");
 
-exports.canTransition = (from, to) => {
-  return transitions[from]?.includes(to);
-};
+exports.canTransition = (from, to) => canTransitionOrderStatus(from, to);

@@ -15,13 +15,32 @@ async function processSettlement({
   fee,
   idempotencyKey,
 }) {
+  const normalizedAmount = toNumber(grossAmount, 0);
+  if (!shopId) {
+    throw new Error("shopId is required");
+  }
+  if (!idempotencyKey) {
+    throw new Error("idempotencyKey is required");
+  }
+  if (normalizedAmount <= 0) {
+    throw new Error("grossAmount must be greater than 0");
+  }
+
+  const existingSettlement = await Settlement.findOne({ idempotencyKey });
+  if (existingSettlement) {
+    return {
+      settlement: existingSettlement,
+      financial: { duplicate: true },
+      platformCommission: { duplicate: true },
+    };
+  }
 
   return runOnce(
     `settlement:${idempotencyKey}`,
     async () => {
       const breakdown = await buildSettlementBreakdown({
         tenantId: shopId,
-        grossAmount,
+        grossAmount: normalizedAmount,
         orderChannel: "ONLINE",
         paymentMethod: "UNKNOWN",
         hasOwnGateway: false,
@@ -51,7 +70,7 @@ async function processSettlement({
           : await executeFinancial({
               shopId,
               amount: breakdown.netAmount,
-              idempotencyKey,
+              idempotencyKey: `${idempotencyKey}:wallet_credit`,
               reason: "wallet_credit"
             });
 

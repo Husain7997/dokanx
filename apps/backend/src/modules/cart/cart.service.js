@@ -96,7 +96,7 @@ async function saveCart({ shopId, userId = null, guestToken = null, items = [] }
     },
     {
       upsert: true,
-      new: true,
+      returnDocument: "after",
       setDefaultsOnInsert: true,
     }
   ).lean();

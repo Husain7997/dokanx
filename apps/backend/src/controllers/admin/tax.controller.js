@@ -23,19 +23,21 @@ exports.updateTaxRule = async (req, res) => {
 };
 
 exports.vatSummary = async (req, res) => {
+  const shopId = String(req.query.shopId || "").trim() || null;
   const data = await vatReportService.getVatSummary({
     from: req.query.from || null,
     to: req.query.to || null,
-    shopId: req.query.shopId || null,
+    shopId,
   });
   res.json({ data });
 };
 
 exports.exportVatCSV = async (req, res) => {
+  const shopId = String(req.query.shopId || "").trim() || null;
   const rows = await vatReportService.buildVatExportRows({
     from: req.query.from || null,
     to: req.query.to || null,
-    shopId: req.query.shopId || null,
+    shopId,
     limit: req.query.limit || 1000,
   });
 

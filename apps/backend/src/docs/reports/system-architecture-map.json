@@ -1,0 +1,133 @@
+{
+  "generated_at": "2026-03-12T00:00:00.000Z",
+  "SystemArchitectureMap": {
+    "modules": [
+      "auth",
+      "catalog",
+      "catalog-import",
+      "discovery",
+      "cart",
+      "courier",
+      "credit",
+      "behavior",
+      "trust",
+      "support",
+      "marketing",
+      "automation",
+      "merchant-assistant",
+      "ai-insights",
+      "app-marketplace",
+      "ads",
+      "billing",
+      "backup",
+      "warehouse",
+      "supplier-marketplace",
+      "pos",
+      "platform",
+      "theme",
+      "referral-affiliate"
+    ],
+    "services": {
+      "core": [
+        "checkout.engine",
+        "financial.engine",
+        "queue.engine",
+        "idempotency.service",
+        "transaction.audit"
+      ],
+      "platform": [
+        "event.publisher",
+        "event.replay.service",
+        "notification.service",
+        "metrics.service",
+        "systemHealth.service"
+      ],
+      "domain_services": [
+        "settlement.service",
+        "payout.service",
+        "reconciliation.service",
+        "financeAssurance.service",
+        "wallet.service",
+        "order.service",
+        "payment.service"
+      ]
+    },
+    "controllers": [
+      "admin",
+      "checkout",
+      "inventory",
+      "order",
+      "payment",
+      "product",
+      "settlement",
+      "shop",
+      "audit",
+      "module-specific controllers under src/modules/*"
+    ],
+    "workers": [
+      "analytics.worker",
+      "appWebhookRetry.worker",
+      "courierStatusPoll.worker",
+      "fraudSignal.worker",
+      "notification.worker",
+      "recovery.worker",
+      "settlement.queue.worker",
+      "inventory consumer/projection workers",
+      "projection worker"
+    ],
+    "queues": [
+      "settlement",
+      "notification",
+      "executeActions",
+      "collectSignals",
+      "predictInventoryRisk"
+    ],
+    "database_models": [
+      "commerce: Order Product Cart Inventory Shop",
+      "finance: Ledger Settlement Payout ShopWallet Finance ReconciliationReport FinanceException",
+      "growth: MarketingCoupon AutomationRule AutomationTask LoyaltyPointLedger Referral AffiliateCommission",
+      "ecosystem: MarketplaceApp AppInstallation AppToken AppWebhook AppWebhookDelivery",
+      "operations: Outbox PlatformEvent AuditLog MetricBucket BackupJob RestoreRequest",
+      "intelligence: KnowledgeGraphNode KnowledgeGraphEdge IntelligenceMetric"
+    ],
+    "event_emitters": [
+      "system/singletons/eventBus",
+      "platform/events/event.publisher",
+      "core/infrastructure.publishEvent",
+      "outbox dispatcher"
+    ],
+    "api_routes": {
+      "root_router": "src/routes/index.js",
+      "system": [
+        "/health",
+        "/system",
+        "/webhooks"
+      ],
+      "commerce": [
+        "/products",
+        "/orders",
+        "/payments",
+        "/cart",
+        "/inventory",
+        "/checkout"
+      ],
+      "intelligence_related_existing": [
+        "/search",
+        "/insights",
+        "/assistant",
+        "/automation",
+        "/behavior",
+        "/catalog"
+      ],
+      "admin": [
+        "/admin",
+        "/admin/finance",
+        "/admin/compliance",
+        "/admin/settlements",
+        "/admin/payouts",
+        "/admin/billing",
+        "/admin/backups"
+      ]
+    }
+  }
+}

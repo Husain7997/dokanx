@@ -18,11 +18,22 @@ function tenantGuard(req, res, next) {
     }
 
     const userShopId = String(req.user.shopId);
+    const requestedShopId = String(
+      req.params?.shopId ||
+      req.body?.shopId ||
+      req.query?.shopId ||
+      ""
+    ).trim();
 
     // Attach tenant context if not already resolved by auth middleware.
     if (!req.shop) {
       req.shop = { _id: req.user.shopId };
-      return next();
+    }
+
+    if (requestedShopId && requestedShopId !== userShopId) {
+      return res.status(403).json({
+        message: "Tenant mismatch"
+      });
     }
 
     const reqShopId = String(req.shop._id || req.shop.id || "");

@@ -55,6 +55,22 @@ exports.getShipment = async (req, res, next) => {
   }
 };
 
+exports.fetchShipmentStatus = async (req, res, next) => {
+  try {
+    const shopId = resolveShopId(req);
+    if (!shopId) return response.failure(res, "Shop context missing", 400);
+
+    const data = await service.fetchShipmentStatus({
+      shopId,
+      shipmentId: req.params.shipmentId,
+    });
+
+    return response.updated(res, req, data);
+  } catch (err) {
+    return next(err);
+  }
+};
+
 exports.handleWebhook = async (req, res) => {
   try {
     const shipment = await service.applyWebhookEvent({

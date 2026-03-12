@@ -4,6 +4,12 @@ const {
   runPlatformCommissionReconciliation,
   listPlatformCommissionReconciliations,
 } = require('@/services/platformCommissionReconciliation.service');
+const {
+  verifyReconciliation,
+  getFinanceAdminDashboard,
+  listFinanceExceptions,
+  updateFinanceExceptionStatus,
+} = require('@/services/financeAssurance.service');
 
 exports.lockPeriod = async (req, res) => {
   const { period } = req.body;
@@ -40,4 +46,40 @@ exports.runPlatformCommissionReconciliation = async (req, res) => {
 exports.platformCommissionReconciliationReports = async (req, res) => {
   const data = await listPlatformCommissionReconciliations(req.query.limit || 30);
   res.json({ data });
+};
+
+exports.runFinanceAssurance = async (req, res) => {
+  const result = await verifyReconciliation({
+    date: req.body?.date || new Date(),
+    shopId: req.body?.shopId || null,
+    thresholds: req.body?.thresholds || {},
+  });
+  res.json({ message: 'Finance assurance reconciliation completed', data: result });
+};
+
+exports.financeAssuranceDashboard = async (req, res) => {
+  const data = await getFinanceAdminDashboard({
+    shopId: req.query.shopId || null,
+    days: req.query.days || 7,
+  });
+  res.json({ data });
+};
+
+exports.financeExceptions = async (req, res) => {
+  const data = await listFinanceExceptions({
+    shopId: req.query.shopId || null,
+    status: req.query.status || null,
+    limit: req.query.limit || 50,
+  });
+  res.json({ data });
+};
+
+exports.updateFinanceException = async (req, res) => {
+  const data = await updateFinanceExceptionStatus({
+    exceptionId: req.params.exceptionId,
+    status: req.body?.status,
+    actorId: req.user?._id || null,
+    note: req.body?.note || '',
+  });
+  res.json({ message: 'Finance exception updated', data });
 };

@@ -57,7 +57,7 @@ async function upsertWarehouseStock({ shopId, payload }) {
         productId: payload.productId,
       },
     },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: "after" }
   );
 }
 
@@ -171,7 +171,7 @@ async function updateTransferStatus({ shopId, transferId, actorId, status, note 
           reorderPoint: 0,
         },
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: "after" }
     );
   }
 

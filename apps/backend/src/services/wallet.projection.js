@@ -1,32 +1,12 @@
 const Wallet = require("@/models/wallet.model");
 const Ledger = require("@/modules/ledger/ledger.model");
+const { calculateLedgerDelta } = require("@/core/financial/ledger.delta");
 
 async function applyTransaction(shopId, referenceId) {
 
   const entries =
     await Ledger.find({ shopId, referenceId });
-
-  let delta = 0;
-
-  for (const e of entries) {
-    const reason = e.meta?.reason;
-
-    if (reason === "wallet_credit" && e.type === "credit") {
-      delta += e.amount;
-      continue;
-    }
-
-    if (reason === "wallet_debit" && e.type === "debit") {
-      delta -= e.amount;
-      continue;
-    }
-
-    if (e.type === "credit") {
-      delta += e.amount;
-    } else {
-      delta -= e.amount;
-    }
-  }
+  const delta = calculateLedgerDelta(entries);
 
   await Wallet.findOneAndUpdate(
     { shopId },

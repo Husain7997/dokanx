@@ -1,36 +1,8 @@
-const transitions = {
+const {
+  ORDER_STATUS_TRANSITIONS,
+  canTransitionOrderStatus,
+} = require("./orderStatus");
 
-  PLACED: [
-    "PAYMENT_PENDING",
-    "CANCELLED",
-  ],
+exports.canTransition = (from, to) => canTransitionOrderStatus(from, to);
 
-  PAYMENT_PENDING: [
-    "CONFIRMED",
-    "FAILED",
-    "CANCELLED",
-  ],
-
-  CONFIRMED: [
-    "SHIPPED",
-    "CANCELLED",
-  ],
-
-  SHIPPED: [
-    "DELIVERED",
-  ],
-
-  DELIVERED: [
-    "REFUNDED",
-  ],
-
-  CANCELLED: [],
-  REFUNDED: [],
-  FAILED: [],
-};
-
-exports.canTransition = (from, to) => {
-  return transitions[from]?.includes(to);
-};
-
-exports.transitions = transitions;
+exports.transitions = ORDER_STATUS_TRANSITIONS;

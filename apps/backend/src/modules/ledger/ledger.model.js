@@ -32,12 +32,29 @@ const ledgerSchema = new mongoose.Schema({
 
 }, { timestamps: true });
 
-ledgerSchema.pre("updateOne", () => {
+function immutableQueryGuard() {
   throw new Error("Ledger immutable");
-});
+}
 
-ledgerSchema.pre("deleteOne", () => {
+function immutableDeleteGuard() {
   throw new Error("Ledger delete forbidden");
-});
+}
+
+function immutableSaveGuard(next) {
+  if (!this.isNew) {
+    return next(new Error("Ledger immutable"));
+  }
+  return next();
+}
+
+ledgerSchema.pre("save", immutableSaveGuard);
+ledgerSchema.pre("updateOne", immutableQueryGuard);
+ledgerSchema.pre("updateMany", immutableQueryGuard);
+ledgerSchema.pre("findOneAndUpdate", immutableQueryGuard);
+ledgerSchema.pre("replaceOne", immutableQueryGuard);
+ledgerSchema.pre("findOneAndReplace", immutableQueryGuard);
+ledgerSchema.pre("deleteOne", immutableDeleteGuard);
+ledgerSchema.pre("deleteMany", immutableDeleteGuard);
+ledgerSchema.pre("findOneAndDelete", immutableDeleteGuard);
 
 module.exports = mongoose.model("Ledger", ledgerSchema);

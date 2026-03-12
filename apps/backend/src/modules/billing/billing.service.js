@@ -151,7 +151,7 @@ async function assignSubscription(payload) {
         tenant: payload.tenantId,
       },
     },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: "after" }
   ).populate("plan");
 
   return resolveSubscriptionPlanShape(subscription);

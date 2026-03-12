@@ -92,6 +92,70 @@ describe("orderState.service", () => {
     });
   });
 
+  it("should emit packed event for packed transition", async () => {
+    const session = {
+      startTransaction: jest.fn(),
+      commitTransaction: jest.fn(),
+      abortTransaction: jest.fn(),
+      endSession: jest.fn(),
+    };
+    const order = {
+      _id: "order-1",
+      shopId: "shop-1",
+      status: "CONFIRMED",
+      items: [{ product: "p1", quantity: 1 }],
+      save: jest.fn(),
+    };
+
+    mongoose.startSession.mockResolvedValue(session);
+    Order.findById.mockReturnValue({
+      session: jest.fn().mockResolvedValue(order),
+    });
+
+    await service.transitionOrder({
+      orderId: "order-1",
+      nextStatus: "PACKED",
+    });
+
+    expect(eventBus.emit).toHaveBeenCalledWith(EVENTS.ORDER_PACKED, {
+      orderId: "order-1",
+      shopId: "shop-1",
+      items: [{ product: "p1", quantity: 1 }],
+    });
+  });
+
+  it("should emit returned event for returned transition", async () => {
+    const session = {
+      startTransaction: jest.fn(),
+      commitTransaction: jest.fn(),
+      abortTransaction: jest.fn(),
+      endSession: jest.fn(),
+    };
+    const order = {
+      _id: "order-1",
+      shopId: "shop-1",
+      status: "DELIVERED",
+      items: [{ product: "p1", quantity: 1 }],
+      save: jest.fn(),
+    };
+
+    mongoose.startSession.mockResolvedValue(session);
+    Order.findById.mockReturnValue({
+      session: jest.fn().mockResolvedValue(order),
+    });
+
+    await service.transitionOrder({
+      orderId: "order-1",
+      nextStatus: "RETURNED",
+    });
+
+    expect(eventBus.emit).toHaveBeenCalledWith(EVENTS.ORDER_RETURNED, {
+      orderId: "order-1",
+      shopId: "shop-1",
+      items: [{ product: "p1", quantity: 1 }],
+    });
+  });
+
   it("should abort transaction on illegal transition", async () => {
     const abortTransaction = jest.fn();
     const session = {

@@ -65,4 +65,23 @@ describe("shop.controller", () => {
       message: "User not found",
     });
   });
+
+  it("should prefer resolved tenant shop when blocking customer", async () => {
+    Shop.findById.mockResolvedValue({ owner: "owner-1" });
+    User.findById.mockResolvedValue({ _id: "user-9", save: jest.fn() });
+
+    const req = {
+      shop: { _id: "shop-from-tenant" },
+      params: { shopId: "shop-from-param", userId: "user-9" },
+      user: { _id: "owner-1" },
+    };
+    const res = {
+      json: jest.fn(),
+      status: jest.fn(() => ({ json: jest.fn() })),
+    };
+
+    await controller.blockCustomer(req, res);
+
+    expect(Shop.findById).toHaveBeenCalledWith("shop-from-tenant");
+  });
 });

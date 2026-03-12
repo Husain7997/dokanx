@@ -1,32 +1,28 @@
 const reportService = require("./report.service");
+const response = require("@/utils/controllerResponse");
+
+function resolveShopId(req) {
+  return req.shop?._id || req.user?.shopId || null;
+}
 
 exports.getShopSummary = async (req, res) => {
-  const shopId = req.user.shopId;
+  const shopId = resolveShopId(req);
 
   const data = await reportService.shopSummary(shopId);
 
-  res.json({
-    message: t('common.updated', req.lang),
-    data,
-  });
+  return response.updated(res, req, data);
 };
 
 exports.getAdminKPI = async (req, res) => {
   const data = await reportService.adminKPI();
 
-  res.json({
-    message: t('common.updated', req.lang),
-    data,
-  });
+  return response.updated(res, req, data);
 };
 
 exports.getSettlementHistory = async (req, res) => {
-  const shopId = req.user.shopId;
+  const shopId = resolveShopId(req);
 
   const data = await reportService.settlementHistory(shopId);
 
-  res.json({
-    message: t('common.updated', req.lang),
-    data,
-  });
+  return response.updated(res, req, data);
 };

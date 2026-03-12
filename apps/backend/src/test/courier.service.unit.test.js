@@ -96,4 +96,34 @@ describe("courier.service", () => {
       { $set: { status: "DELIVERED" } }
     );
   });
+
+  it("should map returned webhook to returned order status", async () => {
+    const save = jest.fn().mockResolvedValue(true);
+    CourierShipment.findOne.mockResolvedValue({
+      _id: "ship-1",
+      shopId: "shop-1",
+      orderId: "order-1",
+      courier: "PATHAO",
+      trackingCode: "PAT-123",
+      cashOnDeliveryAmount: 300,
+      codCollectedAmount: 0,
+      codReconciliationStatus: "PENDING",
+      status: "OUT_FOR_DELIVERY",
+      events: [],
+      save,
+    });
+
+    await service.applyWebhookEvent({
+      payload: {
+        courier: "pathao",
+        trackingCode: "PAT-123",
+        event: "RETURNED",
+      },
+    });
+
+    expect(Order.updateOne).toHaveBeenCalledWith(
+      { _id: "order-1", shopId: "shop-1" },
+      { $set: { status: "RETURNED" } }
+    );
+  });
 });

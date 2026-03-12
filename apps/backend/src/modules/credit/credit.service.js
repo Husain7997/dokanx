@@ -89,7 +89,7 @@ async function registerCustomer({
   phone,
   name,
 }) {
-  const customer = await findOrCreateCustomer(phone, name);
+  const customer = await findOrCreateCustomer({ shopId, phone, name });
   const { account } = await getOrCreateAccount({
     shopId,
     customerId: customer._id,

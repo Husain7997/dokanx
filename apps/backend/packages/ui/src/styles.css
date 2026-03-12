@@ -1,0 +1,83 @@
+:root {
+  --background: 36 33% 97%;
+  --foreground: 222 30% 12%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 30% 12%;
+  --primary: 18 79% 53%;
+  --primary-foreground: 36 33% 97%;
+  --secondary: 212 50% 18%;
+  --secondary-foreground: 36 33% 97%;
+  --muted: 32 25% 94%;
+  --muted-foreground: 218 14% 41%;
+  --accent: 210 33% 96%;
+  --accent-foreground: 222 30% 12%;
+  --success: 145 63% 42%;
+  --warning: 35 92% 52%;
+  --destructive: 0 79% 63%;
+  --border: 28 17% 84%;
+  --input: 28 17% 84%;
+  --ring: 18 79% 53%;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 12px 30px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 24px 80px rgba(15, 23, 42, 0.14);
+  --z-base: 0;
+  --z-dropdown: 20;
+  --z-sticky: 30;
+  --z-overlay: 40;
+  --z-modal: 50;
+  --z-toast: 60;
+  --z-command: 70;
+}
+
+.dark,
+[data-theme="dark"],
+[data-theme="admin-theme"] {
+  --background: 224 29% 8%;
+  --foreground: 36 33% 97%;
+  --card: 223 24% 11%;
+  --card-foreground: 36 33% 97%;
+  --primary: 21 95% 58%;
+  --primary-foreground: 222 30% 12%;
+  --secondary: 213 27% 90%;
+  --secondary-foreground: 222 30% 12%;
+  --muted: 222 22% 15%;
+  --muted-foreground: 219 12% 68%;
+  --accent: 223 18% 16%;
+  --accent-foreground: 36 33% 97%;
+  --success: 145 58% 50%;
+  --warning: 39 88% 56%;
+  --destructive: 0 85% 67%;
+  --border: 223 15% 24%;
+  --input: 223 15% 24%;
+  --ring: 21 95% 58%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+html {
+  color-scheme: light;
+}
+
+.dark,
+[data-theme="dark"],
+[data-theme="admin-theme"] {
+  color-scheme: dark;
+}
+
+body {
+  font-family: "Inter Variable", "Inter", sans-serif;
+  background: radial-gradient(circle at top, hsl(var(--accent)) 0%, hsl(var(--background)) 45%);
+  color: hsl(var(--foreground));
+  text-rendering: optimizeLegibility;
+}
+
+.dx-surface {
+  background: hsl(var(--card) / 0.88);
+  backdrop-filter: blur(14px);
+}

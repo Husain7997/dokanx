@@ -1,0 +1,58 @@
+{
+  "generated_at": "2026-03-12T00:00:00.000Z",
+  "ArchitectureAuditReport": {
+    "duplicate_modules": [
+      {
+        "area": "AI and intelligence",
+        "items": [
+          "core/ai/*",
+          "brain/*",
+          "modules/ai-insights/*",
+          "intelligence/*"
+        ],
+        "assessment": "Overlapping advisory and signal-generation logic exists; new work should compose existing ai-insights and merchant-assistant paths instead of creating more public APIs."
+      },
+      {
+        "area": "Automation",
+        "items": [
+          "modules/automation/models/automationRule.model.js",
+          "modules/marketing/models/automationRule.model.js"
+        ],
+        "assessment": "Marketing automation and platform automation use separate rule stores; avoid cross-writing without explicit boundary handling."
+      },
+      {
+        "area": "Monitoring",
+        "items": [
+          "routes/health.routes.js",
+          "infrastructure/monitoring/health.routes.js",
+          "platform/observability/*"
+        ],
+        "assessment": "Operational health endpoints exist in both lightweight and richer monitoring paths."
+      }
+    ],
+    "overlapping_logic": [
+      "catalog deduplication and product similarity now span catalog, ai-insights, and intelligence layers",
+      "merchant advisory exists in modules/merchant-assistant and modules/ai-insights and should be extended through adapters",
+      "discovery ranking already exists in modules/discovery and should only be upgraded behind compatible service wrappers"
+    ],
+    "legacy_code_paths": [
+      "routes/settlement.routes.js and several legacy validators coexist with newer admin routes",
+      "tests live in both src/test and src/tests",
+      "some model files still contain commented legacy schema fragments"
+    ],
+    "missing_integrations": [
+      "new intelligence services are not yet mounted behind existing discovery, assistant, or dashboard controllers",
+      "search log persistence is not present, so trend detection currently requires injected search data",
+      "analytics layer is read-only but not yet scheduled through a dedicated worker"
+    ],
+    "safe_extension_points": [
+      "modules/catalog/catalog.service.js",
+      "modules/discovery/discovery.service.js",
+      "modules/merchant-assistant/merchantAssistant.service.js",
+      "modules/automation/automation.service.js",
+      "platform/events/event.publisher.js",
+      "core/infrastructure/queue.engine.js",
+      "platform/observability/metrics.service.js"
+    ]
+  }
+}

@@ -16,22 +16,14 @@ exports.createSettlement = async (req, res) => {
     const wallet = await ShopWallet.findOne({ shopId: shopId });
     if (!wallet) return res.status(404).json({ message: "Shop wallet not found" });
 
-    const settlement = await Settlement.create({
-      shopId: shopId,
-      totalAmount,
-      netAmount: totalAmount,
-      orderCount: 0,
-      status: "PENDING",
-    });
-
-    await processSettlement({
+    const result = await processSettlement({
       shopId,
       grossAmount: totalAmount,
       fee: 0,
-      idempotencyKey: `SETTLEMENT_${settlement._id}`
+      idempotencyKey: `SETTLEMENT_${shopId}_${Date.now()}`
     });
 
-    res.json(settlement);
+    res.json(result.settlement);
   } catch (err) {
     logger.error({ err: err.message }, "Create settlement failed");
     res.status(500).json({ success: false, error: err.message, message: err.message });
@@ -45,7 +37,10 @@ exports.payoutSettlement = async (req, res) => {
     if (!settlement) {
       return res.status(404).json({ success: false, error: "Settlement not found", message: "Settlement not found" });
     }
-    const result = await processPayout({ shopId: settlement.shopId });
+    const result = await processPayout({
+      shopId: settlement.shopId,
+      settlementId: settlement._id,
+    });
     res.json(result);
   } catch (err) {
     logger.error({ err: err.message }, "Settlement payout failed");

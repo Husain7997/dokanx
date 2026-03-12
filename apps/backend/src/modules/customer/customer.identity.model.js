@@ -2,11 +2,17 @@ const mongoose = require("mongoose");
 
 const schema = new mongoose.Schema(
   {
+    shopId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Shop",
+      default: null,
+      index: true,
+    },
+
     phone: {
       type: String,
       required: true,
       index: true,
-      unique: true,
     },
 
     name: String,
@@ -25,6 +31,14 @@ const schema = new mongoose.Schema(
     metadata: Object,
   },
   { timestamps: true }
+);
+
+schema.index(
+  { shopId: 1, phone: 1 },
+  {
+    unique: true,
+    sparse: true,
+  }
 );
 
 module.exports = mongoose.model(

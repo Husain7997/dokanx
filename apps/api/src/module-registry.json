@@ -1,0 +1,237 @@
+{
+  "auth": {
+    "routes": ["../../backend/src/modules/auth/auth.routes.js"],
+    "controllers": ["../../backend/src/modules/auth/auth.controller.js"],
+    "services": ["../../backend/src/modules/auth/auth.service.js"],
+    "models": [
+      "../../backend/src/models/user.model.js",
+      "../../backend/src/models/refreshToken.model.js",
+      "../../backend/src/modules/auth/models/authOtpRequest.model.js",
+      "../../backend/src/modules/auth/models/magicLinkToken.model.js"
+    ]
+  },
+  "tenant": {
+    "routes": [],
+    "controllers": [],
+    "services": [
+      "../../backend/src/modules/platform/services/platform.context.service.js",
+      "../../backend/src/modules/platform/services/platform.auth.service.js"
+    ],
+    "models": ["../../backend/src/models/shop.model.js"],
+    "middleware": [
+      "../../backend/src/api/middleware/tenantGuard.js",
+      "../../backend/src/middlewares/tenantResolution.middleware.js"
+    ]
+  },
+  "products": {
+    "routes": ["../../backend/src/routes/product.routes.js"],
+    "controllers": ["../../backend/src/controllers/product.controller.js"],
+    "services": ["../../backend/src/modules/catalog/catalog.service.js"],
+    "models": [
+      "../../backend/src/models/product.model.js",
+      "../../backend/src/modules/catalog/models/catalogGlobalProduct.model.js"
+    ],
+    "notes": ["Legacy product endpoints predate the full module pattern and currently share catalog services."]
+  },
+  "orders": {
+    "routes": ["../../backend/src/routes/order.routes.js"],
+    "controllers": ["../../backend/src/controllers/order.controller.js"],
+    "services": [
+      "../../backend/src/services/order.service.js",
+      "../../backend/src/services/orderState.service.js"
+    ],
+    "models": ["../../backend/src/models/order.model.js"]
+  },
+  "inventory": {
+    "routes": ["../../backend/src/routes/inventory.routes.js"],
+    "controllers": ["../../backend/src/controllers/inventory.controller.js"],
+    "services": [
+      "../../backend/src/services/inventoryReservation.service.js",
+      "../../backend/src/services/inventoryAdmin.service.js",
+      "../../backend/src/inventory/inventoryLedger.service.js"
+    ],
+    "models": [
+      "../../backend/src/models/Inventory.model.js",
+      "../../backend/src/models/inventoryLedger.model.js"
+    ]
+  },
+  "cart": {
+    "routes": ["../../backend/src/modules/cart/cart.routes.js"],
+    "controllers": ["../../backend/src/modules/cart/cart.controller.js"],
+    "services": ["../../backend/src/modules/cart/cart.service.js"],
+    "models": ["../../backend/src/models/cart.model.js"]
+  },
+  "checkout": {
+    "routes": ["../../backend/src/routes/checkout.routes.js"],
+    "controllers": ["../../backend/src/controllers/checkout.controller.js"],
+    "services": ["../../backend/src/core/checkout/checkout.engine.js"],
+    "models": [
+      "../../backend/src/models/cart.model.js",
+      "../../backend/src/models/checkoutLock.model.js"
+    ]
+  },
+  "payments": {
+    "routes": ["../../backend/src/routes/payment.routes.js"],
+    "controllers": [
+      "../../backend/src/controllers/payment.controller.js",
+      "../../backend/src/controllers/payment.webhook.controller.js"
+    ],
+    "services": [
+      "../../backend/src/services/payment.service.js",
+      "../../backend/src/services/paymentProcessor.service.js"
+    ],
+    "models": [
+      "../../backend/src/models/payment.model.js",
+      "../../backend/src/models/paymentAttempt.model.js",
+      "../../backend/src/models/paymentLock.model.js"
+    ]
+  },
+  "wallet": {
+    "routes": [
+      "../../backend/src/routes/wallet.routes.js",
+      "../../backend/src/routes/shop/wallet.routes.js"
+    ],
+    "controllers": ["../../backend/src/controllers/shop/wallet.controller.js"],
+    "services": [
+      "../../backend/src/services/wallet.service.js",
+      "../../backend/src/services/wallet.projection.js"
+    ],
+    "models": [
+      "../../backend/src/models/wallet.model.js",
+      "../../backend/src/models/walletTransaction.model.js",
+      "../../backend/src/models/ShopWallet.js",
+      "../../backend/src/models/platformWallet.model.js"
+    ]
+  },
+  "settlements": {
+    "routes": [
+      "../../backend/src/routes/settlement.routes.js",
+      "../../backend/src/routes/admin/settlement.routes.js"
+    ],
+    "controllers": [
+      "../../backend/src/controllers/settlement.controller.js",
+      "../../backend/src/controllers/admin/settlement.controller.js"
+    ],
+    "services": [
+      "../../backend/src/services/settlement.service.js",
+      "../../backend/src/services/payout.service.js",
+      "../../backend/src/services/reconciliation.service.js"
+    ],
+    "models": [
+      "../../backend/src/models/settlement.model.js",
+      "../../backend/src/models/SettlementRun.js",
+      "../../backend/src/models/PayoutRetry.js",
+      "../../backend/src/models/ReconciliationReport.js"
+    ]
+  },
+  "pos": {
+    "routes": ["../../backend/src/modules/pos/pos.routes.js"],
+    "controllers": ["../../backend/src/modules/pos/pos.controller.js"],
+    "services": [
+      "../../backend/src/modules/pos/pos.service.js",
+      "../../backend/src/modules/pos/pos.analytics.service.js"
+    ],
+    "models": [
+      "../../backend/src/modules/pos/models/posSale.model.js",
+      "../../backend/src/modules/pos/models/posPayment.model.js",
+      "../../backend/src/modules/pos/models/posSession.model.js",
+      "../../backend/src/modules/pos/models/posSyncQueue.model.js"
+    ]
+  },
+  "courier": {
+    "routes": ["../../backend/src/modules/courier/courier.routes.js"],
+    "controllers": ["../../backend/src/modules/courier/courier.controller.js"],
+    "services": [
+      "../../backend/src/modules/courier/courier.service.js",
+      "../../backend/src/modules/courier/providerConfig.service.js",
+      "../../backend/src/modules/courier/courier.cod.reconciliation.service.js"
+    ],
+    "models": ["../../backend/src/modules/courier/models/courierShipment.model.js"]
+  },
+  "catalog": {
+    "routes": ["../../backend/src/modules/catalog/catalog.routes.js"],
+    "controllers": ["../../backend/src/modules/catalog/catalog.controller.js"],
+    "services": [
+      "../../backend/src/modules/catalog/catalog.service.js",
+      "../../backend/src/modules/catalog/catalogSearch.service.js"
+    ],
+    "models": [
+      "../../backend/src/modules/catalog/models/catalogGlobalProduct.model.js",
+      "../../backend/src/modules/catalog/models/ProductVariant.model.js",
+      "../../backend/src/modules/catalog/models/Category.model.js",
+      "../../backend/src/modules/catalog/models/Brand.model.js",
+      "../../backend/src/modules/catalog/models/BarcodeRegistry.model.js"
+    ]
+  },
+  "discovery": {
+    "routes": ["../../backend/src/modules/discovery/discovery.routes.js"],
+    "controllers": ["../../backend/src/modules/discovery/discovery.controller.js"],
+    "services": ["../../backend/src/modules/discovery/discovery.service.js"],
+    "models": []
+  },
+  "automation": {
+    "routes": ["../../backend/src/modules/automation/automation.routes.js"],
+    "controllers": ["../../backend/src/modules/automation/automation.controller.js"],
+    "services": [
+      "../../backend/src/modules/automation/automation.service.js",
+      "../../backend/src/modules/marketing/marketingTrigger.service.js"
+    ],
+    "models": [
+      "../../backend/src/modules/automation/models/automationRule.model.js",
+      "../../backend/src/modules/automation/models/automationTask.model.js",
+      "../../backend/src/modules/automation/models/automationLog.model.js"
+    ]
+  },
+  "reviews": {
+    "routes": ["../../backend/src/modules/trust/trust.routes.js"],
+    "controllers": ["../../backend/src/modules/trust/trust.controller.js"],
+    "services": ["../../backend/src/modules/trust/trust.service.js"],
+    "models": [
+      "../../backend/src/modules/trust/models/productReview.model.js",
+      "../../backend/src/modules/trust/models/shopReview.model.js"
+    ]
+  },
+  "trust": {
+    "routes": ["../../backend/src/modules/trust/trust.routes.js"],
+    "controllers": ["../../backend/src/modules/trust/trust.controller.js"],
+    "services": ["../../backend/src/modules/trust/trust.service.js"],
+    "models": [
+      "../../backend/src/modules/trust/models/productReview.model.js",
+      "../../backend/src/modules/trust/models/shopReview.model.js",
+      "../../backend/src/modules/trust/models/buyerClaim.model.js"
+    ]
+  },
+  "marketing": {
+    "routes": ["../../backend/src/modules/marketing/marketing.routes.js"],
+    "controllers": ["../../backend/src/modules/marketing/marketing.controller.js"],
+    "services": [
+      "../../backend/src/modules/marketing/marketing.service.js",
+      "../../backend/src/modules/marketing/marketingTrigger.service.js"
+    ],
+    "models": [
+      "../../backend/src/modules/marketing/models/coupon.model.js",
+      "../../backend/src/modules/marketing/models/couponRedemption.model.js",
+      "../../backend/src/modules/marketing/models/automationExecution.model.js"
+    ]
+  },
+  "marketplace": {
+    "routes": [
+      "../../backend/src/modules/supplier-marketplace/supplierMarketplace.routes.js",
+      "../../backend/src/modules/app-marketplace/appMarketplace.routes.js"
+    ],
+    "controllers": [
+      "../../backend/src/modules/supplier-marketplace/supplierMarketplace.controller.js",
+      "../../backend/src/modules/app-marketplace/appMarketplace.controller.js"
+    ],
+    "services": [
+      "../../backend/src/modules/supplier-marketplace/supplierMarketplace.service.js",
+      "../../backend/src/modules/app-marketplace/appMarketplace.service.js"
+    ],
+    "models": [
+      "../../backend/src/modules/supplier-marketplace/models/supplier.model.js",
+      "../../backend/src/modules/supplier-marketplace/models/supplierOffer.model.js",
+      "../../backend/src/modules/app-marketplace/models/app.model.js",
+      "../../backend/src/modules/app-marketplace/models/appInstallation.model.js"
+    ]
+  }
+}

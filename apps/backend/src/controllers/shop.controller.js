@@ -118,7 +118,12 @@ exports.suspendShop = async (req, res) => {
 
 exports.blockCustomer = async (req, res) => {
   try {
-    const { shopId, userId } = req.params;
+    const userId = req.params.userId;
+    const shopId = req.shop?._id || req.params.shopId || req.user?.shopId || null;
+
+    if (!shopId) {
+      return response.failure(res, "Shop context missing", 400);
+    }
 
     const shop = await Shop.findById(shopId);
     if (!shop) {

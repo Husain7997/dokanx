@@ -4,6 +4,8 @@ const { startAnalyticsWorker } = require("@/workers/analytics.worker");
 const { startFraudSignalWorker } = require("@/workers/fraudSignal.worker");
 const { startSettlementQueueWorker } = require("@/workers/settlement.queue.worker");
 const { startQueueDeadLetterMonitor } = require("@/platform/queue/deadLetter.monitor");
+const { startAppWebhookRetryWorker } = require("@/workers/appWebhookRetry.worker");
+const { startCourierStatusPollWorker } = require("@/workers/courierStatusPoll.worker");
 
 let started = false;
 let monitorTimer = null;
@@ -18,6 +20,8 @@ function startPhase2Workers() {
     workerRefs.push(startAnalyticsWorker());
     workerRefs.push(startFraudSignalWorker());
     workerRefs.push(startSettlementQueueWorker());
+    workerRefs.push(startAppWebhookRetryWorker());
+    workerRefs.push(startCourierStatusPollWorker());
     monitorTimer = startQueueDeadLetterMonitor();
     logger.info("Phase-2 queue workers started");
   } catch (err) {

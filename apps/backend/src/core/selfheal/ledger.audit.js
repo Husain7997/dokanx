@@ -3,6 +3,8 @@ const Wallet =
 
 const Ledger =
  require("@/modules/ledger/ledger.model");
+const { calculateLedgerDelta } =
+ require("@/core/financial/ledger.delta");
 
 exports.findInconsistencies =
 async () => {
@@ -14,19 +16,13 @@ async () => {
 
   for (const wallet of wallets) {
 
-    const agg =
-      await Ledger.aggregate([
-        { $match:{shopId:wallet.shopId}},
-        {
-          $group:{
-            _id:null,
-            balance:{ $sum:"$amount"}
-          }
-        }
-      ]);
+    const entries =
+      await Ledger.find({ shopId: wallet.shopId })
+        .select("amount type meta")
+        .lean();
 
     const expected =
-      agg[0]?.balance || 0;
+      calculateLedgerDelta(entries);
 
     if (expected !== wallet.balance) {
 

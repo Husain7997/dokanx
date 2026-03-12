@@ -1,6 +1,8 @@
 // src/infrastructure/events/listeners.js
 
 const { eventBus, logger } = require("@/core/infrastructure");
+const { registerAutomationEventListeners } = require("@/modules/automation/automationEvents.listener");
+const appWebhookDelivery = require("@/modules/app-marketplace/webhookDelivery.service");
 
 /**
  * GLOBAL EVENT LISTENERS
@@ -15,6 +17,18 @@ function registerEventListeners() {
       payload
     });
   });
+
+  ["ORDER_CREATED", "ORDER_DELIVERED", "PAYMENT_RECEIVED", "SETTLEMENT_COMPLETED", "POS_SYNC_COMPLETED", "LOW_STOCK_ALERT"].forEach(eventName => {
+    eventBus.on(eventName, async payload => {
+      try {
+        await appWebhookDelivery.deliverEvent({ eventName, payload });
+      } catch (err) {
+        logger.warn({ err: err.message, eventName }, "App webhook delivery enqueue failed");
+      }
+    });
+  });
+
+  registerAutomationEventListeners();
 
   // Add more domain listeners here
 

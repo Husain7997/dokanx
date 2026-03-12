@@ -1,0 +1,69 @@
+{
+  "info": {
+    "name": "DokanX Phase 11 Enterprise Missing Systems",
+    "_postman_id": "b98be15a-cd67-4bc4-8b0a-3d8d2e087999",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Customer Segments Evaluate",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{baseUrl}}/customers/segments/evaluate",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"profiles\": [{\"customerId\":\"c1\",\"totalOrders\":8,\"lifetimeValue\":12000,\"inactiveDays\":3}]\n}"
+        }
+      }
+    },
+    {
+      "name": "Create Gift Card",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{baseUrl}}/gift-cards",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"code\": \"GC1001\",\n  \"balance\": 500\n}"
+        }
+      }
+    },
+    {
+      "name": "Courier Optimization Recommendation",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{baseUrl}}/courier/optimization/recommendation",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"providers\": [{\"name\":\"PATHAO\",\"reliabilityScore\":92,\"codSuccessRate\":90,\"cost\":80,\"etaHours\":12}]\n}"
+        }
+      }
+    },
+    {
+      "name": "Create CMS Page",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{baseUrl}}/content/pages",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"slug\": \"about-us\",\n  \"title\": \"About Us\",\n  \"body\": \"Company profile\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Build Analytics Warehouse",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{baseUrl}}/analytics/warehouse/build",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"dailySales\": [{\"dateKey\":\"2026-03-12\",\"orderCount\":1,\"grossSales\":100,\"itemCount\":2}]\n}"
+        }
+      }
+    }
+  ]
+}

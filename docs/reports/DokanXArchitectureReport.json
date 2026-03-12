@@ -1,0 +1,157 @@
+{
+  "generated_at": "2026-03-12",
+  "report_name": "DokanXArchitectureReport",
+  "existing_modules": {
+    "backend_api": [
+      "auth",
+      "cart",
+      "catalog",
+      "catalog-import",
+      "discovery",
+      "courier",
+      "marketing",
+      "automation",
+      "trust",
+      "warehouse",
+      "billing",
+      "platform",
+      "credit",
+      "merchant-assistant",
+      "supplier-marketplace",
+      "app-marketplace",
+      "pos",
+      "reporting",
+      "theme",
+      "support",
+      "backup",
+      "behavior",
+      "ai-insights"
+    ],
+    "core_financial": [
+      "ledger",
+      "settlement",
+      "payout",
+      "reconciliation",
+      "wallet",
+      "tax engine",
+      "financial command service"
+    ],
+    "intelligence": [
+      "ai-brain",
+      "demand forecasting",
+      "price intelligence",
+      "merchant recommendations",
+      "search ranking",
+      "geo search",
+      "product knowledge graph",
+      "product similarity"
+    ],
+    "workers": [
+      "settlement queue worker",
+      "courier status poll worker",
+      "app webhook retry worker",
+      "analytics worker",
+      "notification worker",
+      "fraud signal worker",
+      "recovery worker"
+    ],
+    "observability_security": [
+      "rate limiting",
+      "audit service",
+      "metrics service",
+      "system health service",
+      "health and readiness routes",
+      "http logging"
+    ]
+  },
+  "new_modules": {
+    "monorepo_scaffolds": [
+      "apps/api",
+      "apps/admin-dashboard",
+      "apps/merchant-dashboard",
+      "apps/mobile-app",
+      "services/*",
+      "intelligence/*",
+      "extensions/*",
+      "analytics/*",
+      "workers/*",
+      "packages/*",
+      "infrastructure/*",
+      "tests/*"
+    ],
+    "api_manifests": [
+      "apps/api/src/architecture.manifest.json",
+      "apps/api/src/module-registry.json"
+    ],
+    "workspace_controls": [
+      "root npm workspaces",
+      "reporting and architecture readmes"
+    ]
+  },
+  "duplicate_modules_detected": [
+    {
+      "area": "API composition",
+      "details": [
+        "apps/backend/src/routes + controllers + services",
+        "apps/backend/src/modules/* with their own routes/controllers/services"
+      ],
+      "risk": "medium"
+    },
+    {
+      "area": "Eventing",
+      "details": [
+        "apps/backend/src/system/singletons/eventBus.js",
+        "apps/backend/src/platform/events/*",
+        "apps/backend/src/infrastructure/events/*",
+        "apps/backend/src/domain/events.js"
+      ],
+      "risk": "high"
+    },
+    {
+      "area": "AI and intelligence",
+      "details": [
+        "apps/backend/src/brain/*",
+        "apps/backend/src/core/ai/*",
+        "apps/backend/src/intelligence/*"
+      ],
+      "risk": "medium"
+    },
+    {
+      "area": "Logging and rate limiting",
+      "details": [
+        "apps/backend/src/utils/logger.js",
+        "apps/backend/src/core/infrastructure/logger.js",
+        "apps/backend/src/middlewares/rateLimit.js",
+        "apps/backend/src/platform/rate-limit/redisRateLimiter.js",
+        "apps/backend/src/infrastructure/rateLimit/rateLimiter.js"
+      ],
+      "risk": "medium"
+    },
+    {
+      "area": "Test layout",
+      "details": [
+        "apps/backend/src/test",
+        "apps/backend/src/tests"
+      ],
+      "risk": "low"
+    }
+  ],
+  "refactor_recommendations": [
+    "Keep apps/backend as the operational API until apps/api has a controlled cutover plan.",
+    "Promote apps/api manifests into executable adapters only after regression coverage for routes, ledger, and POS sync is complete.",
+    "Consolidate event publishing under packages/events while preserving current event names and delivery behavior.",
+    "Standardize queue access behind packages/queue and point existing workers to that package incrementally.",
+    "Unify audit logging, API audit logs, and admin action logging behind a single schema without changing current persistence semantics.",
+    "Normalize tests into monorepo buckets by linking or moving only after CI proves equivalence."
+  ],
+  "missing_components": [
+    "No implemented Next.js admin dashboard yet",
+    "No implemented Next.js merchant dashboard yet",
+    "No implemented React Native mobile app yet",
+    "No root-level shared packages extracted from backend source yet",
+    "No single canonical event package implementation yet",
+    "No dedicated API IP blocking package or policy registry yet",
+    "No root-level monitoring dashboards or kubernetes manifests yet"
+  ],
+  "architecture_health_score": 82
+}

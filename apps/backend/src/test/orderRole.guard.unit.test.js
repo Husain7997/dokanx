@@ -48,4 +48,22 @@ describe("orderRole.guard", () => {
     expect(json).toHaveBeenCalledWith({ message: "Unauthorized role" });
     expect(next).not.toHaveBeenCalled();
   });
+
+  it("should allow packed transition for owner", async () => {
+    Order.findById.mockResolvedValue({ status: "CONFIRMED" });
+
+    const req = {
+      params: { orderId: "order-1" },
+      body: { status: "packed" },
+      user: { role: "OWNER" },
+    };
+    const res = {
+      status: jest.fn(() => ({ json: jest.fn() })),
+    };
+    const next = jest.fn();
+
+    await canUpdateOrderStatus(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+  });
 });

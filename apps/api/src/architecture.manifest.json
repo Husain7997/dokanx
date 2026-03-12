@@ -1,0 +1,11 @@
+{
+  "workspace": "apps/api",
+  "source_of_truth": "../../backend/src",
+  "pattern": "route -> controller -> service -> model",
+  "compatibility_mode": "non-invasive",
+  "notes": [
+    "No business logic was moved out of apps/backend during this restructuring step.",
+    "apps/api is the canonical monorepo workspace and points at the existing backend implementation.",
+    "Where an explicit service layer is incomplete in the legacy API, the gap is documented rather than rewritten."
+  ]
+}

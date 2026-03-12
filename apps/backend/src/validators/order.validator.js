@@ -1,3 +1,5 @@
+const { isValidOrderStatus } = require("@/domain/orderStatus");
+
 function validatePlaceOrderBody(body = {}) {
   const errors = [];
 
@@ -40,19 +42,9 @@ function validatePlaceOrderBody(body = {}) {
 
 function validateOrderStatusBody(body = {}) {
   const status = String(body.status || "").trim().toUpperCase();
-  const allowed = [
-    "PLACED",
-    "PAYMENT_PENDING",
-    "PAYMENT_FAILED",
-    "CONFIRMED",
-    "SHIPPED",
-    "DELIVERED",
-    "CANCELLED",
-    "REFUNDED",
-  ];
 
   const errors = [];
-  if (!allowed.includes(status)) {
+  if (!isValidOrderStatus(status)) {
     errors.push("status is invalid");
   }
 

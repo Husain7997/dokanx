@@ -12,11 +12,12 @@ function parseRegexQuery(q) {
   return new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
 }
 
-function buildShopScore({ distanceKm, ratingAverage, inStockCount }) {
+function buildShopScore({ distanceKm, ratingAverage, trustScore = 0, inStockCount }) {
   const distanceScore = Math.max(0, 100 - Math.min(distanceKm * 8, 100));
   const ratingScore = Math.min((Number(ratingAverage || 0) / 5) * 30, 30);
+  const trustBonus = Math.min((Number(trustScore || 0) / 100) * 15, 15);
   const stockScore = Math.min(Number(inStockCount || 0), 20);
-  return Number((distanceScore + ratingScore + stockScore).toFixed(2));
+  return Number((distanceScore + ratingScore + trustBonus + stockScore).toFixed(2));
 }
 
 function buildProductScore({ distanceKm, ratingAverage, stock, price }) {
@@ -71,6 +72,7 @@ async function getNearbyShops({ lat, lng, radiusKm = 10, limit = 200 }) {
         status: 1,
         ratingAverage: 1,
         ratingCount: 1,
+        trustScore: 1,
         location: 1,
         distanceMeters: 1,
       },
@@ -126,6 +128,7 @@ async function searchShops({
         const score = buildShopScore({
           distanceKm,
           ratingAverage: s.ratingAverage,
+          trustScore: s.trustScore || 0,
           inStockCount: stock.inStockCount,
         });
 
@@ -135,6 +138,7 @@ async function searchShops({
           status: s.status,
           ratingAverage: s.ratingAverage || 0,
           ratingCount: s.ratingCount || 0,
+          trustScore: s.trustScore || 0,
           location: s.location,
           distanceKm,
           inStockCount: stock.inStockCount || 0,
@@ -163,6 +167,7 @@ async function searchShops({
     status: s.status,
     ratingAverage: s.ratingAverage || 0,
     ratingCount: s.ratingCount || 0,
+    trustScore: s.trustScore || 0,
     location: s.location || null,
     distanceKm: null,
     inStockCount: null,
@@ -251,6 +256,7 @@ module.exports = {
   searchProducts,
   toNumber,
   _internals: {
+    buildShopScore,
     buildProductScore,
     sortProductRows,
   },

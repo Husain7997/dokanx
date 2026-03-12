@@ -35,6 +35,7 @@ jest.mock("../controllers/shop/shopPayout.controller", () => ({
 }));
 
 jest.mock("../controllers/inventory.controller", () => ({
+  getLowStockAlerts: jest.fn((req, res) => res.json({ ok: true })),
   adjustStock: jest.fn((req, res) => res.json({ ok: true })),
 }));
 
