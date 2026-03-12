@@ -9,20 +9,21 @@ import { createOrder, saveCart } from "@/lib/runtime-api";
 
 type CheckoutWorkspaceProps = {
   cart: Cart;
+  suggestedShopId?: string | null;
 };
 
 function isMongoId(value: string) {
   return /^[a-f0-9]{24}$/i.test(value);
 }
 
-export function CheckoutWorkspace({ cart }: CheckoutWorkspaceProps) {
+export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWorkspaceProps) {
   const auth = useAuth();
   const [customer, setCustomer] = useState({
     fullName: "Husain Ahmed",
     phone: "01700000000",
     address: "House 12, Road 4, Dhaka",
     notes: "",
-    shopId: auth.user?.shopId || "",
+    shopId: auth.user?.shopId || suggestedShopId || "",
   });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -75,6 +76,7 @@ export function CheckoutWorkspace({ cart }: CheckoutWorkspaceProps) {
       });
 
       const order = await createOrder({
+        shopId: customer.shopId.trim() || String(auth.user?.shopId || ""),
         items: cart.items.map((item) => ({
           product: item.productId,
           quantity: item.quantity,
@@ -173,6 +175,11 @@ export function CheckoutWorkspace({ cart }: CheckoutWorkspaceProps) {
         {invalidProductIds.length > 0 ? (
           <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm">
             Demo cart detected. Backend order creation needs live Mongo product IDs, but found: {invalidProductIds.join(", ")}
+          </div>
+        ) : null}
+        {!invalidProductIds.length && customer.shopId ? (
+          <div className="mt-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm">
+            Checkout is preloaded with live shop context: {customer.shopId}
           </div>
         ) : null}
       </Card>

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button, Input } from "@dokanx/ui";
 
-import { applyTheme, listThemes, resetTheme } from "@/lib/runtime-api";
+import { applyTheme, listThemes, resetTheme, updateShopSettings } from "@/lib/runtime-api";
 
 import { OwnerSessionPanel } from "./owner-session-panel";
 import { WorkspaceCard } from "./workspace-card";
@@ -28,6 +28,7 @@ export function SettingsWorkspace() {
   const [selectedThemeId, setSelectedThemeId] = useState("");
   const [loadingThemes, setLoadingThemes] = useState(false);
   const [submittingTheme, setSubmittingTheme] = useState(false);
+  const [submittingSettings, setSubmittingSettings] = useState(false);
 
   useEffect(() => {
     async function loadThemes() {
@@ -84,6 +85,26 @@ export function SettingsWorkspace() {
     }
   }
 
+  async function handleSaveSettings() {
+    setSubmittingSettings(true);
+    setMessage(null);
+
+    try {
+      const response = await updateShopSettings({
+        name: settings.shopName,
+        supportEmail: settings.supportEmail,
+        whatsapp: settings.whatsapp,
+        payoutSchedule: settings.payoutSchedule,
+      });
+      setMessage(response.message || "Shop settings saved.");
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unable to save settings.";
+      setMessage(errorMessage);
+    } finally {
+      setSubmittingSettings(false);
+    }
+  }
+
   return (
     <div className="grid gap-6">
       <OwnerSessionPanel title="Owner session for settings mutations" />
@@ -111,8 +132,11 @@ export function SettingsWorkspace() {
             </label>
           </div>
           <div className="mt-6 flex gap-3">
-            <Button variant="secondary" onClick={() => setMessage("Profile fields are staged locally until a shop settings endpoint is added.")}>
-              Save Draft
+            <Button onClick={handleSaveSettings} disabled={submittingSettings}>
+              {submittingSettings ? "Saving..." : "Save Settings"}
+            </Button>
+            <Button variant="secondary" onClick={() => setMessage("Theme and shop settings can now be saved to the backend. Team permissions still need separate endpoints.")}>
+              Review Gaps
             </Button>
           </div>
           <p className="mt-4 text-sm text-muted-foreground">{message}</p>

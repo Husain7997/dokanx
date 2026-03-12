@@ -64,6 +64,35 @@ async function safeCall<T>(request: () => Promise<T>, fallback: T): Promise<T> {
   }
 }
 
+function buildCartFromProducts(products: Array<Product & { _id?: string; shopId?: string }>): Cart {
+  if (!products.length) {
+    return fallbackCart;
+  }
+
+  const seededShopId = products[0]?.shopId;
+  const sameShopProducts = products.filter((item) => item.shopId === seededShopId).slice(0, 2);
+  const rows = (sameShopProducts.length ? sameShopProducts : products.slice(0, 2)).map((item, index) => ({
+    id: `line-${index + 1}`,
+    productId: String(item._id || item.id),
+    name: item.name,
+    quantity: 1,
+    price: item.price,
+    shopId: item.shopId,
+  }));
+
+  const subtotal = rows.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+  return {
+    id: "seeded-cart",
+    items: rows,
+    totals: {
+      subtotal,
+      quantity: rows.reduce((sum, item) => sum + item.quantity, 0),
+      itemCount: rows.length,
+    },
+  };
+}
+
 export async function getHomePageData(tenant: TenantConfig | null) {
   const api = createServerApi(tenant);
   const [productsResponse, appsResponse] = await Promise.all([
@@ -88,8 +117,18 @@ export async function getProductsData(tenant: TenantConfig | null, query?: Recor
 }
 
 export async function getCartData(tenant: TenantConfig | null) {
-  const response = await safeCall(() => createServerApi(tenant).cart.get(), { data: fallbackCart });
-  return response.data || fallbackCart;
+  const api = createServerApi(tenant);
+  const [cartResponse, productsResponse] = await Promise.all([
+    safeCall(() => api.cart.get(), { data: fallbackCart }),
+    safeCall(() => api.product.search({ limit: "6", minStock: "1" }), { data: fallbackProducts, count: fallbackProducts.length }),
+  ]);
+
+  const cart = cartResponse.data || null;
+  if (cart?.items?.length) {
+    return cart;
+  }
+
+  return buildCartFromProducts((productsResponse.data || fallbackProducts) as Array<Product & { _id?: string; shopId?: string }>);
 }
 
 export async function getOrdersData(tenant: TenantConfig | null) {

@@ -97,8 +97,8 @@ describe("order.controller", () => {
       itemCount: 2,
     });
     expect(CheckoutEngine.checkout).toHaveBeenCalledWith({
-      shopId: req.shop,
-      user: req.user,
+      shopId: "shop-1",
+      customerId: "user-1",
       items: req.body.items,
       totalAmount: 90,
       session,
@@ -170,6 +170,46 @@ describe("order.controller", () => {
       success: false,
       message: "Coupon invalid",
     });
+    expect(session.endSession).toHaveBeenCalled();
+  });
+
+  it("should resolve shop context from request body when shop middleware is missing", async () => {
+    const session = {
+      withTransaction: jest.fn(async (callback) => callback()),
+      endSession: jest.fn(),
+    };
+    mongoose.startSession.mockResolvedValue(session);
+
+    const save = jest.fn();
+    const order = {
+      _id: "order-2",
+      save,
+    };
+    CheckoutEngine.checkout.mockResolvedValue(order);
+
+    const json = jest.fn();
+    const req = {
+      user: { _id: "user-2" },
+      body: {
+        shopId: "shop-2",
+        totalAmount: 200,
+        items: [{ product: "prod-2", quantity: 1, price: 200 }],
+      },
+    };
+    const res = {
+      status: jest.fn(() => ({ json })),
+    };
+
+    await controller.placeOrder(req, res);
+
+    expect(CheckoutEngine.checkout).toHaveBeenCalledWith({
+      shopId: "shop-2",
+      customerId: "user-2",
+      items: req.body.items,
+      totalAmount: 200,
+      session,
+    });
+    expect(res.status).toHaveBeenCalledWith(201);
     expect(session.endSession).toHaveBeenCalled();
   });
 

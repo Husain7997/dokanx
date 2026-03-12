@@ -63,7 +63,7 @@ export type ApiModules = {
   product: {
     list: (query?: Record<string, string | number | boolean | undefined>) => Promise<ApiListResponse<Product>>;
     detail: (productId: string) => Promise<ApiEnvelope<Product>>;
-    search: (query: { q?: string; category?: string }) => Promise<ApiListResponse<Product>>;
+    search: (query: Record<string, string | number | boolean | undefined>) => Promise<ApiListResponse<Product>>;
     inventory: (productId: string) => Promise<ApiEnvelope<InventoryRecord>>;
   };
   cart: {

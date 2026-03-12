@@ -41,6 +41,45 @@ exports.createShop = async (req, res) => {
   }
 };
 
+exports.updateMyShopSettings = async (req, res) => {
+  try {
+    const shopId = req.shop?._id || req.user?.shopId || null;
+
+    if (!shopId) {
+      return response.failure(res, "Shop context missing", 400);
+    }
+
+    const shop = await Shop.findById(shopId);
+    if (!shop) {
+      return response.notFound(res, "Shop");
+    }
+
+    if (String(shop.owner) !== String(req.user._id)) {
+      return response.failure(res, "Not your shop", 403);
+    }
+
+    shop.name = String(req.body.name || "").trim();
+    shop.supportEmail = String(req.body.supportEmail || "").trim().toLowerCase();
+    shop.whatsapp = String(req.body.whatsapp || "").trim();
+    shop.payoutSchedule = String(req.body.payoutSchedule || "").trim();
+
+    await shop.save();
+
+    await createAudit({
+      action: "UPDATE_SHOP_SETTINGS",
+      performedBy: req.user._id,
+      targetType: "Shop",
+      targetId: shop._id,
+      req,
+    });
+
+    return response.updated(res, req, shop);
+  } catch (err) {
+    logger.error({ err: err.message }, "Update shop settings failed");
+    return response.failure(res, "Update shop settings failed", 500);
+  }
+};
+
 exports.updateOrderStatus = async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;

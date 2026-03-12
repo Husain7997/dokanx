@@ -54,6 +54,44 @@ const shopSchema = new mongoose.Schema(
       required: true,
     },
 
+    supportEmail: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: "",
+    },
+
+    whatsapp: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    payoutSchedule: {
+      type: String,
+      trim: true,
+      default: "Weekly",
+    },
+
+    supportEmail: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: "",
+    },
+
+    whatsapp: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    payoutSchedule: {
+      type: String,
+      trim: true,
+      default: "Weekly",
+    },
+
     // ✅ ADD THIS
     isActive: {
       type: Boolean,

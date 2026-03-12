@@ -15,6 +15,11 @@ const { addJob } = require("@/core/infrastructure");
 const { triggerFirstPurchaseFlow } = require("@/modules/marketing/marketingTrigger.service");
 const cartService = require("@/modules/cart/cart.service");
 const marketingService = require("@/modules/marketing/marketing.service");
+
+function resolveShopId(req) {
+  return req.shop?._id || req.user?.shopId || req.body?.shopId || req.tenant || null;
+}
+
 exports.placeOrder = async (req, res) => {
 
   const session = await mongoose.startSession();
@@ -24,7 +29,10 @@ exports.placeOrder = async (req, res) => {
     let order;
 
     await session.withTransaction(async () => {
-      const shopId = req.shop?._id || req.shop;
+      const shopId = resolveShopId(req);
+      if (!shopId) {
+        throw new Error("Shop context missing");
+      }
       let subtotal = Number(req.body.totalAmount || 0);
       let discountTotal = 0;
       let finalAmount = subtotal;
@@ -59,8 +67,8 @@ exports.placeOrder = async (req, res) => {
       }
 
       order = await CheckoutEngine.checkout({
-        shopId: req.shop,
-        user: req.user,
+        shopId,
+        customerId: req.user?._id || null,
         items: req.body.items,
         totalAmount: finalAmount,
         session

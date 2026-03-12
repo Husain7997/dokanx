@@ -22,6 +22,16 @@ type MutationResponse = {
   data?: JsonValue;
 };
 
+type ShopSettingsResponse = {
+  message?: string;
+  data?: {
+    name?: string;
+    supportEmail?: string;
+    whatsapp?: string;
+    payoutSchedule?: string;
+  } & JsonValue;
+};
+
 function getHeaders() {
   const store = useAuthStore.getState();
   return {
@@ -76,5 +86,17 @@ export function resetTheme() {
   return request<MutationResponse>("/themes/reset", {
     method: "POST",
     body: JSON.stringify({}),
+  });
+}
+
+export function updateShopSettings(payload: {
+  name: string;
+  supportEmail: string;
+  whatsapp: string;
+  payoutSchedule: string;
+}) {
+  return request<ShopSettingsResponse>("/shops/me/settings", {
+    method: "PUT",
+    body: JSON.stringify(payload),
   });
 }

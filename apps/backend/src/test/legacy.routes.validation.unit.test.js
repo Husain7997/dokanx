@@ -43,6 +43,7 @@ jest.mock("../controllers/shop.controller", () => ({
   createShop: jest.fn((req, res) => res.json({ ok: true })),
   updateOrderStatus: jest.fn((req, res) => res.json({ ok: true })),
   blockCustomer: jest.fn((req, res) => res.json({ ok: true })),
+  updateMyShopSettings: jest.fn((req, res) => res.json({ ok: true })),
 }));
 
 const settlementController = require("../controllers/settlement.controller");
@@ -123,5 +124,15 @@ describe("legacy route validation", () => {
     expect(res.statusCode).toBe(400);
     expect(res.body.errors).toContain("status is invalid");
     expect(shopController.updateOrderStatus).not.toHaveBeenCalled();
+  });
+
+  it("should reject invalid shop settings payload", async () => {
+    const app = buildApp("/shops", shopRoutes);
+    const res = await request(app).put("/shops/me/settings").send({ name: "", supportEmail: "bad-email" });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body.errors).toContain("name is required");
+    expect(res.body.errors).toContain("supportEmail must be a valid email");
+    expect(shopController.updateMyShopSettings).not.toHaveBeenCalled();
   });
 });

@@ -4,10 +4,12 @@ const router = express.Router();
 const {
   createShop,
   updateOrderStatus,
-  blockCustomer
+  blockCustomer,
+  updateMyShopSettings
 } = require('../controllers/shop.controller');
 
 const { protect, allowRoles } = require("../middlewares");
+const { tenantGuard } = require("@/api/middleware/tenantGuard");
 const { validateBody, validateParams } = require("../middlewares/validateRequest");
 const legacyValidator = require("../validators/legacyRoutes.validator");
 
@@ -27,6 +29,15 @@ router.put(
   validateBody(legacyValidator.validateShopStatusBody),
   canUpdateOrderStatus,
   updateOrderStatus
+);
+
+router.put(
+  "/me/settings",
+  protect,
+  tenantGuard,
+  allowRoles("OWNER"),
+  validateBody(legacyValidator.validateShopSettingsBody),
+  updateMyShopSettings
 );
 
 router.post(

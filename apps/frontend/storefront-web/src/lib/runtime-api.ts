@@ -73,6 +73,7 @@ export function saveCart(payload: {
 }
 
 export function createOrder(payload: {
+  shopId?: string;
   items: Array<{ product: string; quantity: number }>;
   totalAmount: number;
   shippingFee?: number;

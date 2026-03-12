@@ -75,6 +75,29 @@ function validateShopAndUserParams(params = {}) {
   return { valid: errors.length === 0, errors };
 }
 
+function validateShopSettingsBody(body = {}) {
+  const errors = [];
+
+  requireNonEmpty("name", body.name, errors);
+
+  if (body.supportEmail !== undefined) {
+    const email = String(body.supportEmail || "").trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errors.push("supportEmail must be a valid email");
+    }
+  }
+
+  if (body.whatsapp !== undefined && !String(body.whatsapp || "").trim()) {
+    errors.push("whatsapp must not be empty");
+  }
+
+  if (body.payoutSchedule !== undefined && !String(body.payoutSchedule || "").trim()) {
+    errors.push("payoutSchedule must not be empty");
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
 module.exports = {
   validateSettlementCreateBody,
   validateSettlementProcessBody,
@@ -85,4 +108,5 @@ module.exports = {
   validateCreateShopBody,
   validateShopStatusBody,
   validateShopAndUserParams,
+  validateShopSettingsBody,
 };
