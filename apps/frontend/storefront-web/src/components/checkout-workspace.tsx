@@ -5,7 +5,7 @@ import { useAuth } from "@dokanx/auth";
 import { Button, Card, CardDescription, CardTitle, CheckoutLayout, Input } from "@dokanx/ui";
 import type { Cart } from "@dokanx/types";
 
-import { createOrder, saveCart } from "@/lib/runtime-api";
+import { createOrder, initiatePayment, saveCart } from "@/lib/runtime-api";
 
 type CheckoutWorkspaceProps = {
   cart: Cart;
@@ -28,6 +28,16 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState("bkash");
+  const [handoff, setHandoff] = useState<{
+    orderId: string;
+    gateway?: string;
+    provider?: string;
+    paymentUrl?: string;
+    handoffType?: string;
+    transactionId?: string | null;
+    sessionId?: string | null;
+  } | null>(null);
 
   const totals = useMemo(() => {
     const subtotal = cart.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -47,6 +57,7 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
   async function handleSubmitOrder() {
     setSubmitting(true);
     setStatus(null);
+    setHandoff(null);
 
     if (auth.status !== "authenticated" || auth.user?.roleName !== "customer") {
       setSubmitting(false);
@@ -85,8 +96,29 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
         shippingFee: totals.shipping,
       });
 
+      const rawOrder = order.data || {};
+      const orderId = String(rawOrder._id || rawOrder.orderId || "");
+
+      if (!orderId) {
+        throw new Error("Order created without an order id.");
+      }
+
+      const payment = await initiatePayment(orderId, {
+        paymentMethod,
+        hasOwnGateway: paymentMethod === "stripe",
+      });
+
       setSubmitted(true);
-      setStatus(order.message || "Order submitted to backend.");
+      setHandoff({
+        orderId,
+        gateway: payment.gateway,
+        provider: payment.provider,
+        paymentUrl: payment.paymentUrl,
+        handoffType: payment.handoffType,
+        transactionId: payment.transactionId,
+        sessionId: payment.sessionId,
+      });
+      setStatus(payment.message || order.message || "Order submitted and payment handoff is ready.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to submit order.";
       setStatus(message);
@@ -98,6 +130,7 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
   function handleReset() {
     setSubmitted(false);
     setStatus(null);
+    setHandoff(null);
   }
 
   return (
@@ -158,10 +191,21 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
             <span>Shop ID</span>
             <Input value={customer.shopId} onChange={(event) => setCustomer((current) => ({ ...current, shopId: event.target.value }))} placeholder="Required if your customer session is not linked to a shop" />
           </label>
+          <label className="grid gap-2 text-sm md:col-span-2">
+            <span>Payment method</span>
+            <select
+              className="h-11 rounded-full border border-border bg-background px-4 text-sm"
+              value={paymentMethod}
+              onChange={(event) => setPaymentMethod(event.target.value)}
+            >
+              <option value="bkash">bKash redirect</option>
+              <option value="stripe">Stripe hosted checkout</option>
+            </select>
+          </label>
         </div>
         <div className="mt-6 flex flex-wrap gap-3">
           <Button onClick={handleSubmitOrder} disabled={submitting}>
-            {submitting ? "Submitting..." : "Submit Order"}
+            {submitting ? "Submitting..." : "Create Order And Prepare Payment"}
           </Button>
           <Button variant="secondary" onClick={handleReset}>
             Reset
@@ -180,6 +224,25 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
         {!invalidProductIds.length && customer.shopId ? (
           <div className="mt-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm">
             Checkout is preloaded with live shop context: {customer.shopId}
+          </div>
+        ) : null}
+        {handoff ? (
+          <div className="mt-4 rounded-2xl border border-sky-500/30 bg-sky-500/5 p-4 text-sm">
+            <p className="font-medium">Payment handoff ready</p>
+            <p className="mt-2">Order: {handoff.orderId}</p>
+            <p>Gateway: {handoff.provider || handoff.gateway || "Unknown"}</p>
+            <p>Mode: {handoff.handoffType || "N/A"}</p>
+            {handoff.transactionId ? <p>Transaction: {handoff.transactionId}</p> : null}
+            {handoff.sessionId ? <p>Session: {handoff.sessionId}</p> : null}
+            {handoff.paymentUrl ? (
+              <div className="mt-3">
+                <Button asChild>
+                  <a href={handoff.paymentUrl} target="_blank" rel="noreferrer">
+                    Launch {handoff.provider || "Payment"}
+                  </a>
+                </Button>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </Card>

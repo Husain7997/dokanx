@@ -262,3 +262,142 @@ exports.getProductInventory = async (req, res) => {
     reserved: inventory.reserved,
   });
 };
+
+exports.updateProduct = async (req, res) => {
+  try {
+    if (!req.shop) {
+      return res.status(404).json({
+        success: false,
+        message: "Shop not found",
+      });
+    }
+
+    const product = await Product.findOne({
+      _id: req.params.productId,
+      shopId: req.shop._id,
+      isActive: true,
+    });
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    if (req.body.name !== undefined) product.name = String(req.body.name || "").trim();
+    if (req.body.brand !== undefined) product.brand = String(req.body.brand || "").trim();
+    if (req.body.category !== undefined) product.category = String(req.body.category || "").trim();
+    if (req.body.barcode !== undefined) product.barcode = String(req.body.barcode || "").trim();
+    if (req.body.imageUrl !== undefined) product.imageUrl = String(req.body.imageUrl || "").trim();
+    if (req.body.price !== undefined) product.price = safeNumber(req.body.price, 0);
+    if (req.body.stock !== undefined) product.stock = safeNumber(req.body.stock, 0);
+
+    await product.save();
+
+    if (req.body.stock !== undefined) {
+      await Inventory.findOneAndUpdate(
+        {
+          shopId: req.shop._id,
+          product: product._id,
+        },
+        {
+          $set: {
+            stock: product.stock,
+            isActive: true,
+          },
+          $setOnInsert: {
+            reserved: 0,
+            inventoryVersion: 0,
+            isReconciling: false,
+          },
+        },
+        {
+          upsert: true,
+          new: true,
+        }
+      );
+    }
+
+    await createAudit({
+      action: "UPDATE_PRODUCT",
+      performedBy: req.user._id,
+      targetType: "Product",
+      targetId: product._id,
+      req,
+    });
+
+    res.json({
+      success: true,
+      data: product,
+    });
+  } catch (err) {
+    logger.error({ err: err.message }, "Update product failed");
+    res.status(500).json({
+      success: false,
+      message: "Product update failed",
+    });
+  }
+};
+
+exports.deleteProduct = async (req, res) => {
+  try {
+    if (!req.shop) {
+      return res.status(404).json({
+        success: false,
+        message: "Shop not found",
+      });
+    }
+
+    const product = await Product.findOne({
+      _id: req.params.productId,
+      shopId: req.shop._id,
+      isActive: true,
+    });
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    product.isActive = false;
+    await product.save();
+
+    await Inventory.findOneAndUpdate(
+      {
+        shopId: req.shop._id,
+        product: product._id,
+      },
+      {
+        $set: {
+          isActive: false,
+        },
+      }
+    );
+
+    await createAudit({
+      action: "DELETE_PRODUCT",
+      performedBy: req.user._id,
+      targetType: "Product",
+      targetId: product._id,
+      req,
+    });
+
+    res.json({
+      success: true,
+      message: "Product archived",
+      data: {
+        _id: product._id,
+        isActive: false,
+      },
+    });
+  } catch (err) {
+    logger.error({ err: err.message }, "Delete product failed");
+    res.status(500).json({
+      success: false,
+      message: "Product delete failed",
+    });
+  }
+};

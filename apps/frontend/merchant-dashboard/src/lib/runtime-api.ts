@@ -8,8 +8,32 @@ type JsonValue = Record<string, unknown>;
 type ProductResponse = {
   message?: string;
   data?: {
+    _id?: string;
     name?: string;
+    category?: string;
+    price?: number;
+    stock?: number;
   } & JsonValue;
+  product?: {
+    _id?: string;
+    name?: string;
+    category?: string;
+    price?: number;
+    stock?: number;
+  } & JsonValue;
+};
+
+type ProductListResponse = {
+  message?: string;
+  count?: number;
+  data?: Array<{
+    _id?: string;
+    name?: string;
+    category?: string;
+    price?: number;
+    stock?: number;
+    isActive?: boolean;
+  } & JsonValue>;
 };
 
 type ThemeResponse = {
@@ -20,6 +44,11 @@ type ThemeResponse = {
 type MutationResponse = {
   message?: string;
   data?: JsonValue;
+};
+
+type InventoryAdjustResponse = {
+  message?: string;
+  ledger?: JsonValue;
 };
 
 type ShopSettingsResponse = {
@@ -66,6 +95,39 @@ export function createProduct(payload: {
   stock: number;
 }) {
   return request<ProductResponse>("/products", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listShopProducts(shopId: string) {
+  return request<ProductListResponse>(`/products/shop/${shopId}`);
+}
+
+export function updateProduct(productId: string, payload: {
+  name: string;
+  category: string;
+  price: number;
+  stock: number;
+}) {
+  return request<ProductResponse>(`/products/${productId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteProduct(productId: string) {
+  return request<MutationResponse>(`/products/${productId}`, {
+    method: "DELETE",
+  });
+}
+
+export function adjustInventory(payload: {
+  product: string;
+  quantity: number;
+  note?: string;
+}) {
+  return request<InventoryAdjustResponse>("/inventory/adjust", {
     method: "POST",
     body: JSON.stringify(payload),
   });

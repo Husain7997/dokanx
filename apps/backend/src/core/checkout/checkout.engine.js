@@ -75,10 +75,8 @@ async function checkout({
       amount: totalAmount
     });
 
-    return {
-      orderId: order._id,
-      attemptId: attempt._id
-    };
+    order.paymentAttemptId = attempt._id;
+    return order;
   } finally {
     await lockManager.release(lockKey);
   }

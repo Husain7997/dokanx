@@ -34,6 +34,22 @@ function validateProductCreateBody(body = {}) {
   return { valid: errors.length === 0, errors };
 }
 
+function validateProductUpdateBody(body = {}) {
+  const errors = [];
+  const allowedKeys = ["name", "brand", "category", "barcode", "imageUrl", "price", "stock"];
+  const hasAllowedField = allowedKeys.some((key) => body[key] !== undefined);
+
+  if (!hasAllowedField) {
+    errors.push("At least one product field is required");
+  }
+
+  if (body.name !== undefined) requireNonEmpty("name", body.name, errors);
+  if (body.price !== undefined) requirePositiveOrZero("price", body.price, errors);
+  if (body.stock !== undefined) requirePositiveOrZero("stock", body.stock, errors);
+
+  return { valid: errors.length === 0, errors };
+}
+
 function validateSmartSuggestBody(body = {}) {
   const errors = [];
   const localProduct = body.localProduct || {};
@@ -75,6 +91,7 @@ function validateCheckoutBody(body = {}) {
 
 module.exports = {
   validateProductCreateBody,
+  validateProductUpdateBody,
   validateSmartSuggestBody,
   validateShopIdParam,
   validateProductIdParam,

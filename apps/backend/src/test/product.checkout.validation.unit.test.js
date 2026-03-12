@@ -17,6 +17,8 @@ jest.mock("@/platform/rate-limit/redisRateLimiter", () => ({
 jest.mock("../controllers/product.controller", () => ({
   smartSuggest: jest.fn((req, res) => res.json({ ok: true })),
   createProduct: jest.fn((req, res) => res.json({ ok: true })),
+  updateProduct: jest.fn((req, res) => res.json({ ok: true })),
+  deleteProduct: jest.fn((req, res) => res.json({ ok: true })),
   getProductsByShop: jest.fn((req, res) => res.json({ ok: true })),
   getProductInventory: jest.fn((req, res) => res.json({ ok: true })),
 }));
@@ -71,5 +73,14 @@ describe("product and checkout route validation", () => {
     expect(res.body.errors).toContain("items must be a non-empty array");
     expect(res.body.errors).toContain("totalAmount must be >= 0");
     expect(checkoutController.checkout).not.toHaveBeenCalled();
+  });
+
+  it("should reject invalid product update payload", async () => {
+    const app = buildApp("/products", productRoutes);
+    const res = await request(app).patch("/products/prod-1").send({ price: -1 });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body.errors).toContain("price must be >= 0");
+    expect(productController.updateProduct).not.toHaveBeenCalled();
   });
 });

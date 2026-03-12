@@ -7,10 +7,39 @@ const PaymentAttempt = require("../models/paymentAttempt.model");
 const paymentService = require("../services/payment.service");
 const { ensureIdempotent } = require("../utils/idempotency");
 const { resolveBillingSnapshot } = require("../modules/billing/billingExecution.service");
+const paymentGateway = require("../infrastructure/payment/paymentGateway.service");
+
+function resolveGateway(paymentMethod) {
+  const normalized = String(paymentMethod || "").trim().toUpperCase();
+
+  if (normalized === "BKASH") {
+    return {
+      gateway: "bkash",
+      provider: "bKash",
+      handoff: "REDIRECT",
+    };
+  }
+
+  if (["STRIPE", "CARD", "VISA", "MASTERCARD"].includes(normalized)) {
+    return {
+      gateway: "stripe",
+      provider: "Stripe",
+      handoff: "HOSTED_CHECKOUT",
+    };
+  }
+
+  return {
+    gateway: "ssl",
+    provider: "SSLCommerz",
+    handoff: "REDIRECT",
+  };
+}
 
 exports.initiatePayment = async (req, res, next) => {
   try {
     const { orderId } = req.params;
+    const method = String(req.body?.paymentMethod || "").trim().toUpperCase();
+    const gatewayConfig = resolveGateway(method);
 
     const order = await Order.findById(orderId);
     if (!order) {
@@ -40,8 +69,8 @@ exports.initiatePayment = async (req, res, next) => {
         order: order._id,
         shopId: orderShopId,
         amount: order.totalAmount,
-        provider: "sandbox",
-        gateway: "sandbox",
+        provider: gatewayConfig.provider.toLowerCase(),
+        gateway: gatewayConfig.gateway,
         providerPaymentId: `pay_${new mongoose.Types.ObjectId()}`,
         status: "PENDING",
         processed: false,
@@ -49,11 +78,24 @@ exports.initiatePayment = async (req, res, next) => {
       });
     }
 
+    const handoff = await paymentGateway.createPayment(gatewayConfig.gateway, {
+      orderId: order._id,
+      amount: order.totalAmount,
+      attemptId: attempt._id,
+      paymentMethod: method,
+    });
+
     return res.status(201).json({
       message: t("common.updated", req.lang),
       providerPaymentId,
       attemptId: attempt._id,
       billing: attempt.billingSnapshot || null,
+      gateway: gatewayConfig.gateway,
+      provider: gatewayConfig.provider,
+      handoffType: gatewayConfig.handoff,
+      paymentUrl: handoff.paymentURL,
+      sessionId: handoff.sessionId || null,
+      transactionId: handoff.txnId || null,
     });
   } catch (err) {
     return next(err);

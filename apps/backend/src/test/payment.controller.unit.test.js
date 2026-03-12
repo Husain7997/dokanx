@@ -32,12 +32,17 @@ jest.mock("../modules/billing/billingExecution.service", () => ({
   resolveBillingSnapshot: jest.fn(),
 }));
 
+jest.mock("../infrastructure/payment/paymentGateway.service", () => ({
+  createPayment: jest.fn(),
+}));
+
 const { addJob, t } = require("@/core/infrastructure");
 const Order = require("../models/order.model");
 const PaymentAttempt = require("../models/paymentAttempt.model");
 const paymentService = require("../services/payment.service");
 const { ensureIdempotent } = require("../utils/idempotency");
 const { resolveBillingSnapshot } = require("../modules/billing/billingExecution.service");
+const paymentGateway = require("../infrastructure/payment/paymentGateway.service");
 const controller = require("../controllers/payment.controller");
 
 describe("payment.controller", () => {
@@ -62,6 +67,10 @@ describe("payment.controller", () => {
         commission: { amount: 6, rate: 5 },
         routing: { destination: "PLATFORM_WALLET", source: "default" },
       },
+    });
+    paymentGateway.createPayment.mockResolvedValue({
+      paymentURL: "https://bkash.mock/pay",
+      txnId: "BKASH_1",
     });
 
     const json = jest.fn();
@@ -89,6 +98,12 @@ describe("payment.controller", () => {
       hasOwnGateway: true,
     });
     expect(t).toHaveBeenCalledWith("common.updated", "en");
+    expect(paymentGateway.createPayment).toHaveBeenCalledWith("bkash", {
+      orderId: "order-1",
+      amount: 120,
+      attemptId: "attempt-1",
+      paymentMethod: "BKASH",
+    });
     expect(res.status).toHaveBeenCalledWith(201);
     expect(json).toHaveBeenCalledWith({
       message: "updated",
@@ -98,6 +113,12 @@ describe("payment.controller", () => {
         commission: { amount: 6, rate: 5 },
         routing: { destination: "PLATFORM_WALLET", source: "default" },
       },
+      gateway: "bkash",
+      provider: "bKash",
+      handoffType: "REDIRECT",
+      paymentUrl: "https://bkash.mock/pay",
+      sessionId: null,
+      transactionId: "BKASH_1",
     });
     expect(next).not.toHaveBeenCalled();
   });

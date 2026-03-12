@@ -7,6 +7,7 @@ jest.mock("../models/product.model", () => ({
 jest.mock("../models/Inventory.model", () => ({
   create: jest.fn(),
   findOne: jest.fn(),
+  findOneAndUpdate: jest.fn(),
 }));
 
 jest.mock("../utils/audit.util", () => ({
@@ -137,6 +138,98 @@ describe("product.controller", () => {
       success: true,
       available: 10,
       reserved: 2,
+    });
+  });
+
+  it("should update a product and sync inventory stock", async () => {
+    const save = jest.fn();
+    Product.findOne.mockResolvedValue({
+      _id: "prod-1",
+      shopId: "shop-1",
+      name: "Old Name",
+      stock: 3,
+      save,
+    });
+    const res = {
+      json: jest.fn(),
+    };
+
+    await controller.updateProduct(
+      {
+        shop: { _id: "shop-1" },
+        user: { _id: "user-1" },
+        params: { productId: "prod-1" },
+        body: { name: "New Name", stock: 9 },
+      },
+      res
+    );
+
+    expect(save).toHaveBeenCalled();
+    expect(Inventory.findOneAndUpdate).toHaveBeenCalledWith(
+      {
+        shopId: "shop-1",
+        product: "prod-1",
+      },
+      expect.objectContaining({
+        $set: expect.objectContaining({
+          stock: 9,
+          isActive: true,
+        }),
+      }),
+      expect.objectContaining({
+        upsert: true,
+      })
+    );
+    expect(res.json).toHaveBeenCalledWith({
+      success: true,
+      data: expect.objectContaining({
+        _id: "prod-1",
+        name: "New Name",
+        stock: 9,
+      }),
+    });
+  });
+
+  it("should archive a product instead of hard deleting it", async () => {
+    const save = jest.fn();
+    Product.findOne.mockResolvedValue({
+      _id: "prod-2",
+      shopId: "shop-1",
+      isActive: true,
+      save,
+    });
+    const res = {
+      json: jest.fn(),
+    };
+
+    await controller.deleteProduct(
+      {
+        shop: { _id: "shop-1" },
+        user: { _id: "user-1" },
+        params: { productId: "prod-2" },
+      },
+      res
+    );
+
+    expect(save).toHaveBeenCalled();
+    expect(Inventory.findOneAndUpdate).toHaveBeenCalledWith(
+      {
+        shopId: "shop-1",
+        product: "prod-2",
+      },
+      {
+        $set: {
+          isActive: false,
+        },
+      }
+    );
+    expect(res.json).toHaveBeenCalledWith({
+      success: true,
+      message: "Product archived",
+      data: {
+        _id: "prod-2",
+        isActive: false,
+      },
     });
   });
 });

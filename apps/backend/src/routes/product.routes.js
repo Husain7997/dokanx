@@ -29,6 +29,27 @@ router.post(
   productController.createProduct
 );
 
+router.patch(
+  "/:productId",
+  protect,
+  tenantGuard,
+  role("OWNER"),
+  checkShopOwnership,
+  validateParams(validator.validateProductIdParam),
+  validateBody(validator.validateProductUpdateBody),
+  productController.updateProduct
+);
+
+router.delete(
+  "/:productId",
+  protect,
+  tenantGuard,
+  role("OWNER"),
+  checkShopOwnership,
+  validateParams(validator.validateProductIdParam),
+  productController.deleteProduct
+);
+
 router.get("/shop/:shopId", validateParams(validator.validateShopIdParam), productController.getProductsByShop);
 
 router.get(
