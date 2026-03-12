@@ -4,21 +4,26 @@ import { useMemo, useState } from "react";
 import { ProtectedRoute, useAuth } from "@dokanx/auth";
 import { Button, Card, CardDescription, CardTitle, Input } from "@dokanx/ui";
 
-import { api } from "@/lib/api";
+import { getProfile, registerCustomer } from "@/lib/runtime-api";
 
 type FormState = {
+  name: string;
   email: string;
+  phone: string;
   password: string;
 };
 
 export function AccountWorkspace() {
   const auth = useAuth();
   const [form, setForm] = useState<FormState>({
-    email: "merchant@dokanx.test",
+    name: "Customer Demo",
+    email: "customer@dokanx.test",
+    phone: "01700000000",
     password: "Password123!",
   });
   const [status, setStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [profileSnapshot, setProfileSnapshot] = useState<string | null>(null);
 
   const sessionDetails = useMemo(
     () => [
@@ -35,11 +40,31 @@ export function AccountWorkspace() {
     setStatus(null);
 
     try {
-      await auth.login(form);
-      setStatus("Session restored and storefront auth is active.");
+      await auth.login({ email: form.email, password: form.password });
+      setStatus("Customer session is active.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to sign in.";
       setStatus(`${message} Demo credentials stay prefilled so you can retry quickly.`);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleRegister() {
+    setSubmitting(true);
+    setStatus(null);
+
+    try {
+      await registerCustomer({
+        name: form.name,
+        email: form.email,
+        password: form.password,
+        phone: form.phone || undefined,
+      });
+      setStatus("Customer account created. Sign in now to attach a live session.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to register customer.";
+      setStatus(message);
     } finally {
       setSubmitting(false);
     }
@@ -50,7 +75,9 @@ export function AccountWorkspace() {
     setStatus(null);
 
     try {
-      await api.auth.me();
+      const response = await getProfile();
+      const profile = response.user || response.data || null;
+      setProfileSnapshot(profile ? JSON.stringify(profile, null, 2) : null);
       setStatus("Profile sync request completed.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to refresh profile.";
@@ -66,6 +93,7 @@ export function AccountWorkspace() {
 
     try {
       await auth.logout();
+      setProfileSnapshot(null);
       setStatus("You are signed out.");
     } finally {
       setSubmitting(false);
@@ -77,10 +105,17 @@ export function AccountWorkspace() {
       <Card>
         <CardTitle>Sign in and manage session</CardTitle>
         <CardDescription className="mt-2">
-          This route now uses the shared auth provider instead of a placeholder. It is ready for login,
-          logout, refresh, and protected account surfaces.
+          Storefront auth is wired to real customer registration, login, logout, and profile sync endpoints.
         </CardDescription>
         <div className="mt-6 grid gap-4">
+          <label className="grid gap-2 text-sm">
+            <span>Full name</span>
+            <Input
+              value={form.name}
+              onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+              placeholder="Customer name"
+            />
+          </label>
           <label className="grid gap-2 text-sm">
             <span>Email</span>
             <Input
@@ -90,15 +125,26 @@ export function AccountWorkspace() {
             />
           </label>
           <label className="grid gap-2 text-sm">
+            <span>Phone</span>
+            <Input
+              value={form.phone}
+              onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
+              placeholder="01700000000"
+            />
+          </label>
+          <label className="grid gap-2 text-sm">
             <span>Password</span>
             <Input
               type="password"
               value={form.password}
               onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
-              placeholder="••••••••"
+              placeholder="********"
             />
           </label>
           <div className="flex flex-wrap gap-3">
+            <Button variant="secondary" onClick={handleRegister} disabled={submitting}>
+              {submitting ? "Working..." : "Register Customer"}
+            </Button>
             <Button onClick={handleLogin} disabled={submitting}>
               {submitting ? "Working..." : "Sign In"}
             </Button>
@@ -110,6 +156,11 @@ export function AccountWorkspace() {
             </Button>
           </div>
           {status ? <p className="text-sm text-muted-foreground">{status}</p> : null}
+          {profileSnapshot ? (
+            <pre className="overflow-x-auto rounded-2xl border border-border/60 bg-muted/30 p-4 text-xs">
+              {profileSnapshot}
+            </pre>
+          ) : null}
         </div>
       </Card>
 
@@ -138,7 +189,7 @@ export function AccountWorkspace() {
           <Card>
             <CardTitle>Profile actions unlocked</CardTitle>
             <CardDescription className="mt-2">
-              Next step is wiring addresses, notification preferences, and saved payment methods to backend routes.
+              Profile sync is live. Address book and payment methods still need dedicated backend endpoints.
             </CardDescription>
           </Card>
         </ProtectedRoute>

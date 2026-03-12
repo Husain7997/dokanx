@@ -1,21 +1,32 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useAuth } from "@dokanx/auth";
 import { Button, Card, CardDescription, CardTitle, CheckoutLayout, Input } from "@dokanx/ui";
 import type { Cart } from "@dokanx/types";
+
+import { createOrder, saveCart } from "@/lib/runtime-api";
 
 type CheckoutWorkspaceProps = {
   cart: Cart;
 };
 
+function isMongoId(value: string) {
+  return /^[a-f0-9]{24}$/i.test(value);
+}
+
 export function CheckoutWorkspace({ cart }: CheckoutWorkspaceProps) {
+  const auth = useAuth();
   const [customer, setCustomer] = useState({
     fullName: "Husain Ahmed",
     phone: "01700000000",
     address: "House 12, Road 4, Dhaka",
     notes: "",
+    shopId: auth.user?.shopId || "",
   });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
 
   const totals = useMemo(() => {
     const subtotal = cart.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -26,6 +37,66 @@ export function CheckoutWorkspace({ cart }: CheckoutWorkspaceProps) {
       total: subtotal + shipping,
     };
   }, [cart.items]);
+
+  const invalidProductIds = useMemo(
+    () => cart.items.filter((item) => !isMongoId(item.productId)).map((item) => item.productId),
+    [cart.items],
+  );
+
+  async function handleSubmitOrder() {
+    setSubmitting(true);
+    setStatus(null);
+
+    if (auth.status !== "authenticated" || auth.user?.roleName !== "customer") {
+      setSubmitting(false);
+      setStatus("Sign in with a CUSTOMER account before submitting checkout.");
+      return;
+    }
+
+    if (invalidProductIds.length > 0) {
+      setSubmitting(false);
+      setStatus("Current cart uses demo product IDs. Replace them with live backend product IDs before creating an order.");
+      return;
+    }
+
+    if (!customer.shopId.trim() && !auth.user?.shopId) {
+      setSubmitting(false);
+      setStatus("Shop ID is required for cart save when the session is not already linked to a shop.");
+      return;
+    }
+
+    try {
+      await saveCart({
+        shopId: customer.shopId.trim() || String(auth.user?.shopId || ""),
+        items: cart.items.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+        })),
+      });
+
+      const order = await createOrder({
+        items: cart.items.map((item) => ({
+          product: item.productId,
+          quantity: item.quantity,
+        })),
+        totalAmount: totals.total,
+        shippingFee: totals.shipping,
+      });
+
+      setSubmitted(true);
+      setStatus(order.message || "Order submitted to backend.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to submit order.";
+      setStatus(message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function handleReset() {
+    setSubmitted(false);
+    setStatus(null);
+  }
 
   return (
     <CheckoutLayout
@@ -62,7 +133,7 @@ export function CheckoutWorkspace({ cart }: CheckoutWorkspaceProps) {
       <Card>
         <CardTitle>Customer and delivery details</CardTitle>
         <CardDescription className="mt-2">
-          This is now a working checkout shell with address capture and review state instead of a placeholder.
+          Checkout now saves the cart and submits a real order request when the session and product IDs are valid.
         </CardDescription>
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           <label className="grid gap-2 text-sm">
@@ -81,16 +152,27 @@ export function CheckoutWorkspace({ cart }: CheckoutWorkspaceProps) {
             <span>Delivery note</span>
             <Input value={customer.notes} onChange={(event) => setCustomer((current) => ({ ...current, notes: event.target.value }))} placeholder="Gate code, landmark, preferred slot" />
           </label>
+          <label className="grid gap-2 text-sm md:col-span-2">
+            <span>Shop ID</span>
+            <Input value={customer.shopId} onChange={(event) => setCustomer((current) => ({ ...current, shopId: event.target.value }))} placeholder="Required if your customer session is not linked to a shop" />
+          </label>
         </div>
         <div className="mt-6 flex flex-wrap gap-3">
-          <Button onClick={() => setSubmitted(true)}>Review Order</Button>
-          <Button variant="secondary" onClick={() => setSubmitted(false)}>
+          <Button onClick={handleSubmitOrder} disabled={submitting}>
+            {submitting ? "Submitting..." : "Submit Order"}
+          </Button>
+          <Button variant="secondary" onClick={handleReset}>
             Reset
           </Button>
         </div>
-        {submitted ? (
-          <div className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm">
-            Review step is ready. The next implementation pass only needs payment method selection and backend order submission.
+        {status ? (
+          <div className="mt-6 rounded-2xl border border-border/60 bg-muted/20 p-4 text-sm">
+            {status}
+          </div>
+        ) : null}
+        {invalidProductIds.length > 0 ? (
+          <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm">
+            Demo cart detected. Backend order creation needs live Mongo product IDs, but found: {invalidProductIds.join(", ")}
           </div>
         ) : null}
       </Card>
