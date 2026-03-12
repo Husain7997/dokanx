@@ -2,6 +2,8 @@ import { OrdersTable } from "@dokanx/ui";
 
 import { createServerApi } from "@/lib/server-api";
 
+export const dynamic = "force-dynamic";
+
 export default async function OrdersPage() {
   const orders = await createServerApi().order.list();
 

@@ -7,7 +7,7 @@ export const fadeUp = {
   initial: { opacity: 0, y: 16 },
   animate: { opacity: 1, y: 0 },
   exit: { opacity: 0, y: -8 },
-  transition: { duration: 0.24, ease: "easeOut" }
+  transition: { duration: 0.24, ease: "easeOut" as const }
 };
 
 export function PageTransition({
@@ -35,7 +35,7 @@ export function HoverLift({
     <motion.div
       className={className}
       whileHover={{ y: -4, scale: 1.01 }}
-      transition={{ duration: 0.18, ease: "easeOut" }}
+      transition={{ duration: 0.18, ease: "easeOut" as const }}
     >
       {children}
     </motion.div>

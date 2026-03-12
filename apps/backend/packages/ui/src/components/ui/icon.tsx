@@ -2,12 +2,16 @@ import type { SVGProps } from "react";
 
 import { cn } from "../../lib/utils";
 
+type IconProps = SVGProps<SVGSVGElement> & {
+  title?: string;
+};
+
 export function Icon({
   className,
   title,
   children,
   ...props
-}: SVGProps<SVGSVGElement>) {
+}: IconProps) {
   return (
     <svg
       viewBox="0 0 24 24"

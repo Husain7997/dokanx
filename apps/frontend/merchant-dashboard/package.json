@@ -8,12 +8,12 @@
     "start": "next start"
   },
   "dependencies": {
-    "@dokanx/api-client": "workspace:*",
-    "@dokanx/auth": "workspace:*",
-    "@dokanx/hooks": "workspace:*",
-    "@dokanx/types": "workspace:*",
-    "@dokanx/ui": "workspace:*",
-    "@dokanx/utils": "workspace:*",
+    "@dokanx/api-client": "file:../../backend/packages/api-client",
+    "@dokanx/auth": "file:../../backend/packages/auth",
+    "@dokanx/hooks": "file:../../backend/packages/hooks",
+    "@dokanx/types": "file:../../backend/packages/types",
+    "@dokanx/ui": "file:../../backend/packages/ui",
+    "@dokanx/utils": "file:../../backend/packages/utils",
     "@tanstack/react-query": "^5.68.0",
     "next": "^15.2.0",
     "react": "^19.0.0",
@@ -21,7 +21,7 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
-    "@dokanx/config": "workspace:*",
+    "@dokanx/config": "file:../../backend/packages/config",
     "@types/node": "^24.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

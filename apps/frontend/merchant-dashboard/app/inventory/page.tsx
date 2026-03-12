@@ -2,6 +2,8 @@ import { InventoryTable } from "@dokanx/ui";
 
 import { createServerApi } from "@/lib/server-api";
 
+export const dynamic = "force-dynamic";
+
 export default async function InventoryPage() {
   const inventory = await createServerApi().inventory.list();
 

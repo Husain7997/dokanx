@@ -6,7 +6,8 @@ export type AuthUser = SessionUser & {
   roleName: AuthRole;
 };
 
-export type AuthState = SessionState & {
+export type AuthState = Omit<SessionState, "user"> & {
+  user: AuthUser | null;
   tenant: TenantConfig | null;
 };
 

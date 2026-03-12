@@ -4,6 +4,8 @@ import { headers } from "next/headers";
 import { createServerApi } from "@/lib/server-api";
 import { getTenantConfig } from "@/lib/tenant";
 
+export const dynamic = "force-dynamic";
+
 export default async function OrdersPage() {
   const tenant = getTenantConfig((await headers()).get("host") || "localhost:3000");
   const orders = await createServerApi(tenant).order.list();

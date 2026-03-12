@@ -6,8 +6,8 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "dependencies": {
-    "@dokanx/types": "workspace:*",
-    "@dokanx/utils": "workspace:*",
+    "@dokanx/types": "file:../types",
+    "@dokanx/utils": "file:../utils",
     "zustand": "^5.0.3"
   },
   "peerDependencies": {

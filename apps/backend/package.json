@@ -3,17 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "type": "commonjs",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "scripts": {
     "dev": "cross-env NODE_ENV=development nodemon src/server.js",
-    "dev:storefront": "npm run dev -w @dokanx/storefront-web",
-    "dev:merchant": "npm run dev -w @dokanx/merchant-dashboard",
-    "dev:admin": "npm run dev -w @dokanx/admin-panel",
-    "dev:developer": "npm run dev -w @dokanx/developer-portal",
-    "dev:mobile": "npm run dev -w @dokanx/mobile-app",
     "load:test": "node -r module-alias/register src/load/wallet.loadtest.js",
     "start": "cross-env NODE_ENV=production node src/server.js",
     "test": "cross-env NODE_ENV=test jest --config jest.core.config.js --runInBand --detectOpenHandles",

@@ -13,6 +13,8 @@ import type {
   WalletSummary
 } from "@dokanx/types";
 
+export type { ApiEnvelope } from "@dokanx/types";
+
 export type ApiMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export type ApiClientRequestOptions = {

@@ -2,6 +2,8 @@ import { AnalyticsCards, SalesChart } from "@dokanx/ui";
 
 import { createServerApi } from "@/lib/server-api";
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardPage() {
   const analytics = await createServerApi().analytics.warehouse();
   const metrics = analytics.data || [];
