@@ -1,25 +1,14 @@
-import { Card, CardDescription, CardTitle, CheckoutLayout } from "@dokanx/ui";
+import { headers } from "next/headers";
 
-export default function CheckoutPage() {
-  return (
-    <CheckoutLayout
-      steps={["Address", "Delivery", "Payment", "Review"]}
-      currentStep={1}
-      aside={
-        <Card>
-          <CardTitle>Order Summary</CardTitle>
-          <CardDescription className="mt-2">
-            Checkout integration is ready for payment and ledger flows.
-          </CardDescription>
-        </Card>
-      }
-    >
-      <Card>
-        <CardTitle>Checkout Flow</CardTitle>
-        <CardDescription className="mt-2">
-          The checkout route is prepared for authenticated order creation and payment initiation.
-        </CardDescription>
-      </Card>
-    </CheckoutLayout>
-  );
+import { CheckoutWorkspace } from "@/components/checkout-workspace";
+import { getCartData } from "@/lib/server-data";
+import { getTenantConfig } from "@/lib/tenant";
+
+export const dynamic = "force-dynamic";
+
+export default async function CheckoutPage() {
+  const tenant = getTenantConfig((await headers()).get("host") || "localhost:3000");
+  const cart = await getCartData(tenant);
+
+  return <CheckoutWorkspace cart={cart} />;
 }

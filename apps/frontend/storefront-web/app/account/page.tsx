@@ -1,10 +1,5 @@
-import { PagePlaceholder } from "@dokanx/ui";
+import { AccountWorkspace } from "@/components/account-workspace";
 
 export default function AccountPage() {
-  return (
-    <PagePlaceholder
-      title="Account"
-      description="Customer account route scaffolded for profile, addresses, and session management."
-    />
-  );
+  return <AccountWorkspace />;
 }

@@ -1,0 +1,133 @@
+import type { Cart, MarketplaceApp, Order, Product, TenantConfig } from "@dokanx/types";
+
+import { createServerApi } from "./server-api";
+
+const fallbackProducts: Product[] = [
+  {
+    id: "demo-headphones",
+    name: "Studio Wireless Headphones",
+    category: "Audio",
+    description: "Balanced sound, low latency, and all-day battery life.",
+    price: 5400,
+    stock: 12,
+    image: "https://placehold.co/1200x900",
+  },
+  {
+    id: "demo-keyboard",
+    name: "Mechanical Keyboard",
+    category: "Accessories",
+    description: "Hot-swappable compact board with tactile feedback.",
+    price: 3200,
+    stock: 18,
+    image: "https://placehold.co/1200x900",
+  },
+  {
+    id: "demo-speaker",
+    name: "Portable Speaker",
+    category: "Audio",
+    description: "Room-filling sound with IPX water resistance.",
+    price: 2800,
+    stock: 7,
+    image: "https://placehold.co/1200x900",
+  },
+];
+
+const fallbackApps: MarketplaceApp[] = [
+  { id: "crm", name: "CRM Sync", category: "Growth", installed: true },
+  { id: "chat", name: "Live Chat", category: "Support", installed: true },
+  { id: "loyalty", name: "Loyalty Engine", category: "Retention", installed: false },
+];
+
+const fallbackCart: Cart = {
+  id: "demo-cart",
+  items: [
+    { id: "line-1", productId: "demo-headphones", name: "Studio Wireless Headphones", quantity: 1, price: 5400 },
+    { id: "line-2", productId: "demo-keyboard", name: "Mechanical Keyboard", quantity: 1, price: 3200 },
+  ],
+  totals: {
+    subtotal: 8600,
+    quantity: 2,
+    itemCount: 2,
+  },
+};
+
+const fallbackOrders: Order[] = [
+  { id: "DX-10021", status: "PROCESSING", totalAmount: 8600, createdAt: "Today, 10:20 AM" },
+  { id: "DX-10012", status: "DELIVERED", totalAmount: 3200, createdAt: "Yesterday, 4:05 PM" },
+];
+
+async function safeCall<T>(request: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await request();
+  } catch {
+    return fallback;
+  }
+}
+
+export async function getHomePageData(tenant: TenantConfig | null) {
+  const api = createServerApi(tenant);
+  const [productsResponse, appsResponse] = await Promise.all([
+    safeCall(() => api.product.list(), { data: fallbackProducts, count: fallbackProducts.length }),
+    safeCall(() => api.marketplace.list(), { data: fallbackApps }),
+  ]);
+
+  return {
+    products: productsResponse.data || fallbackProducts,
+    productCount: productsResponse.count || productsResponse.data?.length || fallbackProducts.length,
+    apps: appsResponse.data || fallbackApps,
+  };
+}
+
+export async function getProductsData(tenant: TenantConfig | null, query?: Record<string, string>) {
+  const response = await safeCall(
+    () => createServerApi(tenant).product.search(query || {}),
+    { data: fallbackProducts, count: fallbackProducts.length },
+  );
+
+  return response.data || fallbackProducts;
+}
+
+export async function getCartData(tenant: TenantConfig | null) {
+  const response = await safeCall(() => createServerApi(tenant).cart.get(), { data: fallbackCart });
+  return response.data || fallbackCart;
+}
+
+export async function getOrdersData(tenant: TenantConfig | null) {
+  const response = await safeCall(() => createServerApi(tenant).order.list(), { data: fallbackOrders });
+  return response.data || fallbackOrders;
+}
+
+export async function getProductBySlug(tenant: TenantConfig | null, slug: string) {
+  const response = await safeCall(
+    () => createServerApi(tenant).product.list({ slug }),
+    { data: fallbackProducts.filter((item) => item.id === slug || item.slug === slug) },
+  );
+
+  return response.data?.[0] || fallbackProducts[0];
+}
+
+export async function getShopsDirectory() {
+  return [
+    {
+      slug: "aurora",
+      name: "Aurora Electronics",
+      description: "Fast-moving gadgets, audio gear, and creator tools.",
+      rating: "4.9",
+      verified: true,
+    },
+    {
+      slug: "nook",
+      name: "Nook Home",
+      description: "Kitchen, decor, and daily essentials for compact living.",
+      rating: "4.7",
+      verified: true,
+    },
+    {
+      slug: "atelier",
+      name: "Atelier Wear",
+      description: "Small-batch fashion, accessories, and premium basics.",
+      rating: "4.8",
+      verified: false,
+    },
+  ];
+}

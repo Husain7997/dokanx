@@ -1,10 +1,5 @@
-import { PagePlaceholder } from "@dokanx/ui";
+import { SettingsWorkspace } from "@/components/settings-workspace";
 
 export default function SettingsPage() {
-  return (
-    <PagePlaceholder
-      title="Settings"
-      description="Merchant settings route scaffolded for tenant configuration and permissions."
-    />
-  );
+  return <SettingsWorkspace />;
 }

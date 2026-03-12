@@ -1,7 +1,7 @@
 import { ProductGrid } from "@dokanx/ui";
 import { headers } from "next/headers";
 
-import { createServerApi } from "@/lib/server-api";
+import { getProductsData } from "@/lib/server-data";
 import { getTenantConfig } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
@@ -13,11 +13,11 @@ export default async function CategoryPage({
 }) {
   const tenant = getTenantConfig((await headers()).get("host") || "localhost:3000");
   const slug = (await params).slug;
-  const response = await createServerApi(tenant).product.search({ category: slug });
+  const products = await getProductsData(tenant, { category: slug });
 
   return (
     <ProductGrid
-      products={(response.data || []).map((product) => ({
+      products={products.map((product) => ({
         title: product.name,
         price: product.price,
         image: product.image || "https://placehold.co/800x600",

@@ -1,10 +1,5 @@
-import { PagePlaceholder } from "@dokanx/ui";
+import { ProductWorkspace } from "@/components/product-workspace";
 
 export default function ProductsPage() {
-  return (
-    <PagePlaceholder
-      title="Products"
-      description="Merchant product management route scaffolded for catalog CRUD workflows."
-    />
-  );
+  return <ProductWorkspace />;
 }

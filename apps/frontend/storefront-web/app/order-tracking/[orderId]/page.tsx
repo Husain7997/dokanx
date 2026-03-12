@@ -1,7 +1,7 @@
 import { OrderTimeline } from "@dokanx/ui";
 import { headers } from "next/headers";
 
-import { createServerApi } from "@/lib/server-api";
+import { getOrdersData } from "@/lib/server-data";
 import { getTenantConfig } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
@@ -13,15 +13,16 @@ export default async function OrderTrackingPage({
 }) {
   const tenant = getTenantConfig((await headers()).get("host") || "localhost:3000");
   const orderId = (await params).orderId;
-  const order = await createServerApi(tenant).order.track(orderId);
+  const orders = await getOrdersData(tenant);
+  const order = orders.find((item) => item.id === orderId) || orders[0];
 
   return (
     <OrderTimeline
       items={[
         {
-          title: `Order ${order.data?.id || orderId}`,
-          description: order.data?.status || "Tracking initialized",
-          time: order.data?.createdAt || "Now"
+          title: `Order ${order?.id || orderId}`,
+          description: order?.status || "Tracking initialized",
+          time: order?.createdAt || "Now"
         }
       ]}
     />
