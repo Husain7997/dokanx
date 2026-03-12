@@ -44,6 +44,9 @@ jest.mock("../controllers/shop.controller", () => ({
   updateOrderStatus: jest.fn((req, res) => res.json({ ok: true })),
   blockCustomer: jest.fn((req, res) => res.json({ ok: true })),
   updateMyShopSettings: jest.fn((req, res) => res.json({ ok: true })),
+  listTeamMembers: jest.fn((req, res) => res.json({ ok: true })),
+  addTeamMember: jest.fn((req, res) => res.json({ ok: true })),
+  updateTeamMember: jest.fn((req, res) => res.json({ ok: true })),
 }));
 
 const settlementController = require("../controllers/settlement.controller");
@@ -134,5 +137,16 @@ describe("legacy route validation", () => {
     expect(res.body.errors).toContain("name is required");
     expect(res.body.errors).toContain("supportEmail must be a valid email");
     expect(shopController.updateMyShopSettings).not.toHaveBeenCalled();
+  });
+
+  it("should reject invalid team member create payload", async () => {
+    const app = buildApp("/shops", shopRoutes);
+    const res = await request(app).post("/shops/me/team").send({ name: "", email: "", role: "BAD" });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body.errors).toContain("name is required");
+    expect(res.body.errors).toContain("email is required");
+    expect(res.body.errors).toContain("role must be STAFF or OWNER");
+    expect(shopController.addTeamMember).not.toHaveBeenCalled();
   });
 });

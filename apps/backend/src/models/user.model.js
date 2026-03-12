@@ -44,6 +44,36 @@ const userSchema = new mongoose.Schema(
     type: Boolean,
     default: false,
   },
+
+  addresses: [
+    {
+      label: { type: String, default: "" },
+      recipient: { type: String, default: "" },
+      phone: { type: String, default: "" },
+      line1: { type: String, default: "" },
+      line2: { type: String, default: "" },
+      city: { type: String, default: "" },
+      postalCode: { type: String, default: "" },
+      isDefault: { type: Boolean, default: false },
+    },
+  ],
+
+  savedPaymentMethods: [
+    {
+      label: { type: String, default: "" },
+      provider: { type: String, default: "" },
+      accountRef: { type: String, default: "" },
+      isDefault: { type: Boolean, default: false },
+    },
+  ],
+
+  permissionOverrides: [
+    {
+      type: String,
+      trim: true,
+      uppercase: true,
+    },
+  ],
 },
 { timestamps: true }
 );

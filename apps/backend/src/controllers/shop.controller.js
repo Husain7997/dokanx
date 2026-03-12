@@ -1,8 +1,18 @@
 const Shop = require("../models/shop.model");
 const User = require("../models/user.model");
+const bcrypt = require("bcryptjs");
 const { createAudit } = require("../utils/audit.util");
 const { logger } = require("@/core/infrastructure");
 const response = require("@/utils/controllerResponse");
+
+async function loadOwnedShop(req) {
+  const shopId = req.shop?._id || req.user?.shopId || null;
+  if (!shopId) return null;
+
+  const shop = await Shop.findById(shopId);
+  if (!shop) return null;
+  return shop;
+}
 
 exports.createShop = async (req, res) => {
   try {
@@ -43,15 +53,9 @@ exports.createShop = async (req, res) => {
 
 exports.updateMyShopSettings = async (req, res) => {
   try {
-    const shopId = req.shop?._id || req.user?.shopId || null;
-
-    if (!shopId) {
-      return response.failure(res, "Shop context missing", 400);
-    }
-
-    const shop = await Shop.findById(shopId);
+    const shop = await loadOwnedShop(req);
     if (!shop) {
-      return response.notFound(res, "Shop");
+      return response.failure(res, "Shop context missing", 400);
     }
 
     if (String(shop.owner) !== String(req.user._id)) {
@@ -62,6 +66,22 @@ exports.updateMyShopSettings = async (req, res) => {
     shop.supportEmail = String(req.body.supportEmail || "").trim().toLowerCase();
     shop.whatsapp = String(req.body.whatsapp || "").trim();
     shop.payoutSchedule = String(req.body.payoutSchedule || "").trim();
+    if (req.body.logoUrl !== undefined) {
+      shop.logoUrl = String(req.body.logoUrl || "").trim();
+    }
+
+    const themeOverrides = { ...(shop.themeOverrides || {}) };
+    const tokenOverrides = { ...(themeOverrides.tokens || {}) };
+    if (req.body.brandPrimaryColor !== undefined) {
+      tokenOverrides.primaryColor = String(req.body.brandPrimaryColor || "").trim();
+    }
+    if (req.body.brandAccentColor !== undefined) {
+      tokenOverrides.accentColor = String(req.body.brandAccentColor || "").trim();
+    }
+    shop.themeOverrides = {
+      ...themeOverrides,
+      tokens: tokenOverrides,
+    };
 
     await shop.save();
 
@@ -77,6 +97,129 @@ exports.updateMyShopSettings = async (req, res) => {
   } catch (err) {
     logger.error({ err: err.message }, "Update shop settings failed");
     return response.failure(res, "Update shop settings failed", 500);
+  }
+};
+
+exports.listTeamMembers = async (req, res) => {
+  try {
+    const shop = await loadOwnedShop(req);
+    if (!shop) {
+      return response.failure(res, "Shop context missing", 400);
+    }
+
+    if (String(shop.owner) !== String(req.user._id)) {
+      return response.failure(res, "Not your shop", 403);
+    }
+
+    const members = await User.find({
+      shopId: shop._id,
+      role: { $in: ["OWNER", "STAFF"] },
+    }).select("name email role phone permissionOverrides");
+
+    return response.updated(res, req, members);
+  } catch (error) {
+    logger.error({ err: error.message }, "List team members failed");
+    return response.failure(res, "Failed to load team members", 500);
+  }
+};
+
+exports.addTeamMember = async (req, res) => {
+  try {
+    const shop = await loadOwnedShop(req);
+    if (!shop) {
+      return response.failure(res, "Shop context missing", 400);
+    }
+
+    if (String(shop.owner) !== String(req.user._id)) {
+      return response.failure(res, "Not your shop", 403);
+    }
+
+    const normalizedEmail = String(req.body.email || "").trim().toLowerCase();
+    let user = await User.findOne({ email: normalizedEmail });
+
+    if (!user) {
+      const hashedPassword = await bcrypt.hash("Password123!", 10);
+      user = await User.create({
+        name: String(req.body.name || "").trim(),
+        email: normalizedEmail,
+        password: hashedPassword,
+        phone: req.body.phone ? String(req.body.phone).trim() : null,
+        role: String(req.body.role || "STAFF").trim().toUpperCase(),
+        shopId: shop._id,
+        permissionOverrides: Array.isArray(req.body.permissions)
+          ? req.body.permissions.map((item) => String(item || "").trim().toUpperCase()).filter(Boolean)
+          : [],
+      });
+    } else {
+      user.name = String(req.body.name || user.name || "").trim();
+      user.phone = req.body.phone ? String(req.body.phone).trim() : user.phone;
+      user.role = String(req.body.role || user.role || "STAFF").trim().toUpperCase();
+      user.shopId = shop._id;
+      user.permissionOverrides = Array.isArray(req.body.permissions)
+        ? req.body.permissions.map((item) => String(item || "").trim().toUpperCase()).filter(Boolean)
+        : user.permissionOverrides || [];
+      await user.save();
+    }
+
+    await createAudit({
+      action: "UPSERT_TEAM_MEMBER",
+      performedBy: req.user._id,
+      targetType: "User",
+      targetId: user._id,
+      req,
+    });
+
+    return response.success(res, { data: user }, 201);
+  } catch (error) {
+    logger.error({ err: error.message }, "Add team member failed");
+    return response.failure(res, "Failed to save team member", 500);
+  }
+};
+
+exports.updateTeamMember = async (req, res) => {
+  try {
+    const shop = await loadOwnedShop(req);
+    if (!shop) {
+      return response.failure(res, "Shop context missing", 400);
+    }
+
+    if (String(shop.owner) !== String(req.user._id)) {
+      return response.failure(res, "Not your shop", 403);
+    }
+
+    const member = await User.findOne({
+      _id: req.params.userId,
+      shopId: shop._id,
+      role: { $in: ["OWNER", "STAFF"] },
+    });
+
+    if (!member) {
+      return response.notFound(res, "User");
+    }
+
+    if (req.body.role !== undefined) {
+      member.role = String(req.body.role || member.role).trim().toUpperCase();
+    }
+    if (req.body.permissions !== undefined) {
+      member.permissionOverrides = Array.isArray(req.body.permissions)
+        ? req.body.permissions.map((item) => String(item || "").trim().toUpperCase()).filter(Boolean)
+        : [];
+    }
+
+    await member.save();
+
+    await createAudit({
+      action: "UPDATE_TEAM_MEMBER",
+      performedBy: req.user._id,
+      targetType: "User",
+      targetId: member._id,
+      req,
+    });
+
+    return response.updated(res, req, member);
+  } catch (error) {
+    logger.error({ err: error.message }, "Update team member failed");
+    return response.failure(res, "Failed to update team member", 500);
   }
 };
 

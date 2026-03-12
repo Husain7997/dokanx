@@ -3,7 +3,15 @@
 import { useEffect, useState } from "react";
 import { Button, Input } from "@dokanx/ui";
 
-import { applyTheme, listThemes, resetTheme, updateShopSettings } from "@/lib/runtime-api";
+import {
+  addTeamMember,
+  applyThemeWithOverrides,
+  listTeamMembers,
+  listThemes,
+  resetTheme,
+  updateShopSettings,
+  updateTeamMember,
+} from "@/lib/runtime-api";
 
 import { OwnerSessionPanel } from "./owner-session-panel";
 import { WorkspaceCard } from "./workspace-card";
@@ -16,37 +24,68 @@ type ThemeOption = {
   category?: string;
 };
 
+type TeamMember = {
+  _id?: string;
+  name?: string;
+  email?: string;
+  role?: string;
+  permissionOverrides?: string[];
+};
+
 export function SettingsWorkspace() {
   const [settings, setSettings] = useState({
     shopName: "Merchant Workspace",
     supportEmail: "ops@merchant-dashboard.test",
     whatsapp: "+8801700000000",
     payoutSchedule: "Weekly",
+    logoUrl: "https://placehold.co/180x180",
+    brandPrimaryColor: "#0f766e",
+    brandAccentColor: "#f97316",
   });
-  const [message, setMessage] = useState<string | null>("Theme actions are live. Shop profile fields still need a dedicated backend update endpoint.");
+  const [teamDraft, setTeamDraft] = useState({
+    name: "Operations Lead",
+    email: "staff@merchant-dashboard.test",
+    phone: "01710000000",
+    role: "STAFF",
+    permissions: "READ_ORDERS,WRITE_PRODUCTS,WRITE_THEME",
+  });
+  const [message, setMessage] = useState<string | null>("Shop profile, branding, theme overrides, and team permissions are now managed from one workspace.");
   const [themes, setThemes] = useState<ThemeOption[]>([]);
   const [selectedThemeId, setSelectedThemeId] = useState("");
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loadingThemes, setLoadingThemes] = useState(false);
   const [submittingTheme, setSubmittingTheme] = useState(false);
   const [submittingSettings, setSubmittingSettings] = useState(false);
+  const [submittingTeam, setSubmittingTeam] = useState(false);
+
+  async function loadThemes() {
+    setLoadingThemes(true);
+    try {
+      const response = await listThemes();
+      const rows = Array.isArray(response.data) ? (response.data as ThemeOption[]) : [];
+      setThemes(rows);
+      setSelectedThemeId((current) => current || String(rows[0]?._id || rows[0]?.id || ""));
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unable to load themes.";
+      setMessage(errorMessage);
+    } finally {
+      setLoadingThemes(false);
+    }
+  }
+
+  async function loadTeamMembers() {
+    try {
+      const response = await listTeamMembers();
+      setTeamMembers(Array.isArray(response.data) ? (response.data as TeamMember[]) : []);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unable to load team members.";
+      setMessage(errorMessage);
+    }
+  }
 
   useEffect(() => {
-    async function loadThemes() {
-      setLoadingThemes(true);
-      try {
-        const response = await listThemes();
-        const rows = Array.isArray(response.data) ? (response.data as ThemeOption[]) : [];
-        setThemes(rows);
-        setSelectedThemeId((current) => current || String(rows[0]?._id || rows[0]?.id || ""));
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unable to load themes.";
-        setMessage(errorMessage);
-      } finally {
-        setLoadingThemes(false);
-      }
-    }
-
     void loadThemes();
+    void loadTeamMembers();
   }, []);
 
   async function handleApplyTheme() {
@@ -59,7 +98,18 @@ export function SettingsWorkspace() {
     setMessage(null);
 
     try {
-      await applyTheme(selectedThemeId);
+      await applyThemeWithOverrides({
+        themeId: selectedThemeId,
+        overrides: {
+          tokens: {
+            primaryColor: settings.brandPrimaryColor,
+            accentColor: settings.brandAccentColor,
+          },
+          assets: {
+            logoUrl: settings.logoUrl,
+          },
+        },
+      });
       const activeTheme = themes.find((theme) => String(theme._id || theme.id || "") === selectedThemeId);
       setMessage(`Applied theme: ${activeTheme?.name || selectedThemeId}`);
     } catch (error) {
@@ -95,6 +145,9 @@ export function SettingsWorkspace() {
         supportEmail: settings.supportEmail,
         whatsapp: settings.whatsapp,
         payoutSchedule: settings.payoutSchedule,
+        logoUrl: settings.logoUrl,
+        brandPrimaryColor: settings.brandPrimaryColor,
+        brandAccentColor: settings.brandAccentColor,
       });
       setMessage(response.message || "Shop settings saved.");
     } catch (error) {
@@ -105,13 +158,51 @@ export function SettingsWorkspace() {
     }
   }
 
+  async function handleAddTeamMember() {
+    setSubmittingTeam(true);
+    setMessage(null);
+
+    try {
+      await addTeamMember({
+        name: teamDraft.name,
+        email: teamDraft.email,
+        phone: teamDraft.phone,
+        role: teamDraft.role,
+        permissions: teamDraft.permissions.split(",").map((item) => item.trim()).filter(Boolean),
+      });
+      await loadTeamMembers();
+      setMessage("Team member saved.");
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unable to save team member.";
+      setMessage(errorMessage);
+    } finally {
+      setSubmittingTeam(false);
+    }
+  }
+
+  async function handlePromoteMember(memberId: string) {
+    setSubmittingTeam(true);
+    setMessage(null);
+
+    try {
+      await updateTeamMember(memberId, { role: "OWNER" });
+      await loadTeamMembers();
+      setMessage("Team member role updated.");
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unable to update team member.";
+      setMessage(errorMessage);
+    } finally {
+      setSubmittingTeam(false);
+    }
+  }
+
   return (
     <div className="grid gap-6">
       <OwnerSessionPanel title="Owner session for settings mutations" />
       <div className="grid gap-6 lg:grid-cols-2">
         <WorkspaceCard
-          title="Tenant profile"
-          description="Profile fields remain editable locally while live settings mutations are routed through backend theme endpoints."
+          title="Tenant profile and branding"
+          description="Profile, logo, and brand color overrides persist to the backend."
         >
           <div className="grid gap-4">
             <label className="grid gap-2 text-sm">
@@ -130,21 +221,31 @@ export function SettingsWorkspace() {
               <span>Payout schedule</span>
               <Input value={settings.payoutSchedule} onChange={(event) => setSettings((current) => ({ ...current, payoutSchedule: event.target.value }))} />
             </label>
+            <label className="grid gap-2 text-sm">
+              <span>Logo URL</span>
+              <Input value={settings.logoUrl} onChange={(event) => setSettings((current) => ({ ...current, logoUrl: event.target.value }))} />
+            </label>
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="grid gap-2 text-sm">
+                <span>Primary color</span>
+                <Input value={settings.brandPrimaryColor} onChange={(event) => setSettings((current) => ({ ...current, brandPrimaryColor: event.target.value }))} />
+              </label>
+              <label className="grid gap-2 text-sm">
+                <span>Accent color</span>
+                <Input value={settings.brandAccentColor} onChange={(event) => setSettings((current) => ({ ...current, brandAccentColor: event.target.value }))} />
+              </label>
+            </div>
           </div>
           <div className="mt-6 flex gap-3">
             <Button onClick={handleSaveSettings} disabled={submittingSettings}>
               {submittingSettings ? "Saving..." : "Save Settings"}
             </Button>
-            <Button variant="secondary" onClick={() => setMessage("Theme and shop settings can now be saved to the backend. Team permissions still need separate endpoints.")}>
-              Review Gaps
-            </Button>
           </div>
-          <p className="mt-4 text-sm text-muted-foreground">{message}</p>
         </WorkspaceCard>
 
         <WorkspaceCard
           title="Theme sync"
-          description="Theme list, apply, and reset are connected to live backend mutations."
+          description="Theme application now carries brand overrides so storefront identity stays coherent."
         >
           <div className="grid gap-4">
             <label className="grid gap-2 text-sm">
@@ -173,15 +274,53 @@ export function SettingsWorkspace() {
                 Reset Theme
               </Button>
             </div>
-            <ul className="grid gap-3 text-sm text-muted-foreground">
-              <li>Primary payout account verification</li>
-              <li>Theme and storefront branding sync</li>
-              <li>Courier default rules and SLA preferences</li>
-              <li>Team roles and permission scopes</li>
-              <li>Tax and invoice defaults by tenant</li>
-            </ul>
           </div>
         </WorkspaceCard>
+
+        <WorkspaceCard
+          title="Team roles and permissions"
+          description="Owner-managed team roles and permission overrides are now backed by live shop endpoints."
+        >
+          <div className="grid gap-4">
+            <Input value={teamDraft.name} onChange={(event) => setTeamDraft((current) => ({ ...current, name: event.target.value }))} />
+            <Input value={teamDraft.email} onChange={(event) => setTeamDraft((current) => ({ ...current, email: event.target.value }))} />
+            <Input value={teamDraft.phone} onChange={(event) => setTeamDraft((current) => ({ ...current, phone: event.target.value }))} />
+            <select
+              className="h-11 rounded-full border border-border bg-background px-4 text-sm"
+              value={teamDraft.role}
+              onChange={(event) => setTeamDraft((current) => ({ ...current, role: event.target.value }))}
+            >
+              <option value="STAFF">Staff</option>
+              <option value="OWNER">Owner</option>
+            </select>
+            <Input value={teamDraft.permissions} onChange={(event) => setTeamDraft((current) => ({ ...current, permissions: event.target.value }))} />
+            <Button onClick={handleAddTeamMember} disabled={submittingTeam}>
+              {submittingTeam ? "Saving..." : "Add Or Update Team Member"}
+            </Button>
+          </div>
+          <div className="mt-6 grid gap-3">
+            {teamMembers.map((member) => (
+              <div key={String(member._id || member.email)} className="rounded-3xl border border-border/60 p-4 text-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-medium">{member.name || member.email}</p>
+                    <p className="text-muted-foreground">{member.email} / {member.role}</p>
+                    <p className="text-muted-foreground">{(member.permissionOverrides || []).join(", ") || "No overrides"}</p>
+                  </div>
+                  <Button variant="secondary" onClick={() => void handlePromoteMember(String(member._id || ""))} disabled={submittingTeam}>
+                    Promote
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </WorkspaceCard>
+
+        {message ? (
+          <WorkspaceCard title="Status" description="Latest settings mutation result">
+            <p className="text-sm text-muted-foreground">{message}</p>
+          </WorkspaceCard>
+        ) : null}
       </div>
     </div>
   );

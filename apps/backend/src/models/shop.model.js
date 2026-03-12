@@ -73,6 +73,12 @@ const shopSchema = new mongoose.Schema(
       default: "Weekly",
     },
 
+    logoUrl: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
     supportEmail: {
       type: String,
       trim: true,

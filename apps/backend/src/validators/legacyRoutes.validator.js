@@ -95,6 +95,56 @@ function validateShopSettingsBody(body = {}) {
     errors.push("payoutSchedule must not be empty");
   }
 
+  if (body.logoUrl !== undefined && !String(body.logoUrl || "").trim()) {
+    errors.push("logoUrl must not be empty");
+  }
+
+  if (body.brandPrimaryColor !== undefined && !String(body.brandPrimaryColor || "").trim()) {
+    errors.push("brandPrimaryColor must not be empty");
+  }
+
+  if (body.brandAccentColor !== undefined && !String(body.brandAccentColor || "").trim()) {
+    errors.push("brandAccentColor must not be empty");
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+function validateTeamMemberBody(body = {}) {
+  const errors = [];
+  requireNonEmpty("name", body.name, errors);
+  requireNonEmpty("email", body.email, errors);
+
+  const role = String(body.role || "").trim().toUpperCase();
+  if (body.role !== undefined && !["STAFF", "OWNER"].includes(role)) {
+    errors.push("role must be STAFF or OWNER");
+  }
+
+  if (body.permissions !== undefined && !Array.isArray(body.permissions)) {
+    errors.push("permissions must be an array");
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+function validateTeamMemberUpdateBody(body = {}) {
+  const errors = [];
+
+  if (body.role === undefined && body.permissions === undefined) {
+    errors.push("role or permissions is required");
+  }
+
+  if (body.role !== undefined) {
+    const role = String(body.role || "").trim().toUpperCase();
+    if (!["STAFF", "OWNER"].includes(role)) {
+      errors.push("role must be STAFF or OWNER");
+    }
+  }
+
+  if (body.permissions !== undefined && !Array.isArray(body.permissions)) {
+    errors.push("permissions must be an array");
+  }
+
   return { valid: errors.length === 0, errors };
 }
 
@@ -109,4 +159,6 @@ module.exports = {
   validateShopStatusBody,
   validateShopAndUserParams,
   validateShopSettingsBody,
+  validateTeamMemberBody,
+  validateTeamMemberUpdateBody,
 };

@@ -41,6 +41,17 @@ type ThemeResponse = {
   data?: Array<Record<string, unknown>>;
 };
 
+type TeamMemberResponse = {
+  message?: string;
+  data?: Array<{
+    _id?: string;
+    name?: string;
+    email?: string;
+    role?: string;
+    permissionOverrides?: string[];
+  } & JsonValue>;
+};
+
 type MutationResponse = {
   message?: string;
   data?: JsonValue;
@@ -144,6 +155,16 @@ export function applyTheme(themeId: string) {
   });
 }
 
+export function applyThemeWithOverrides(payload: {
+  themeId: string;
+  overrides?: JsonValue;
+}) {
+  return request<MutationResponse>("/themes/apply", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function resetTheme() {
   return request<MutationResponse>("/themes/reset", {
     method: "POST",
@@ -156,9 +177,51 @@ export function updateShopSettings(payload: {
   supportEmail: string;
   whatsapp: string;
   payoutSchedule: string;
+  logoUrl?: string;
+  brandPrimaryColor?: string;
+  brandAccentColor?: string;
 }) {
   return request<ShopSettingsResponse>("/shops/me/settings", {
     method: "PUT",
     body: JSON.stringify(payload),
   });
+}
+
+export function listTeamMembers() {
+  return request<TeamMemberResponse>("/shops/me/team");
+}
+
+export function addTeamMember(payload: {
+  name: string;
+  email: string;
+  phone?: string;
+  role: string;
+  permissions: string[];
+}) {
+  return request<MutationResponse>("/shops/me/team", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateTeamMember(userId: string, payload: {
+  role?: string;
+  permissions?: string[];
+}) {
+  return request<MutationResponse>(`/shops/me/team/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listAnalyticsSnapshots(query: {
+  metricType?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}) {
+  const search = new URLSearchParams();
+  if (query.metricType) search.set("metricType", query.metricType);
+  if (query.dateFrom) search.set("dateFrom", query.dateFrom);
+  if (query.dateTo) search.set("dateTo", query.dateTo);
+  return request<{ data?: Array<Record<string, unknown>> }>(`/analytics/warehouse${search.toString() ? `?${search.toString()}` : ""}`);
 }

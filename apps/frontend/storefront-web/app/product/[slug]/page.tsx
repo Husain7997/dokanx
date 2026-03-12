@@ -1,5 +1,4 @@
 import {
-  AddToCartButton,
   Card,
   CardDescription,
   CardTitle,
@@ -11,6 +10,7 @@ import { headers } from "next/headers";
 
 import { getProductBySlug } from "@/lib/server-data";
 import { getTenantConfig } from "@/lib/tenant";
+import { ProductPurchasePanel } from "@/components/product-purchase-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +44,7 @@ export default async function ProductDetailPage({
           <VariantSelector options={["Default", "Premium", "Bundle"]} selected="Default" />
         </div>
         <div className="mt-6">
-          <AddToCartButton />
+          <ProductPurchasePanel product={product} />
         </div>
       </Card>
     </div>

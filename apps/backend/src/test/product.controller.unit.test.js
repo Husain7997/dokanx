@@ -232,4 +232,35 @@ describe("product.controller", () => {
       },
     });
   });
+
+  it("should list public products", async () => {
+    Product.find.mockReturnValue({
+      sort: () => ({
+        limit: () => ({
+          lean: async () => [{ _id: "prod-3", name: "Public Product" }],
+        }),
+      }),
+    });
+
+    const json = jest.fn();
+    const res = {
+      status: jest.fn(() => ({ json })),
+    };
+
+    await controller.listProducts(
+      {
+        query: {},
+        lang: "en",
+      },
+      res
+    );
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        count: 1,
+        data: [{ _id: "prod-3", name: "Public Product" }],
+      })
+    );
+  });
 });

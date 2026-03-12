@@ -8,12 +8,32 @@ type JsonValue = Record<string, unknown>;
 type ProfileResponse = {
   message?: string;
   data?: JsonValue;
-  user?: JsonValue;
+  user?: (JsonValue & {
+    addresses?: Array<Record<string, unknown>>;
+    savedPaymentMethods?: Array<Record<string, unknown>>;
+  });
 };
 
 type MutationResponse = {
   message?: string;
   data?: JsonValue;
+};
+
+type PreferencePayload = {
+  addresses: Array<{
+    label: string;
+    recipient: string;
+    phone: string;
+    line1: string;
+    city: string;
+    isDefault?: boolean;
+  }>;
+  savedPaymentMethods: Array<{
+    label: string;
+    provider: string;
+    accountRef: string;
+    isDefault?: boolean;
+  }>;
 };
 
 type RuntimeCartItem = {
@@ -67,6 +87,11 @@ type PaymentHandoffResponse = {
   sessionId?: string | null;
   transactionId?: string | null;
   billing?: JsonValue | null;
+};
+
+type OrderDetailResponse = {
+  message?: string;
+  data?: JsonValue;
 };
 
 const guestCartStorageKey = "dokanx.guest-cart-token";
@@ -138,6 +163,13 @@ export function getProfile() {
   return request<ProfileResponse>("/me");
 }
 
+export function updatePreferences(payload: PreferencePayload) {
+  return request<ProfileResponse>("/me/preferences", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function getRuntimeCart(shopId?: string) {
   const query = shopId ? `?shopId=${encodeURIComponent(shopId)}` : "";
   return request<RuntimeCartResponse>(`/cart${query}`);
@@ -182,4 +214,12 @@ export function initiatePayment(orderId: string, payload: { paymentMethod: strin
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export function getMyOrders() {
+  return request<OrderDetailResponse>("/orders/my");
+}
+
+export function getOrderDetail(orderId: string) {
+  return request<OrderDetailResponse>(`/orders/${orderId}`);
 }

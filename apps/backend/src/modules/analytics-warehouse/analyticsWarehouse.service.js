@@ -29,9 +29,14 @@ async function buildWarehouseSnapshots({ shopId = null, input = {} }) {
   return snapshots;
 }
 
-async function listWarehouseSnapshots({ shopId = null, metricType = null }) {
+async function listWarehouseSnapshots({ shopId = null, metricType = null, dateFrom = null, dateTo = null }) {
   const query = { ...(shopId ? { shopId } : {}) };
   if (metricType) query.metricType = String(metricType).trim().toUpperCase();
+  if (dateFrom || dateTo) {
+    query.dateKey = {};
+    if (dateFrom) query.dateKey.$gte = String(dateFrom).trim();
+    if (dateTo) query.dateKey.$lte = String(dateTo).trim();
+  }
   return AnalyticsSnapshot.find(query).sort({ dateKey: -1, createdAt: -1 }).lean();
 }
 

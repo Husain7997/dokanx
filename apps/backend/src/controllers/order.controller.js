@@ -139,6 +139,48 @@ exports.getOrders = async (req, res) => {
   });
 };
 
+exports.getMyOrders = async (req, res) => {
+  const orders = await Order.find({
+    user: req.user._id,
+  })
+    .populate("items.product", "name price")
+    .sort({ createdAt: -1 });
+
+  res.json({
+    message: t("common.updated", req.lang),
+    data: orders,
+  });
+};
+
+exports.getOrderDetail = async (req, res) => {
+  const order = await Order.findById(req.params.orderId)
+    .populate("items.product", "name price")
+    .lean();
+
+  if (!order) {
+    return res.status(404).json({
+      success: false,
+      message: "Order not found",
+    });
+  }
+
+  const isOwner = req.user?.role === "OWNER" && String(order.shopId) === String(req.user?.shopId || "");
+  const isCustomer = String(order.user || "") === String(req.user?._id || "");
+  const isAdmin = req.user?.role === "ADMIN";
+
+  if (!isOwner && !isCustomer && !isAdmin) {
+    return res.status(403).json({
+      success: false,
+      message: "Forbidden",
+    });
+  }
+
+  return res.json({
+    message: t("common.updated", req.lang),
+    data: order,
+  });
+};
+
 /**
  * ADMIN ALL ORDERS
  */

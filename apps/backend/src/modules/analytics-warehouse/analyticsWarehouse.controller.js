@@ -22,6 +22,8 @@ async function listSnapshots(req, res, next) {
     const rows = await service.listWarehouseSnapshots({
       shopId: resolveShopId(req),
       metricType: req.query.metricType || null,
+      dateFrom: req.query.dateFrom || null,
+      dateTo: req.query.dateTo || null,
     });
     return response.updated(res, req, rows);
   } catch (err) {

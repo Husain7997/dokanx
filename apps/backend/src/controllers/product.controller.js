@@ -244,6 +244,69 @@ exports.getProductsByShop = async (req, res) => {
   }
 };
 
+exports.listProducts = async (req, res) => {
+  try {
+    const query = {
+      isActive: true,
+    };
+
+    if (req.query.slug) {
+      query.$or = [
+        { slug: String(req.query.slug).trim() },
+        { name: new RegExp(`^${escapeRegex(req.query.slug)}$`, "i") },
+      ];
+    }
+
+    if (req.query.category) {
+      query.category = new RegExp(escapeRegex(req.query.category), "i");
+    }
+
+    const products = await Product.find(query)
+      .sort({ createdAt: -1 })
+      .limit(Number(req.query.limit) || 24)
+      .lean();
+
+    res.status(200).json({
+      message: t("common.updated", req.lang),
+      count: products.length,
+      data: products,
+    });
+  } catch (error) {
+    logger.error({ err: error.message }, "Failed to list products");
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch products",
+    });
+  }
+};
+
+exports.getProductDetail = async (req, res) => {
+  try {
+    const product = await Product.findOne({
+      _id: req.params.productId,
+      isActive: true,
+    }).lean();
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: product,
+    });
+  } catch (error) {
+    logger.error({ err: error.message }, "Failed to fetch product detail");
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch product detail",
+    });
+  }
+};
+
 exports.getProductInventory = async (req, res) => {
   const inventory = await Inventory.findOne({
     shopId: req.shop._id,

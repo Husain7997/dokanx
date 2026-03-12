@@ -12,6 +12,8 @@ const {
   updateOrderStatus,
   placeOrder,
   getOrders,
+  getMyOrders,
+  getOrderDetail,
 } = require("../controllers/order.controller");
 
 router.post(
@@ -31,6 +33,20 @@ router.patch(
   validateBody(orderValidator.validateOrderStatusBody),
   canUpdateOrderStatus,
   updateOrderStatus
+);
+
+router.get(
+  "/my",
+  protect,
+  allowRoles("CUSTOMER"),
+  getMyOrders
+);
+
+router.get(
+  "/:orderId",
+  protect,
+  allowRoles("OWNER", "ADMIN", "CUSTOMER"),
+  getOrderDetail
 );
 
 router.get(

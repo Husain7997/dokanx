@@ -16,11 +16,13 @@ jest.mock("@/platform/rate-limit/redisRateLimiter", () => ({
 
 jest.mock("../controllers/product.controller", () => ({
   smartSuggest: jest.fn((req, res) => res.json({ ok: true })),
+  listProducts: jest.fn((req, res) => res.json({ ok: true })),
   createProduct: jest.fn((req, res) => res.json({ ok: true })),
   updateProduct: jest.fn((req, res) => res.json({ ok: true })),
   deleteProduct: jest.fn((req, res) => res.json({ ok: true })),
   getProductsByShop: jest.fn((req, res) => res.json({ ok: true })),
   getProductInventory: jest.fn((req, res) => res.json({ ok: true })),
+  getProductDetail: jest.fn((req, res) => res.json({ ok: true })),
 }));
 
 jest.mock("../controllers/checkout.controller", () => ({

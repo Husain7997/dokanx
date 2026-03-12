@@ -19,6 +19,8 @@ router.post(
   productController.smartSuggest
 );
 
+router.get("/", productController.listProducts);
+
 router.post(
   "/",
   protect,
@@ -58,6 +60,12 @@ router.get(
   tenantGuard,
   validateParams(validator.validateProductIdParam),
   productController.getProductInventory
+);
+
+router.get(
+  "/:productId",
+  validateParams(validator.validateProductIdParam),
+  productController.getProductDetail
 );
 
 module.exports = router;
