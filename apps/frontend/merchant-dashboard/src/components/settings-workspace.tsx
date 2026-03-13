@@ -30,6 +30,11 @@ type TeamMember = {
   email?: string;
   role?: string;
   permissionOverrides?: string[];
+  invitation?: {
+    expiresAt?: string;
+    acceptedAt?: string | null;
+  };
+  passwordResetRequired?: boolean;
 };
 
 export function SettingsWorkspace() {
@@ -53,6 +58,7 @@ export function SettingsWorkspace() {
   const [themes, setThemes] = useState<ThemeOption[]>([]);
   const [selectedThemeId, setSelectedThemeId] = useState("");
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [latestInvite, setLatestInvite] = useState<{ url: string; expiresAt?: string } | null>(null);
   const [loadingThemes, setLoadingThemes] = useState(false);
   const [submittingTheme, setSubmittingTheme] = useState(false);
   const [submittingSettings, setSubmittingSettings] = useState(false);
@@ -163,15 +169,21 @@ export function SettingsWorkspace() {
     setMessage(null);
 
     try {
-      await addTeamMember({
+      const response = await addTeamMember({
         name: teamDraft.name,
         email: teamDraft.email,
         phone: teamDraft.phone,
         role: teamDraft.role,
         permissions: teamDraft.permissions.split(",").map((item) => item.trim()).filter(Boolean),
       });
+      if (response.invite?.inviteUrl) {
+        setLatestInvite({
+          url: response.invite.inviteUrl,
+          expiresAt: response.invite.expiresAt,
+        });
+      }
       await loadTeamMembers();
-      setMessage("Team member saved.");
+      setMessage(response.invite?.emailSent ? "Team member saved and invite emailed." : "Team member saved.");
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unable to save team member.";
       setMessage(errorMessage);
@@ -190,6 +202,28 @@ export function SettingsWorkspace() {
       setMessage("Team member role updated.");
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unable to update team member.";
+      setMessage(errorMessage);
+    } finally {
+      setSubmittingTeam(false);
+    }
+  }
+
+  async function handleResendInvite(memberId: string) {
+    setSubmittingTeam(true);
+    setMessage(null);
+
+    try {
+      const response = await updateTeamMember(memberId, { resendInvite: true });
+      if (response.invite?.inviteUrl) {
+        setLatestInvite({
+          url: response.invite.inviteUrl,
+          expiresAt: response.invite.expiresAt,
+        });
+      }
+      await loadTeamMembers();
+      setMessage(response.invite?.emailSent ? "Invite refreshed and emailed." : "Invite refreshed.");
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unable to resend invite.";
       setMessage(errorMessage);
     } finally {
       setSubmittingTeam(false);
@@ -306,14 +340,29 @@ export function SettingsWorkspace() {
                     <p className="font-medium">{member.name || member.email}</p>
                     <p className="text-muted-foreground">{member.email} / {member.role}</p>
                     <p className="text-muted-foreground">{(member.permissionOverrides || []).join(", ") || "No overrides"}</p>
+                    <p className="text-muted-foreground">
+                      Invite: {member.invitation?.acceptedAt ? "Accepted" : member.invitation?.expiresAt ? `Pending until ${member.invitation.expiresAt}` : "Not issued"}
+                    </p>
                   </div>
-                  <Button variant="secondary" onClick={() => void handlePromoteMember(String(member._id || ""))} disabled={submittingTeam}>
-                    Promote
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="secondary" onClick={() => void handlePromoteMember(String(member._id || ""))} disabled={submittingTeam}>
+                      Promote
+                    </Button>
+                    <Button variant="ghost" onClick={() => void handleResendInvite(String(member._id || ""))} disabled={submittingTeam}>
+                      Resend Invite
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
+          {latestInvite ? (
+            <div className="mt-4 rounded-3xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-xs">
+              <p className="font-medium">Latest invite</p>
+              <p className="mt-2 break-all">{latestInvite.url}</p>
+              {latestInvite.expiresAt ? <p className="mt-1">Expires: {latestInvite.expiresAt}</p> : null}
+            </div>
+          ) : null}
         </WorkspaceCard>
 
         {message ? (

@@ -132,6 +132,8 @@ describe("customer purchase flow integration", () => {
     PaymentAttempt.findOne.mockResolvedValue(null);
     PaymentAttempt.create.mockResolvedValue({
       _id: "attempt-1",
+      providerPaymentId: "pay_attempt-1",
+      save: jest.fn(),
       billingSnapshot: { routing: { destination: "PLATFORM_WALLET" } },
     });
     resolveBillingSnapshot.mockResolvedValue({

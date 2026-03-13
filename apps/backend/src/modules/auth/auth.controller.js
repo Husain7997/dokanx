@@ -1,4 +1,5 @@
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const User = require("../../models/user.model");
 const { logger, t } = require("@/core/infrastructure");
 const { triggerWelcomeFlow } = require("@/modules/marketing/marketingTrigger.service");
@@ -21,6 +22,10 @@ function sanitizeUser(user) {
   const raw = typeof user.toObject === "function" ? user.toObject() : { ...user };
   delete raw.password;
   return raw;
+}
+
+function hashInviteToken(token) {
+  return crypto.createHash("sha256").update(String(token || "")).digest("hex");
 }
 
 async function buildAuthResponse(user, req, status = 200) {
@@ -297,6 +302,48 @@ exports.verifyMagicLink = async (req, res) => {
     return res.status(err.statusCode || 401).json({
       success: false,
       message: err.message,
+    });
+  }
+};
+
+exports.acceptInvite = async (req, res) => {
+  try {
+    const token = String(req.body?.token || "").trim();
+    const tokenHash = hashInviteToken(token);
+    const user = await User.findOne({
+      "invitation.tokenHash": tokenHash,
+      "invitation.expiresAt": { $gt: new Date() },
+    }).select("+password +invitation.tokenHash");
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "Invite is invalid or expired",
+      });
+    }
+
+    user.password = await bcrypt.hash(String(req.body.password || ""), 10);
+    user.passwordResetRequired = false;
+    user.invitation = {
+      ...(user.invitation || {}),
+      tokenHash: "",
+      acceptedAt: new Date(),
+      expiresAt: null,
+    };
+
+    if (req.body.name !== undefined) {
+      user.name = String(req.body.name || user.name).trim();
+    }
+
+    await user.save();
+
+    const payload = await buildAuthResponse(user, req, 200);
+    return res.json(payload.body);
+  } catch (err) {
+    logger.error({ err: err.message }, "Invite acceptance failed");
+    return res.status(500).json({
+      success: false,
+      message: "Invite acceptance failed",
     });
   }
 };

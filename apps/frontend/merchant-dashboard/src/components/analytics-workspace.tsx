@@ -49,6 +49,7 @@ export function AnalyticsWorkspace() {
 
   const dailySales = pickMetric(rows, "DAILY_SALES");
   const trendAnalytics = pickMetric(rows, "TREND_ANALYTICS");
+  const merchantCohorts = pickMetric(rows, "MERCHANT_COHORTS");
 
   const chartData = Array.isArray((trendAnalytics?.payload as Record<string, unknown> | null)?.current)
     ? ((trendAnalytics?.payload as { current?: Array<{ label?: string; value?: number }> }).current || []).map((item, index) => ({
@@ -61,7 +62,7 @@ export function AnalyticsWorkspace() {
     { label: "Snapshots", value: String(rows.length), meta: filters.dateFrom || "All dates" },
     { label: "Daily sales rows", value: String(Array.isArray(dailySales?.payload) ? dailySales?.payload.length || 0 : 0), meta: "Warehouse daily sales" },
     { label: "Trend points", value: String(chartData.length), meta: filters.dateTo || "Open-ended" },
-    { label: "Active filter", value: filters.dateFrom || filters.dateTo ? "Scoped" : "Default", meta: "Date-driven analytics" },
+    { label: "Cohorts", value: String(Array.isArray(merchantCohorts?.payload) ? merchantCohorts?.payload.length || 0 : 0), meta: "Merchant retention cohorts" },
   ];
 
   return (
@@ -84,6 +85,25 @@ export function AnalyticsWorkspace() {
         <CardTitle>Trend output</CardTitle>
         <div className="mt-6">
           <SalesChart data={chartData.length ? chartData : [{ label: "No data", value: 0 }]} />
+        </div>
+      </Card>
+      <Card>
+        <CardTitle>Merchant cohorts</CardTitle>
+        <CardDescription className="mt-2">
+          Cohort retention and activation ratios derived from warehouse snapshots.
+        </CardDescription>
+        <div className="mt-6 grid gap-3 text-sm">
+          {Array.isArray(merchantCohorts?.payload) && merchantCohorts?.payload.length ? (
+            (merchantCohorts?.payload as Array<{ cohort?: string; merchantCount?: number; activeMerchantCount?: number; retentionRate?: number }>).map((row) => (
+              <div key={String(row.cohort)} className="flex items-center justify-between gap-4 rounded-2xl border border-border/60 px-4 py-3">
+                <span>{row.cohort}</span>
+                <span>{row.activeMerchantCount}/{row.merchantCount}</span>
+                <span>{Number(row.retentionRate || 0) * 100}% active</span>
+              </div>
+            ))
+          ) : (
+            <p className="text-muted-foreground">No cohort snapshots available for the selected range.</p>
+          )}
         </div>
       </Card>
       {message ? (

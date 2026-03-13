@@ -8,6 +8,7 @@ const paymentService = require("../services/payment.service");
 const { ensureIdempotent } = require("../utils/idempotency");
 const { resolveBillingSnapshot } = require("../modules/billing/billingExecution.service");
 const paymentGateway = require("../infrastructure/payment/paymentGateway.service");
+const { normalizePayload } = require("./payment.webhook.controller");
 
 function resolveGateway(paymentMethod) {
   const normalized = String(paymentMethod || "").trim().toUpperCase();
@@ -35,6 +36,45 @@ function resolveGateway(paymentMethod) {
   };
 }
 
+function resolveFrontendOrigin(req) {
+  const explicit = String(req.body?.frontendOrigin || req.headers["x-frontend-origin"] || "").trim();
+  if (explicit) {
+    return explicit.replace(/\/$/, "");
+  }
+
+  const origin = String(req.headers.origin || "").trim();
+  if (origin) {
+    return origin.replace(/\/$/, "");
+  }
+
+  const referer = String(req.headers.referer || "").trim();
+  if (referer) {
+    try {
+      const parsed = new URL(referer);
+      return `${parsed.protocol}//${parsed.host}`;
+    } catch (_error) {
+      return referer.replace(/\/$/, "");
+    }
+  }
+
+  return "http://localhost:3000";
+}
+
+function buildCallbackUrls(req, orderId, attemptId, providerPaymentId) {
+  const frontendOrigin = resolveFrontendOrigin(req);
+  const apiBase = `${req.protocol || "http"}://${req.get ? req.get("host") : req.headers.host}`;
+  const successUrl = `${frontendOrigin}/payment/callback?status=success&orderId=${encodeURIComponent(orderId)}&attemptId=${encodeURIComponent(attemptId)}&providerPaymentId=${encodeURIComponent(providerPaymentId)}`;
+  const cancelUrl = `${frontendOrigin}/payment/callback?status=failed&orderId=${encodeURIComponent(orderId)}&attemptId=${encodeURIComponent(attemptId)}&providerPaymentId=${encodeURIComponent(providerPaymentId)}`;
+  const callbackUrl = `${apiBase}/api/payments/callback?providerPaymentId=${encodeURIComponent(providerPaymentId)}&orderId=${encodeURIComponent(orderId)}&attemptId=${encodeURIComponent(attemptId)}&redirect=${encodeURIComponent(successUrl)}`;
+
+  return {
+    frontendOrigin,
+    successUrl,
+    cancelUrl,
+    callbackUrl,
+  };
+}
+
 exports.initiatePayment = async (req, res, next) => {
   try {
     const { orderId } = req.params;
@@ -46,7 +86,6 @@ exports.initiatePayment = async (req, res, next) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    const providerPaymentId = `pay_${order._id}`;
     const orderShopId = order.shopId || order.shop;
 
     let attempt = await PaymentAttempt.findOne({
@@ -78,16 +117,29 @@ exports.initiatePayment = async (req, res, next) => {
       });
     }
 
+    const urls = buildCallbackUrls(req, String(order._id), String(attempt._id), String(attempt.providerPaymentId));
+    attempt.handoff = {
+      callbackUrl: urls.callbackUrl,
+      successUrl: urls.successUrl,
+      cancelUrl: urls.cancelUrl,
+      frontendOrigin: urls.frontendOrigin,
+    };
+    await attempt.save();
+
     const handoff = await paymentGateway.createPayment(gatewayConfig.gateway, {
       orderId: order._id,
       amount: order.totalAmount,
       attemptId: attempt._id,
+      providerPaymentId: attempt.providerPaymentId,
       paymentMethod: method,
+      callbackUrl: urls.callbackUrl,
+      successUrl: urls.successUrl,
+      cancelUrl: urls.cancelUrl,
     });
 
     return res.status(201).json({
       message: t("common.updated", req.lang),
-      providerPaymentId,
+      providerPaymentId: attempt.providerPaymentId,
       attemptId: attempt._id,
       billing: attempt.billingSnapshot || null,
       gateway: gatewayConfig.gateway,
@@ -96,6 +148,9 @@ exports.initiatePayment = async (req, res, next) => {
       paymentUrl: handoff.paymentURL,
       sessionId: handoff.sessionId || null,
       transactionId: handoff.txnId || null,
+      callbackUrl: urls.callbackUrl,
+      successUrl: urls.successUrl,
+      cancelUrl: urls.cancelUrl,
     });
   } catch (err) {
     return next(err);
@@ -109,7 +164,7 @@ exports.paymentWebhook = async (req, res) => {
       "payment"
     );
 
-    const result = await paymentService.handlePaymentWebhook(req.body);
+    const result = await paymentService.handlePaymentWebhook(normalizePayload(req.body));
 
     return res.json({
       success: true,
@@ -117,6 +172,50 @@ exports.paymentWebhook = async (req, res) => {
     });
   } catch (err) {
     logger.warn({ err: err.message }, "Payment webhook request failed");
+    return res.status(400).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+exports.paymentCallback = async (req, res) => {
+  try {
+    const payload = normalizePayload({
+      ...req.query,
+      ...req.body,
+      status: req.query.status || req.body?.status || "SUCCESS",
+    });
+
+    const attempt =
+      payload.providerPaymentId
+        ? await PaymentAttempt.findOne({ providerPaymentId: payload.providerPaymentId })
+        : await PaymentAttempt.findById(req.query.attemptId || req.body?.attemptId);
+
+    if (!attempt) {
+      return res.status(404).json({ success: false, message: "Payment attempt not found" });
+    }
+
+    const result = await paymentService.handlePaymentWebhook(payload);
+    const defaultRedirect =
+      payload.status === "SUCCESS"
+        ? attempt.handoff?.successUrl
+        : attempt.handoff?.cancelUrl;
+    const redirectBase = String(req.query.redirect || req.body?.redirect || defaultRedirect || "").trim();
+
+    if (redirectBase) {
+      const separator = redirectBase.includes("?") ? "&" : "?";
+      return res.redirect(
+        `${redirectBase}${separator}gateway=${encodeURIComponent(String(attempt.gateway || ""))}&providerPaymentId=${encodeURIComponent(String(attempt.providerPaymentId || ""))}`
+      );
+    }
+
+    return res.json({
+      success: true,
+      result,
+    });
+  } catch (err) {
+    logger.warn({ err: err.message }, "Payment callback failed");
     return res.status(400).json({
       success: false,
       message: err.message,

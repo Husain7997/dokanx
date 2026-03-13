@@ -1,5 +1,5 @@
-jest.mock("../services/paymentProcessor.service", () => ({
-  processSuccessfulPayment: jest.fn(),
+jest.mock("../services/payment.service", () => ({
+  handlePaymentWebhook: jest.fn(),
 }));
 
 jest.mock("@/core/infrastructure", () => ({
@@ -9,7 +9,7 @@ jest.mock("@/core/infrastructure", () => ({
   },
 }));
 
-const { processSuccessfulPayment } = require("../services/paymentProcessor.service");
+const { handlePaymentWebhook } = require("../services/payment.service");
 const { publishEvent, logger } = require("@/core/infrastructure");
 const controller = require("../controllers/payment.webhook.controller");
 
@@ -19,6 +19,7 @@ describe("payment.webhook.controller", () => {
   });
 
   it("should acknowledge gateway webhook after processing", async () => {
+    handlePaymentWebhook.mockResolvedValue({ ok: true, orderId: "order-1" });
     const res = {
       json: jest.fn(),
       status: jest.fn(() => ({ json: jest.fn() })),
@@ -35,9 +36,12 @@ describe("payment.webhook.controller", () => {
       res
     );
 
-    expect(processSuccessfulPayment).toHaveBeenCalledWith({
+    expect(handlePaymentWebhook).toHaveBeenCalledWith({
       providerPaymentId: "pay-1",
       webhookEventId: "evt-1",
+      orderId: "order-1",
+      status: "SUCCESS",
+      gateway: "",
     });
     expect(publishEvent).toHaveBeenCalledWith({
       type: "PAYMENT_SUCCESS",
@@ -46,6 +50,13 @@ describe("payment.webhook.controller", () => {
         payment_id: "pay-1",
         event_id: "evt-1",
         order_id: "order-1",
+        normalized: {
+          providerPaymentId: "pay-1",
+          webhookEventId: "evt-1",
+          orderId: "order-1",
+          status: "SUCCESS",
+          gateway: "",
+        },
       },
     });
     expect(res.json).toHaveBeenCalledWith({ received: true });
@@ -53,7 +64,7 @@ describe("payment.webhook.controller", () => {
 
   it("should still acknowledge gateway webhook on failure", async () => {
     const json = jest.fn();
-    processSuccessfulPayment.mockRejectedValue(new Error("processor failed"));
+    handlePaymentWebhook.mockRejectedValue(new Error("processor failed"));
 
     const res = {
       json: jest.fn(),

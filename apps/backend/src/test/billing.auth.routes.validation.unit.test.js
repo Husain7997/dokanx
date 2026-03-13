@@ -46,6 +46,7 @@ jest.mock("../modules/auth/auth.controller", () => ({
   verifyOtp: jest.fn((req, res) => res.json({ ok: true })),
   requestMagicLink: jest.fn((req, res) => res.json({ ok: true })),
   verifyMagicLink: jest.fn((req, res) => res.json({ ok: true })),
+  acceptInvite: jest.fn((req, res) => res.json({ ok: true })),
   refresh: jest.fn((req, res) => res.json({ ok: true })),
   logout: jest.fn((req, res) => res.json({ ok: true })),
   logoutAll: jest.fn((req, res) => res.json({ ok: true })),
@@ -158,5 +159,18 @@ describe("billing/auth route validation", () => {
     expect(res.statusCode).toBe(400);
     expect(res.body.errors).toContain("phone must be a valid Bangladesh number");
     expect(authController.requestOtp).not.toHaveBeenCalled();
+  });
+
+  it("should reject invalid invite acceptance body before controller", async () => {
+    const app = buildApp("/auth", authRoutes);
+
+    const res = await request(app)
+      .post("/auth/invitations/accept")
+      .send({ token: "", password: "123" });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body.errors).toContain("token is required");
+    expect(res.body.errors).toContain("password must be at least 8 characters");
+    expect(authController.acceptInvite).not.toHaveBeenCalled();
   });
 });

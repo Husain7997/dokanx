@@ -87,6 +87,9 @@ type PaymentHandoffResponse = {
   sessionId?: string | null;
   transactionId?: string | null;
   billing?: JsonValue | null;
+  callbackUrl?: string;
+  successUrl?: string;
+  cancelUrl?: string;
 };
 
 type OrderDetailResponse = {
@@ -212,7 +215,10 @@ export function createOrder(payload: {
 export function initiatePayment(orderId: string, payload: { paymentMethod: string; hasOwnGateway?: boolean }) {
   return request<PaymentHandoffResponse>(`/payments/initiate/${orderId}`, {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      ...payload,
+      frontendOrigin: typeof window !== "undefined" ? window.location.origin : undefined,
+    }),
   });
 }
 

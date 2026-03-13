@@ -76,6 +76,21 @@ function validateLogoutBody(body = {}) {
   return { valid: errors.length === 0, errors };
 }
 
+function validateAcceptInviteBody(body = {}) {
+  const errors = [];
+  const token = String(body.token || "").trim();
+  const password = String(body.password || "");
+
+  if (!token) errors.push("token is required");
+  if (password.length < 8) errors.push("password must be at least 8 characters");
+
+  if (body.name !== undefined && !String(body.name || "").trim()) {
+    errors.push("name cannot be empty");
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
 module.exports = {
   validateRegisterBody,
   validateLoginBody,
@@ -85,4 +100,5 @@ module.exports = {
   validateMagicLinkVerifyBody,
   validateRefreshBody,
   validateLogoutBody,
+  validateAcceptInviteBody,
 };

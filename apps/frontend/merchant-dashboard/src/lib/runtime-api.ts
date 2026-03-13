@@ -55,6 +55,11 @@ type TeamMemberResponse = {
 type MutationResponse = {
   message?: string;
   data?: JsonValue;
+  invite?: {
+    inviteUrl?: string;
+    expiresAt?: string;
+    emailSent?: boolean;
+  };
 };
 
 type InventoryAdjustResponse = {
@@ -207,9 +212,28 @@ export function addTeamMember(payload: {
 export function updateTeamMember(userId: string, payload: {
   role?: string;
   permissions?: string[];
+  resendInvite?: boolean;
 }) {
   return request<MutationResponse>(`/shops/me/team/${userId}`, {
     method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function acceptInvitation(payload: {
+  token: string;
+  password: string;
+  name?: string;
+}) {
+  return request<{
+    accessToken?: string;
+    token?: string;
+    refreshToken?: string;
+    refreshTokenExpiresAt?: string;
+    user?: JsonValue;
+    message?: string;
+  }>("/auth/invitations/accept", {
+    method: "POST",
     body: JSON.stringify(payload),
   });
 }

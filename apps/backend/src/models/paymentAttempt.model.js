@@ -58,6 +58,13 @@ const paymentAttemptSchema = new mongoose.Schema(
       },
     },
 
+    handoff: {
+      callbackUrl: { type: String, default: "" },
+      successUrl: { type: String, default: "" },
+      cancelUrl: { type: String, default: "" },
+      frontendOrigin: { type: String, default: "" },
+    },
+
     processedAt: Date,
     webhookEventId: {
   type: String,

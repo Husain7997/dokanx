@@ -23,6 +23,8 @@ async function handlePaymentWebhook(
     status
   } = payload;
 
+  const normalizedStatus = String(status || "").trim().toUpperCase();
+
   const attempt =
     await PaymentAttempt.findOne({
       providerPaymentId
@@ -31,17 +33,35 @@ async function handlePaymentWebhook(
   if (!attempt)
     throw new Error("Attempt not found");
 
-  if (attempt.status === "SUCCESS")
+  if (attempt.status === "SUCCESS" && attempt.processed)
     return { duplicate: true };
-
-  attempt.status = status;
-  await attempt.save();
-
-  if (status !== "SUCCESS")
-    return { ok: false };
 
   const order =
     await Order.findById(attempt.order);
+
+  attempt.status = normalizedStatus || attempt.status;
+
+  if (normalizedStatus !== "SUCCESS") {
+    if (order) {
+      order.paymentStatus = "FAILED";
+      if (["PLACED", "PENDING", "PAYMENT_PENDING"].includes(String(order.status || ""))) {
+        order.status = "PAYMENT_FAILED";
+      }
+      await order.save();
+    }
+
+    await attempt.save();
+    return { ok: false };
+  }
+
+  if (order) {
+    order.paymentStatus = "SUCCESS";
+    order.isCompleted = true;
+    if (["PLACED", "PENDING", "PAYMENT_PENDING", "PAYMENT_FAILED"].includes(String(order.status || ""))) {
+      order.status = "CONFIRMED";
+    }
+    await order.save();
+  }
 
   const breakdown = await buildSettlementBreakdown({
     tenantId: order.shopId || order.shop,
@@ -102,6 +122,7 @@ async function handlePaymentWebhook(
 
   return {
     ok: true,
+    orderId: order?._id || null,
     billing: {
       routingDestination: breakdown.routingDestination,
       commissionAmount: breakdown.commissionAmount,

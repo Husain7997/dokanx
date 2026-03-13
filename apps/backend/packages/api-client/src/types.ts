@@ -67,7 +67,7 @@ export type ApiModules = {
     inventory: (productId: string) => Promise<ApiEnvelope<InventoryRecord>>;
   };
   cart: {
-    get: () => Promise<ApiEnvelope<Cart>>;
+    get: (query?: Record<string, string | number | boolean | undefined>) => Promise<ApiEnvelope<Cart>>;
     add: (payload: { productId: string; quantity: number }) => Promise<ApiEnvelope<Cart>>;
     update: (payload: { itemId: string; quantity: number }) => Promise<ApiEnvelope<Cart>>;
     clear: () => Promise<ApiEnvelope<Cart>>;

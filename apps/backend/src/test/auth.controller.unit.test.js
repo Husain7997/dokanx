@@ -103,4 +103,50 @@ describe("auth.controller", () => {
       message: "Unauthorized",
     });
   });
+
+  it("should accept invite and return a live session", async () => {
+    const save = jest.fn();
+    User.findOne.mockReturnValue({
+      select: jest.fn().mockResolvedValue({
+        _id: "user-2",
+        name: "Invited Staff",
+        email: "staff@test.com",
+        role: "STAFF",
+        shopId: "shop-1",
+        invitation: {
+          tokenHash: "hashed",
+          expiresAt: new Date(Date.now() + 60_000),
+        },
+        save,
+      }),
+    });
+    RefreshToken.create.mockResolvedValue({});
+
+    const req = {
+      body: { token: "invite-token", password: "StrongPass123!", name: "Staff Member" },
+      headers: {},
+      lang: "en",
+      ip: "127.0.0.1",
+    };
+    const res = { json: jest.fn() };
+
+    await controller.acceptInvite(req, res);
+
+    expect(User.findOne).toHaveBeenCalledWith({
+      "invitation.tokenHash": expect.any(String),
+      "invitation.expiresAt": { $gt: expect.any(Date) },
+    });
+    expect(save).toHaveBeenCalled();
+    expect(RefreshToken.create).toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true,
+        accessToken: expect.any(String),
+        user: expect.objectContaining({
+          email: "staff@test.com",
+          role: "STAFF",
+        }),
+      })
+    );
+  });
 });

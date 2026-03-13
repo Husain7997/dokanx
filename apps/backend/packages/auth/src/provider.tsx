@@ -40,11 +40,28 @@ export function AuthProvider({
   tenant = null,
   storageKey = storageKeys.session
 }: AuthProviderProps) {
-  const store = useAuthStore();
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const refreshToken = useAuthStore((state) => state.refreshToken);
+  const refreshTokenExpiresAt = useAuthStore((state) => state.refreshTokenExpiresAt);
+  const user = useAuthStore((state) => state.user);
+  const status = useAuthStore((state) => state.status);
+  const currentTenant = useAuthStore((state) => state.tenant);
+  const setSession = useAuthStore((state) => state.setSession);
+  const setTenant = useAuthStore((state) => state.setTenant);
+  const setStatus = useAuthStore((state) => state.setStatus);
+  const clearSession = useAuthStore((state) => state.clearSession);
 
   useEffect(() => {
-    store.setTenant(tenant);
-  }, [store, tenant]);
+    const nextTenant = tenant || null;
+    const prevTenantId = currentTenant?.id || "";
+    const prevTenantSlug = currentTenant?.slug || "";
+    const nextTenantId = nextTenant?.id || "";
+    const nextTenantSlug = nextTenant?.slug || "";
+
+    if (prevTenantId !== nextTenantId || prevTenantSlug !== nextTenantSlug) {
+      setTenant(nextTenant);
+    }
+  }, [currentTenant?.id, currentTenant?.slug, setTenant, tenant]);
 
   async function login(payload: { email: string; password: string }) {
     const response = await fetch(`${baseUrl}/auth/login`, {
@@ -70,11 +87,11 @@ export function AuthProvider({
       user: sanitizeUser(data.user || {})
     };
     localStorage.setItem(storageKey, JSON.stringify(session));
-    store.setSession(session);
+    setSession(session);
   }
 
   async function refreshSession() {
-    if (!store.refreshToken) return;
+    if (!refreshToken) return;
 
     const response = await fetch(`${baseUrl}/auth/refresh`, {
       method: "POST",
@@ -83,11 +100,11 @@ export function AuthProvider({
         ...(tenant?.id ? { "x-tenant-id": tenant.id } : {}),
         ...(tenant?.slug ? { "x-tenant-slug": tenant.slug } : {})
       },
-      body: JSON.stringify({ refreshToken: store.refreshToken })
+      body: JSON.stringify({ refreshToken })
     });
 
     if (!response.ok) {
-      store.clearSession();
+      clearSession();
       localStorage.removeItem(storageKey);
       throw new Error("Session refresh failed");
     }
@@ -100,26 +117,26 @@ export function AuthProvider({
       user: sanitizeUser(data.user || {})
     };
     localStorage.setItem(storageKey, JSON.stringify(session));
-    store.setSession(session);
+    setSession(session);
   }
 
   async function restoreSession() {
-    store.setStatus("restoring");
+    setStatus("restoring");
     const persisted = safeJsonParse<PersistedSession | null>(
       localStorage.getItem(storageKey),
       null
     );
 
     if (!persisted?.refreshToken) {
-      store.clearSession();
+      clearSession();
       return;
     }
 
     try {
-      store.setSession(persisted);
+      setSession(persisted);
       await refreshSession();
     } catch {
-      store.clearSession();
+      clearSession();
     }
   }
 
@@ -128,11 +145,11 @@ export function AuthProvider({
       await fetch(`${baseUrl}/auth/logout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken: store.refreshToken })
+        body: JSON.stringify({ refreshToken })
       });
     } finally {
       localStorage.removeItem(storageKey);
-      store.clearSession();
+      clearSession();
     }
   }
 
@@ -143,15 +160,20 @@ export function AuthProvider({
 
   const value = useMemo<AuthContextValue>(
     () => ({
-      ...store,
+      accessToken,
+      refreshToken,
+      refreshTokenExpiresAt,
+      user,
+      tenant: currentTenant,
+      status,
       login,
       logout,
       refreshSession,
       restoreSession,
       hasRole: (...roles) =>
-        !!store.user?.roleName && roles.includes(store.user.roleName)
+        !!user?.roleName && roles.includes(user.roleName)
     }),
-    [store, tenant]
+    [accessToken, currentTenant, refreshToken, refreshTokenExpiresAt, status, user]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

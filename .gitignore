@@ -18,6 +18,8 @@ yarn-error.log*
 dist/
 build/
 .next/
+.next-verify/
+.next-e2e/
 out/
 
 # OS files
@@ -36,3 +38,7 @@ logs/
 *.log
 /apps/backend/src/test/.env.test
 /apps/backend/src/test/.env.test
+
+# Playwright
+test-results/
+playwright-report/

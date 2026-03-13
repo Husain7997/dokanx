@@ -14,15 +14,27 @@ export function toRole(value: string | undefined | null): AuthRole {
   return "customer";
 }
 
+function isIpAddress(host: string) {
+  const ipv4 =
+    /^(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
+  if (ipv4.test(host)) return true;
+  return host.includes(":");
+}
+
 export function resolveTenantFromHostname(hostname: string): TenantResolution {
   const host = hostname.split(":")[0].toLowerCase();
+
+  if (host.includes("localhost") || isIpAddress(host)) {
+    return { hostname: host, mode: "root", tenantKey: null };
+  }
+
   const parts = host.split(".");
 
   if (parts.length > 2) {
     return { hostname: host, mode: "subdomain", tenantKey: parts[0] };
   }
 
-  if (!host.includes("localhost") && parts.length >= 2) {
+  if (parts.length >= 2) {
     return { hostname: host, mode: "custom-domain", tenantKey: host };
   }
 
@@ -41,7 +53,13 @@ export function buildTenantHeaders(tenant?: Partial<TenantConfig> | null) {
 }
 
 export function getApiBaseUrl(explicitBaseUrl?: string) {
-  return explicitBaseUrl || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+  return (
+    explicitBaseUrl ||
+    process.env.E2E_API_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.API_URL ||
+    "http://localhost:3000"
+  );
 }
 
 export function safeJsonParse<T>(value: string | null, fallback: T): T {

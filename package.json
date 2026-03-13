@@ -11,9 +11,13 @@
     "start:backend": "npm --prefix apps/backend run start",
     "test:backend": "npm --prefix apps/backend run test",
     "test:backend:unit": "npm --prefix apps/backend run test:unit",
+    "test:e2e": "playwright test",
     "dev:storefront": "npm --prefix apps/frontend/storefront-web run dev",
     "build:storefront": "npm --prefix apps/frontend/storefront-web run build",
     "dev:merchant": "npm --prefix apps/frontend/merchant-dashboard run dev",
     "build:merchant": "npm --prefix apps/frontend/merchant-dashboard run build"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.51.1"
   }
 }

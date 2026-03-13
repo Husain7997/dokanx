@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const { initiatePayment } = require("../controllers/payment.controller");
+const { initiatePayment, paymentCallback } = require("../controllers/payment.controller");
 const { protect } = require("../middlewares");
 const { validateBody } = require("../middlewares/validateRequest");
 const paymentController = require("../controllers/payment.controller");
@@ -15,6 +15,8 @@ router.post(
   "/webhook", verifySignature, gatewayWebhook
 );
 // express.json({ type: "*/*" }),
+router.get("/callback", paymentCallback);
+router.post("/callback", paymentCallback);
 
 router.post(
   "/initiate/:orderId",

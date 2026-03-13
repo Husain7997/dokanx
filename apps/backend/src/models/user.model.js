@@ -74,6 +74,36 @@ const userSchema = new mongoose.Schema(
       uppercase: true,
     },
   ],
+
+  invitation: {
+    tokenHash: {
+      type: String,
+      default: "",
+      select: false,
+    },
+    expiresAt: {
+      type: Date,
+      default: null,
+    },
+    invitedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    invitedAt: {
+      type: Date,
+      default: null,
+    },
+    acceptedAt: {
+      type: Date,
+      default: null,
+    },
+  },
+
+  passwordResetRequired: {
+    type: Boolean,
+    default: false,
+  },
 },
 { timestamps: true }
 );

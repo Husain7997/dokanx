@@ -1,8 +1,10 @@
 const Shop = require("../models/shop.model");
 const User = require("../models/user.model");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const { createAudit } = require("../utils/audit.util");
 const { logger } = require("@/core/infrastructure");
+const mailer = require("../infrastructure/mail/mail.service");
 const response = require("@/utils/controllerResponse");
 
 async function loadOwnedShop(req) {
@@ -12,6 +14,41 @@ async function loadOwnedShop(req) {
   const shop = await Shop.findById(shopId);
   if (!shop) return null;
   return shop;
+}
+
+function issueInvite(req) {
+  const token = crypto.randomBytes(24).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const origin =
+    String(req.headers.origin || "").trim() ||
+    String(req.headers.referer || "").trim().replace(/\/$/, "") ||
+    "http://localhost:3001";
+
+  return {
+    token,
+    tokenHash,
+    expiresAt,
+    inviteUrl: `${origin.replace(/\/$/, "")}/accept-invite?token=${encodeURIComponent(token)}`,
+  };
+}
+
+async function sendInviteEmail({ email, name, inviteUrl }) {
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    return false;
+  }
+
+  const subject = "DokanX team invitation";
+  const html = `
+    <p>Hello ${name || "team member"},</p>
+    <p>You have been invited to join a DokanX merchant workspace.</p>
+    <p>Accept your invite:</p>
+    <p><a href="${inviteUrl}">${inviteUrl}</a></p>
+    <p>This link expires in 7 days.</p>
+  `;
+
+  await mailer.send(email, subject, html);
+  return true;
 }
 
 exports.createShop = async (req, res) => {
@@ -114,7 +151,7 @@ exports.listTeamMembers = async (req, res) => {
     const members = await User.find({
       shopId: shop._id,
       role: { $in: ["OWNER", "STAFF"] },
-    }).select("name email role phone permissionOverrides");
+    }).select("name email role phone permissionOverrides invitation passwordResetRequired");
 
     return response.updated(res, req, members);
   } catch (error) {
@@ -136,9 +173,11 @@ exports.addTeamMember = async (req, res) => {
 
     const normalizedEmail = String(req.body.email || "").trim().toLowerCase();
     let user = await User.findOne({ email: normalizedEmail });
+    const invite = issueInvite(req);
 
     if (!user) {
-      const hashedPassword = await bcrypt.hash("Password123!", 10);
+      const bootstrapPassword = crypto.randomBytes(32).toString("hex");
+      const hashedPassword = await bcrypt.hash(bootstrapPassword, 10);
       user = await User.create({
         name: String(req.body.name || "").trim(),
         email: normalizedEmail,
@@ -149,12 +188,29 @@ exports.addTeamMember = async (req, res) => {
         permissionOverrides: Array.isArray(req.body.permissions)
           ? req.body.permissions.map((item) => String(item || "").trim().toUpperCase()).filter(Boolean)
           : [],
+        passwordResetRequired: true,
+        invitation: {
+          tokenHash: invite.tokenHash,
+          expiresAt: invite.expiresAt,
+          invitedBy: req.user._id,
+          invitedAt: new Date(),
+          acceptedAt: null,
+        },
       });
     } else {
       user.name = String(req.body.name || user.name || "").trim();
       user.phone = req.body.phone ? String(req.body.phone).trim() : user.phone;
       user.role = String(req.body.role || user.role || "STAFF").trim().toUpperCase();
       user.shopId = shop._id;
+      user.passwordResetRequired = true;
+      user.invitation = {
+        ...(user.invitation || {}),
+        tokenHash: invite.tokenHash,
+        expiresAt: invite.expiresAt,
+        invitedBy: req.user._id,
+        invitedAt: new Date(),
+        acceptedAt: null,
+      };
       user.permissionOverrides = Array.isArray(req.body.permissions)
         ? req.body.permissions.map((item) => String(item || "").trim().toUpperCase()).filter(Boolean)
         : user.permissionOverrides || [];
@@ -169,7 +225,25 @@ exports.addTeamMember = async (req, res) => {
       req,
     });
 
-    return response.success(res, { data: user }, 201);
+    let inviteEmailSent = false;
+    try {
+      inviteEmailSent = await sendInviteEmail({
+        email: normalizedEmail,
+        name: user.name,
+        inviteUrl: invite.inviteUrl,
+      });
+    } catch (error) {
+      logger.warn({ err: error.message }, "Invite email failed");
+    }
+
+    return response.success(res, {
+      data: user,
+      invite: {
+        inviteUrl: invite.inviteUrl,
+        expiresAt: invite.expiresAt,
+        emailSent: inviteEmailSent,
+      },
+    }, 201);
   } catch (error) {
     logger.error({ err: error.message }, "Add team member failed");
     return response.failure(res, "Failed to save team member", 500);
@@ -205,6 +279,34 @@ exports.updateTeamMember = async (req, res) => {
         ? req.body.permissions.map((item) => String(item || "").trim().toUpperCase()).filter(Boolean)
         : [];
     }
+    let invitePayload = null;
+    if (req.body.resendInvite) {
+      const invite = issueInvite(req);
+      member.passwordResetRequired = true;
+      member.invitation = {
+        ...(member.invitation || {}),
+        tokenHash: invite.tokenHash,
+        expiresAt: invite.expiresAt,
+        invitedBy: req.user._id,
+        invitedAt: new Date(),
+        acceptedAt: null,
+      };
+      invitePayload = {
+        inviteUrl: invite.inviteUrl,
+        expiresAt: invite.expiresAt,
+      };
+
+      try {
+        const emailSent = await sendInviteEmail({
+          email: member.email,
+          name: member.name,
+          inviteUrl: invite.inviteUrl,
+        });
+        invitePayload.emailSent = emailSent;
+      } catch (error) {
+        logger.warn({ err: error.message }, "Resend invite email failed");
+      }
+    }
 
     await member.save();
 
@@ -216,7 +318,11 @@ exports.updateTeamMember = async (req, res) => {
       req,
     });
 
-    return response.updated(res, req, member);
+    return res.json({
+      message: "updated",
+      data: member,
+      invite: invitePayload,
+    });
   } catch (error) {
     logger.error({ err: error.message }, "Update team member failed");
     return response.failure(res, "Failed to update team member", 500);

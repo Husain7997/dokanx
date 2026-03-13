@@ -53,6 +53,12 @@ router.post(
   authController.verifyMagicLink
 );
 router.post(
+  "/invitations/accept",
+  redisRateLimiter({ scope: "auth.invite.accept", limit: 10, windowSec: 60 }),
+  validateBody(authValidator.validateAcceptInviteBody),
+  authController.acceptInvite
+);
+router.post(
   "/refresh",
   redisRateLimiter({ scope: "auth.refresh", limit: 20, windowSec: 60 }),
   validateBody(authValidator.validateRefreshBody),

@@ -63,6 +63,8 @@ describe("payment.controller", () => {
     });
     PaymentAttempt.create.mockResolvedValue({
       _id: "attempt-1",
+      providerPaymentId: "pay_attempt-1",
+      save: jest.fn(),
       billingSnapshot: {
         commission: { amount: 6, rate: 5 },
         routing: { destination: "PLATFORM_WALLET", source: "default" },
@@ -81,6 +83,12 @@ describe("payment.controller", () => {
         paymentMethod: "bkash",
         hasOwnGateway: true,
       },
+      headers: {
+        origin: "http://localhost:3001",
+        host: "localhost:3000",
+      },
+      protocol: "http",
+      get: jest.fn(() => "localhost:3000"),
     };
     const res = {
       status: jest.fn(() => ({ json })),
@@ -102,12 +110,16 @@ describe("payment.controller", () => {
       orderId: "order-1",
       amount: 120,
       attemptId: "attempt-1",
+      providerPaymentId: "pay_attempt-1",
       paymentMethod: "BKASH",
+      callbackUrl: expect.stringContaining("/api/payments/callback"),
+      successUrl: expect.stringContaining("/payment/callback?status=success"),
+      cancelUrl: expect.stringContaining("/payment/callback?status=failed"),
     });
     expect(res.status).toHaveBeenCalledWith(201);
     expect(json).toHaveBeenCalledWith({
       message: "updated",
-      providerPaymentId: "pay_order-1",
+      providerPaymentId: "pay_attempt-1",
       attemptId: "attempt-1",
       billing: {
         commission: { amount: 6, rate: 5 },
@@ -119,6 +131,9 @@ describe("payment.controller", () => {
       paymentUrl: "https://bkash.mock/pay",
       sessionId: null,
       transactionId: "BKASH_1",
+      callbackUrl: expect.stringContaining("/api/payments/callback"),
+      successUrl: expect.stringContaining("/payment/callback?status=success"),
+      cancelUrl: expect.stringContaining("/payment/callback?status=failed"),
     });
     expect(next).not.toHaveBeenCalled();
   });
@@ -157,7 +172,7 @@ describe("payment.controller", () => {
     const json = jest.fn();
     const req = {
       headers: { "idempotency-key": "evt-1" },
-      body: { providerPaymentId: "pay-1" },
+      body: { payment_id: "pay-1", payment_status: "SUCCESS" },
     };
     const res = {
       json,
@@ -168,6 +183,10 @@ describe("payment.controller", () => {
     expect(ensureIdempotent).toHaveBeenCalledWith("evt-1", "payment");
     expect(paymentService.handlePaymentWebhook).toHaveBeenCalledWith({
       providerPaymentId: "pay-1",
+      webhookEventId: "",
+      orderId: "",
+      status: "SUCCESS",
+      gateway: "",
     });
     expect(json).toHaveBeenCalledWith({
       success: true,

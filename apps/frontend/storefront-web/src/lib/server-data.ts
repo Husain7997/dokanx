@@ -118,17 +118,24 @@ export async function getProductsData(tenant: TenantConfig | null, query?: Recor
 
 export async function getCartData(tenant: TenantConfig | null) {
   const api = createServerApi(tenant);
-  const [cartResponse, productsResponse] = await Promise.all([
-    safeCall(() => api.cart.get(), { data: fallbackCart }),
-    safeCall(() => api.product.search({ limit: "6", minStock: "1" }), { data: fallbackProducts, count: fallbackProducts.length }),
-  ]);
+  const productsResponse = await safeCall(
+    () => api.product.search({ limit: "6", minStock: "1" }),
+    { data: fallbackProducts, count: fallbackProducts.length }
+  );
+
+  const products = (productsResponse.data || fallbackProducts) as Array<Product & { _id?: string; shopId?: string }>;
+  const seededShopId = products[0]?.shopId ? String(products[0].shopId) : "";
+  const cartResponse = await safeCall(
+    () => api.cart.get(seededShopId ? { shopId: seededShopId } : undefined),
+    { data: fallbackCart }
+  );
 
   const cart = cartResponse.data || null;
   if (cart?.items?.length) {
     return cart;
   }
 
-  return buildCartFromProducts((productsResponse.data || fallbackProducts) as Array<Product & { _id?: string; shopId?: string }>);
+  return buildCartFromProducts(products);
 }
 
 export async function getOrdersData(tenant: TenantConfig | null) {

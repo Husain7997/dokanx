@@ -54,6 +54,7 @@ describe("payment.service", () => {
     PaymentAttempt.findOne.mockResolvedValue({
       _id: "attempt-1",
       status: "SUCCESS",
+      processed: true,
     });
 
     const result = await paymentService.handlePaymentWebhook({
@@ -68,12 +69,18 @@ describe("payment.service", () => {
 
   it("should mark failed webhook attempt without financial execution", async () => {
     const save = jest.fn();
+    const orderSave = jest.fn();
     PaymentAttempt.findOne.mockResolvedValue({
       _id: "attempt-1",
       order: "order-1",
       amount: 1000,
       status: "PENDING",
       save,
+    });
+    Order.findById.mockResolvedValue({
+      _id: "order-1",
+      status: "PLACED",
+      save: orderSave,
     });
 
     const result = await paymentService.handlePaymentWebhook({
@@ -83,7 +90,8 @@ describe("payment.service", () => {
 
     expect(result).toEqual({ ok: false });
     expect(save).toHaveBeenCalledTimes(1);
-    expect(Order.findById).not.toHaveBeenCalled();
+    expect(Order.findById).toHaveBeenCalledWith("order-1");
+    expect(orderSave).toHaveBeenCalledTimes(1);
     expect(buildSettlementBreakdown).not.toHaveBeenCalled();
     expect(executeFinancial).not.toHaveBeenCalled();
     expect(recordPlatformCommission).not.toHaveBeenCalled();
@@ -91,6 +99,7 @@ describe("payment.service", () => {
 
   it("should skip merchant wallet credit for merchant-direct routing", async () => {
     const save = jest.fn();
+    const orderSave = jest.fn();
     PaymentAttempt.findOne.mockResolvedValue({
       _id: "attempt-1",
       order: "order-1",
@@ -106,6 +115,8 @@ describe("payment.service", () => {
     Order.findById.mockResolvedValue({
       _id: "order-1",
       shopId: "shop-1",
+      status: "PLACED",
+      save: orderSave,
       appliedCoupon: {
         code: "SAVE10",
       },
@@ -146,16 +157,17 @@ describe("payment.service", () => {
     });
     expect(marketingService.consumeCouponForOrder).toHaveBeenCalledWith({
       shopId: "shop-1",
-      order: {
+      order: expect.objectContaining({
         _id: "order-1",
         shopId: "shop-1",
         appliedCoupon: {
           code: "SAVE10",
         },
-      },
+      }),
     });
     expect(result).toEqual({
       ok: true,
+      orderId: "order-1",
       billing: {
         routingDestination: "MERCHANT_DIRECT",
         commissionAmount: 20,
@@ -167,6 +179,7 @@ describe("payment.service", () => {
         consumed: true,
       },
     });
-    expect(save).toHaveBeenCalledTimes(2);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(orderSave).toHaveBeenCalledTimes(1);
   });
 });

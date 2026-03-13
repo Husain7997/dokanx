@@ -130,8 +130,8 @@ function validateTeamMemberBody(body = {}) {
 function validateTeamMemberUpdateBody(body = {}) {
   const errors = [];
 
-  if (body.role === undefined && body.permissions === undefined) {
-    errors.push("role or permissions is required");
+  if (body.role === undefined && body.permissions === undefined && body.resendInvite === undefined) {
+    errors.push("role, permissions, or resendInvite is required");
   }
 
   if (body.role !== undefined) {
@@ -143,6 +143,10 @@ function validateTeamMemberUpdateBody(body = {}) {
 
   if (body.permissions !== undefined && !Array.isArray(body.permissions)) {
     errors.push("permissions must be an array");
+  }
+
+  if (body.resendInvite !== undefined && typeof body.resendInvite !== "boolean") {
+    errors.push("resendInvite must be boolean");
   }
 
   return { valid: errors.length === 0, errors };
