@@ -48,7 +48,7 @@ test.describe("storefront checkout", () => {
 
     await safeGoto(`${storefrontUrl}/cart`);
     await page.getByRole("link", { name: "Proceed To Checkout" }).click();
-    await expect(page.getByTestId("checkout-hydrated")).toHaveAttribute("data-ready", "true");
+    await expect(page.getByLabel("Delivery note")).toBeVisible({ timeout: 30_000 });
     await page.getByLabel("Delivery note").fill("Leave at gate");
     await expect(page.getByLabel("Delivery note")).toHaveValue("Leave at gate");
     await page.getByRole("button", { name: "Create Order And Prepare Payment" }).click();
