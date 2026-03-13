@@ -15,21 +15,21 @@ type AppShellProps = {
 
 export function AppShell({ appName, navigation, children }: AppShellProps) {
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto flex min-h-screen max-w-7xl flex-col md:flex-row">
-        <aside className="border-b border-border md:w-72 md:border-b-0 md:border-r">
+    <div className="dx-shell min-h-screen bg-background text-foreground">
+      <div className="dx-shell-inner mx-auto flex min-h-screen max-w-7xl flex-col md:flex-row">
+        <aside className="dx-shell-sidebar border-b border-border md:w-72 md:border-b-0 md:border-r">
           <div className="px-6 py-5">
-            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+            <p className="dx-shell-brand text-xs uppercase tracking-[0.3em] text-muted-foreground">
               DokanX
             </p>
-            <h1 className="mt-2 text-2xl font-semibold">{appName}</h1>
+            <h1 className="dx-shell-title mt-2 text-2xl font-semibold">{appName}</h1>
           </div>
-          <nav className="grid gap-1 px-3 pb-6">
+          <nav className="dx-shell-nav grid gap-1 px-3 pb-6">
             {navigation.map((item) => (
               <a
                 key={item.href}
                 className={cn(
-                  "rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                  "dx-shell-link rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
                 )}
                 href={item.href}
               >
@@ -38,11 +38,11 @@ export function AppShell({ appName, navigation, children }: AppShellProps) {
             ))}
           </nav>
         </aside>
-        <main className="flex-1">
-          <div className="border-b border-border px-6 py-4">
+        <main className="dx-shell-main flex-1">
+          <div className="dx-shell-topbar border-b border-border px-6 py-4">
             <p className="text-sm text-muted-foreground">Architecture scaffold</p>
           </div>
-          <div className="p-6">{children}</div>
+          <div className="dx-shell-content p-6">{children}</div>
         </main>
       </div>
     </div>

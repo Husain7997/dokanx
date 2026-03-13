@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { headers } from "next/headers";
+import { Fraunces, Sora } from "next/font/google";
 
 import { AppShell } from "@dokanx/ui";
 
@@ -9,6 +10,18 @@ import { getTenantConfig } from "@/lib/tenant";
 import { AppProviders } from "@/providers/app-providers";
 
 import "./globals.css";
+
+const sans = Sora({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+});
+
+const display = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-display",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "DokanX Storefront",
@@ -21,7 +34,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
 
   return (
     <html lang="en">
-      <body>
+      <body className={`${sans.variable} ${display.variable} antialiased`}>
         <AppProviders tenant={tenant}>
           <AppShell appName="Storefront Web" navigation={navigation}>
             {children}

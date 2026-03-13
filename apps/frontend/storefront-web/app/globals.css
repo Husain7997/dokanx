@@ -4,7 +4,118 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --font-sans: "Sora", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Fraunces", "Times New Roman", serif;
+}
+
+[data-theme="storefront-theme"] {
+  --background: 30 50% 98%;
+  --foreground: 222 35% 12%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 35% 12%;
+  --primary: 18 84% 52%;
+  --primary-foreground: 36 33% 97%;
+  --secondary: 210 34% 18%;
+  --secondary-foreground: 36 33% 97%;
+  --muted: 28 30% 94%;
+  --muted-foreground: 218 16% 40%;
+  --accent: 26 45% 95%;
+  --accent-foreground: 222 35% 12%;
+  --border: 24 20% 86%;
+  --input: 24 20% 86%;
+  --ring: 18 84% 52%;
+}
+
 body {
-  background: hsl(var(--background));
+  font-family: var(--font-sans);
+  background: radial-gradient(circle at 15% 20%, hsl(24 86% 93%), transparent 55%),
+    radial-gradient(circle at 85% 10%, hsl(210 70% 94%), transparent 40%),
+    hsl(var(--background));
   color: hsl(var(--foreground));
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+.dx-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+.dx-shell {
+  position: relative;
+  overflow: hidden;
+}
+
+.dx-shell::before {
+  content: "";
+  position: absolute;
+  inset: -40% -20%;
+  background:
+    radial-gradient(circle at 20% 20%, hsl(18 80% 70% / 0.15), transparent 45%),
+    radial-gradient(circle at 80% 30%, hsl(210 60% 65% / 0.12), transparent 40%),
+    radial-gradient(circle at 60% 80%, hsl(40 80% 75% / 0.12), transparent 50%);
+  animation: shellGlow 18s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.dx-shell-inner {
+  position: relative;
+  z-index: 1;
+}
+
+.dx-shell-sidebar {
+  background: hsl(var(--card) / 0.75);
+  backdrop-filter: blur(14px);
+}
+
+.dx-shell-topbar {
+  background: hsl(var(--background) / 0.7);
+  backdrop-filter: blur(12px);
+}
+
+.dx-shell-link {
+  border: 1px solid transparent;
+  transition: transform 200ms ease, border-color 200ms ease, background 200ms ease;
+}
+
+.dx-shell-link:hover {
+  border-color: hsl(var(--border));
+  background: hsl(var(--accent));
+  transform: translateX(2px);
+}
+
+.dx-shell-content {
+  animation: fadeUp 600ms ease both;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shellGlow {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-2%, -1%, 0) scale(1.02);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dx-shell::before,
+  .dx-shell-content {
+    animation: none;
+  }
+}
 }
