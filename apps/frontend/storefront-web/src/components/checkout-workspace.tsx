@@ -116,16 +116,18 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
     }
 
     try {
-      await saveCart({
-        shopId: customer.shopId.trim() || String(auth.user?.shopId || ""),
+      const shopId = customer.shopId.trim() || String(auth.user?.shopId || "");
+      const cartPayload = {
+        shopId,
         items: cart.items.map((item) => ({
           productId: item.productId,
           quantity: item.quantity,
         })),
-      });
+      };
+      const savePromise = saveCart(cartPayload).catch(() => null);
 
       const order = await createOrder({
-        shopId: customer.shopId.trim() || String(auth.user?.shopId || ""),
+        shopId,
         items: cart.items.map((item) => ({
           product: item.productId,
           quantity: item.quantity,
@@ -134,6 +136,7 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
         totalAmount: totals.total,
         shippingFee: totals.shipping,
       });
+      void savePromise;
 
       const rawOrder = order.data || {};
       const orderId = String(rawOrder._id || rawOrder.orderId || "");
