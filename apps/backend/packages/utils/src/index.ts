@@ -23,8 +23,17 @@ function isIpAddress(host: string) {
 
 export function resolveTenantFromHostname(hostname: string): TenantResolution {
   const host = hostname.split(":")[0].toLowerCase();
+  const localSuffixes = ["localhost", "local", "test"];
 
-  if (host.includes("localhost") || isIpAddress(host)) {
+  const isLocalRoot = localSuffixes.includes(host);
+  const localSuffix = localSuffixes.find((suffix) => host.endsWith(`.${suffix}`));
+
+  if (localSuffix) {
+    const parts = host.split(".");
+    return { hostname: host, mode: "subdomain", tenantKey: parts[0] };
+  }
+
+  if (isLocalRoot || isIpAddress(host)) {
     return { hostname: host, mode: "root", tenantKey: null };
   }
 
