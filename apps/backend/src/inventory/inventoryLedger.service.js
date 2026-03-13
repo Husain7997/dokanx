@@ -21,6 +21,10 @@ async function createInventoryEntry({
     if (!product)
       throw new Error("Product not found");
 
+    const resolvedShopId = shopId || product.shopId;
+    if (!resolvedShopId)
+      throw new Error("Shop context missing");
+
     const delta =
       direction === "IN"
         ? quantity
@@ -36,7 +40,7 @@ async function createInventoryEntry({
       [
         {
           product: productId,
-          shopId,
+          shopId: resolvedShopId,
           quantity,
           type,
           direction,
@@ -50,7 +54,7 @@ async function createInventoryEntry({
 
     await publishEvent("INVENTORY_MUTATION", {
       productId,
-      shopId,
+      shopId: resolvedShopId,
       quantity,
       direction,
       type,

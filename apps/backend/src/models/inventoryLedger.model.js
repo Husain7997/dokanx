@@ -26,6 +26,8 @@ const inventoryLedgerSchema =
       "RESTOCK",
       "MANUAL_ADJUST",
       "REFUND",
+      "AUTO_REPAIR_STOCK",
+      "AUTO_REPAIR_RESERVED",
     ],
     required: true,
   },
