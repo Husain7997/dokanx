@@ -23,7 +23,10 @@ type ShopsMapWorkspaceProps = {
 };
 
 function uniqueValues(rows: ShopDirectoryItem[], key: keyof ShopDirectoryItem) {
-  return Array.from(new Set(rows.map((row) => row[key]).filter(Boolean))).sort();
+  const values = rows
+    .map((row) => row[key])
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+  return Array.from(new Set(values)).sort();
 }
 
 export function ShopsMapWorkspace({ initialShops }: ShopsMapWorkspaceProps) {
