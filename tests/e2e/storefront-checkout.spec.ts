@@ -28,24 +28,25 @@ test.describe("storefront checkout", () => {
     await page.getByRole("button", { name: "Sign In" }).click();
     await expect(page.getByText("Customer session is active.")).toBeVisible();
 
+    const customerLogin = await request.post(`${apiUrl}/auth/login`, {
+      data: { email: seeded.customer.email, password: seeded.customer.password },
+    });
+    expect(customerLogin.ok()).toBeTruthy();
+    const customerAuth = await customerLogin.json();
+    const accessToken = customerAuth.accessToken || customerAuth.token;
+    expect(accessToken).toBeTruthy();
+
+    await request.put(`${apiUrl}/cart`, {
+      data: {
+        shopId: seeded.product.shopId,
+        items: [{ productId: seeded.product.id, quantity: 1 }],
+      },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
     await safeGoto(`${storefrontUrl}/cart`);
-    await page.getByRole("button", { name: "Clear Cart" }).click();
-    const productSelect = page.getByLabel("Product");
-    const productValue = await productSelect.evaluate((select, targetName) => {
-      const options = Array.from(select.options);
-      const normalizedTarget = String(targetName || "").toLowerCase();
-      const match = normalizedTarget
-        ? options.find((option) => option.textContent?.toLowerCase().includes(normalizedTarget))
-        : null;
-      if (match?.value) return match.value;
-      const fallback = options.find((option) => option.value && option.value !== "");
-      return fallback?.value || "";
-    }, seeded.product?.name || "");
-    if (!productValue) {
-      throw new Error("No selectable product option available in product selector.");
-    }
-    await productSelect.selectOption(productValue);
-    await page.getByRole("button", { name: "Add To Cart" }).click();
     await page.getByRole("link", { name: "Proceed To Checkout" }).click();
     await expect(page.getByTestId("checkout-hydrated")).toHaveAttribute("data-ready", "true");
     await page.getByLabel("Delivery note").fill("Leave at gate");
