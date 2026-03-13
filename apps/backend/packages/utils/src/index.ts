@@ -61,13 +61,24 @@ export function buildTenantHeaders(tenant?: Partial<TenantConfig> | null) {
   };
 }
 
+function normalizeApiBaseUrl(value?: string) {
+  if (!value) {
+    return "http://localhost:5001/api";
+  }
+  const trimmed = value.replace(/\/$/, "");
+  if (trimmed.endsWith("/api")) {
+    return trimmed;
+  }
+  return `${trimmed}/api`;
+}
+
 export function getApiBaseUrl(explicitBaseUrl?: string) {
-  return (
+  return normalizeApiBaseUrl(
     explicitBaseUrl ||
-    process.env.E2E_API_URL ||
-    process.env.NEXT_PUBLIC_API_URL ||
-    process.env.API_URL ||
-    "http://localhost:3000"
+      process.env.E2E_API_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      process.env.API_URL ||
+      "http://localhost:5001/api"
   );
 }
 

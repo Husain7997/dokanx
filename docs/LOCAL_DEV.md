@@ -13,7 +13,7 @@ npm run dev:backend
 
 ```powershell
 $env:PORT="3001"
-$env:NEXT_PUBLIC_API_URL="http://localhost:5001"
+$env:NEXT_PUBLIC_API_URL="http://localhost:5001/api"
 npm run dev:merchant
 ```
 
@@ -25,7 +25,7 @@ Open:
 
 ```powershell
 $env:PORT="3000"
-$env:NEXT_PUBLIC_API_URL="http://localhost:5001"
+$env:NEXT_PUBLIC_API_URL="http://localhost:5001/api"
 npm run dev:storefront
 ```
 
@@ -38,7 +38,7 @@ Open:
 Run the script below while the backend is running:
 
 ```powershell
-.\scripts\dev-seed.ps1 -ApiBaseUrl "http://localhost:5001" -OwnerEmail "owner@test.com" -OwnerPassword "Secret123!" -ShopName "Demo Shop"
+.\scripts\dev-seed.ps1 -ApiBaseUrl "http://localhost:5001/api" -OwnerEmail "owner@test.com" -OwnerPassword "Secret123!" -ShopName "Demo Shop"
 ```
 
 Then sign in at http://localhost:3001/sign-in using the owner credentials.

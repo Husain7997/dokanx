@@ -1,5 +1,5 @@
 param(
-  [string]$ApiBaseUrl = "http://localhost:5001",
+  [string]$ApiBaseUrl = "http://localhost:5001/api",
   [string]$OwnerEmail = "owner@test.com",
   [string]$OwnerPassword = "Secret123!",
   [string]$OwnerName = "Demo Owner",
