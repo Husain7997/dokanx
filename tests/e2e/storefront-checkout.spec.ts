@@ -31,13 +31,18 @@ test.describe("storefront checkout", () => {
     await safeGoto(`${storefrontUrl}/cart`);
     await page.getByRole("button", { name: "Clear Cart" }).click();
     const productSelect = page.getByLabel("Product");
-    const productValue = await productSelect.evaluate((select) => {
+    const productValue = await productSelect.evaluate((select, targetName) => {
       const options = Array.from(select.options);
-      const match = options.find((option) => option.textContent?.toLowerCase().includes("e2e lamp"));
-      return match?.value || "";
-    });
+      const normalizedTarget = String(targetName || "").toLowerCase();
+      const match = normalizedTarget
+        ? options.find((option) => option.textContent?.toLowerCase().includes(normalizedTarget))
+        : null;
+      if (match?.value) return match.value;
+      const fallback = options.find((option) => option.value && option.value !== "");
+      return fallback?.value || "";
+    }, seeded.product?.name || "");
     if (!productValue) {
-      throw new Error("E2E Lamp option not available in product selector.");
+      throw new Error("No selectable product option available in product selector.");
     }
     await productSelect.selectOption(productValue);
     await page.getByRole("button", { name: "Add To Cart" }).click();
