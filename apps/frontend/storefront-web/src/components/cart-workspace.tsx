@@ -88,7 +88,14 @@ export function CartWorkspace({ initialCart, initialProducts }: CartWorkspacePro
         const response = await searchRuntimeProducts({ limit: "8", minStock: "1" });
         if (response.data?.length) {
           const rows = normalizeRuntimeProducts(response.data as Product[]);
-          setProducts(rows);
+          setProducts((current) => {
+            const merged = new Map<string, CartProduct>();
+            [...current, ...rows].forEach((item) => {
+              const key = String(item._id || item.id || "");
+              if (key) merged.set(key, item);
+            });
+            return Array.from(merged.values());
+          });
           setSelectedProductId((current) => current || String(rows[0]?._id || rows[0]?.id || ""));
         }
       } catch {
