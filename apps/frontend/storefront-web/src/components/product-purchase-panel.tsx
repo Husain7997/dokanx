@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button, CardDescription, Input } from "@dokanx/ui";
 import type { Product } from "@dokanx/types";
 
-import { saveCart } from "@/lib/runtime-api";
+import { addToCart } from "@/lib/runtime-api";
 
 type ProductPurchasePanelProps = {
   product: Product & { _id?: string };
@@ -29,14 +29,10 @@ export function ProductPurchasePanel({ product }: ProductPurchasePanelProps) {
     setStatus(null);
 
     try {
-      await saveCart({
+      await addToCart({
         shopId,
-        items: [
-          {
-            productId,
-            quantity: parsedQuantity,
-          },
-        ],
+        productId,
+        quantity: parsedQuantity,
       });
       setStatus("Item added to cart. Open /cart to continue.");
     } catch (error) {

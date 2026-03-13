@@ -1,6 +1,6 @@
-import { ProductGrid } from "@dokanx/ui";
 import { headers } from "next/headers";
 
+import { StorefrontProductGrid } from "@/components/storefront-product-grid";
 import { getProductsData } from "@/lib/server-data";
 import { getTenantConfig } from "@/lib/tenant";
 
@@ -15,15 +15,5 @@ export default async function CategoryPage({
   const slug = (await params).slug;
   const products = await getProductsData(tenant, { category: slug });
 
-  return (
-    <ProductGrid
-      products={products.map((product) => ({
-        title: product.name,
-        price: product.price,
-        image: product.image || "https://placehold.co/800x600",
-        category: product.category,
-        inStock: (product.stock || 0) > 0
-      }))}
-    />
-  );
+  return <StorefrontProductGrid products={products} />;
 }

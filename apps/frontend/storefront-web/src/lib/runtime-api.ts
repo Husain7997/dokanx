@@ -200,6 +200,39 @@ export function saveCart(payload: {
   });
 }
 
+export async function addToCart(payload: { shopId: string; productId: string; quantity?: number }) {
+  const quantity = Math.max(1, Number(payload.quantity) || 1);
+  if (!payload.shopId || !payload.productId) {
+    throw new Error("shopId and productId are required");
+  }
+
+  let existingItems: Array<{ productId: string; quantity: number }> = [];
+  try {
+    const response = await getRuntimeCart(payload.shopId);
+    existingItems =
+      response.data?.items?.map((item) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+      })) || [];
+  } catch {
+    existingItems = [];
+  }
+
+  const merged = new Map<string, number>();
+  for (const item of existingItems) {
+    merged.set(item.productId, (merged.get(item.productId) || 0) + item.quantity);
+  }
+  merged.set(payload.productId, (merged.get(payload.productId) || 0) + quantity);
+
+  return saveCart({
+    shopId: payload.shopId,
+    items: Array.from(merged.entries()).map(([productId, qty]) => ({
+      productId,
+      quantity: qty,
+    })),
+  });
+}
+
 export function clearCart(shopId: string) {
   return request<MutationResponse>(`/cart?shopId=${encodeURIComponent(shopId)}`, {
     method: "DELETE",

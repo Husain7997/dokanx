@@ -1,4 +1,6 @@
-import { AnalyticsCards, ProductGrid, ShopCard } from "@dokanx/ui";
+import { AnalyticsCards, ShopCard } from "@dokanx/ui";
+
+import { StorefrontProductGrid } from "@/components/storefront-product-grid";
 
 export default async function ShopDetailPage({
   params
@@ -23,15 +25,17 @@ export default async function ShopDetailPage({
           { label: "Currency", value: "BDT" }
         ]}
       />
-      <ProductGrid
+      <StorefrontProductGrid
         products={[
           {
-            title: "Tenant Product",
+            id: "demo-headphones",
+            slug: "demo-headphones",
+            name: "Tenant Product",
             price: 1200,
             image: "https://placehold.co/800x600",
             category: "Featured",
-            inStock: true
-          }
+            stock: 12
+          },
         ]}
       />
     </div>
