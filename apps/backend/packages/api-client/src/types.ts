@@ -68,9 +68,11 @@ export type ApiModules = {
   };
   cart: {
     get: (query?: Record<string, string | number | boolean | undefined>) => Promise<ApiEnvelope<Cart>>;
-    add: (payload: { productId: string; quantity: number }) => Promise<ApiEnvelope<Cart>>;
-    update: (payload: { itemId: string; quantity: number }) => Promise<ApiEnvelope<Cart>>;
-    clear: () => Promise<ApiEnvelope<Cart>>;
+    save: (payload: { shopId?: string; items: Array<{ productId: string; quantity: number }> }) => Promise<ApiEnvelope<Cart>>;
+    clear: (query?: { shopId?: string }) => Promise<ApiEnvelope<never>>;
+    merge: (payload: { guestToken: string }) => Promise<ApiEnvelope<Cart>>;
+    applyCoupon: (payload: { code: string; shippingFee?: number }) => Promise<ApiEnvelope<Cart>>;
+    removeCoupon: () => Promise<ApiEnvelope<Cart>>;
   };
   order: {
     list: () => Promise<ApiListResponse<Order>>;
