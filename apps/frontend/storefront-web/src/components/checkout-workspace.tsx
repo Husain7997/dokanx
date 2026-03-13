@@ -5,7 +5,7 @@ import { useAuth } from "@dokanx/auth";
 import { Button, Card, CardDescription, CardTitle, CheckoutLayout, Input } from "@dokanx/ui";
 import type { Cart } from "@dokanx/types";
 
-import { createOrder, getProfile, initiatePayment, saveCart } from "@/lib/runtime-api";
+import { createOrder, getProfile, getRuntimeCart, initiatePayment, saveCart } from "@/lib/runtime-api";
 
 type CheckoutWorkspaceProps = {
   cart: Cart;
@@ -18,6 +18,7 @@ function isMongoId(value: string) {
 
 export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWorkspaceProps) {
   const auth = useAuth();
+  const [cartState, setCartState] = useState<Cart>(cart);
   const [hydrated, setHydrated] = useState(false);
   const [customer, setCustomer] = useState({
     fullName: "Husain Ahmed",
@@ -46,14 +47,14 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
   }, []);
 
   const totals = useMemo(() => {
-    const subtotal = cart.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const subtotal = cartState.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const shipping = subtotal > 5000 ? 0 : 120;
     return {
       subtotal,
       shipping,
       total: subtotal + shipping,
     };
-  }, [cart.items]);
+  }, [cartState.items]);
 
   useEffect(() => {
     async function hydrateCustomer() {
@@ -88,9 +89,42 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
   }, [auth.status]);
 
   const invalidProductIds = useMemo(
-    () => cart.items.filter((item) => !isMongoId(item.productId)).map((item) => item.productId),
-    [cart.items],
+    () => cartState.items.filter((item) => !isMongoId(item.productId)).map((item) => item.productId),
+    [cartState.items],
   );
+
+  useEffect(() => {
+    async function hydrateCart() {
+      if (auth.status !== "authenticated" || !suggestedShopId) return;
+
+      try {
+        const response = await getRuntimeCart(String(suggestedShopId));
+        const runtimeCart = response.data;
+        if (runtimeCart?.items?.length) {
+          const nextItems = runtimeCart.items.map((item) => ({
+            id: item.id,
+            productId: item.productId,
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price,
+          }));
+          setCartState({
+            id: runtimeCart._id || "runtime-cart",
+            items: nextItems,
+            totals: runtimeCart.totals || {
+              subtotal: nextItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
+              quantity: nextItems.reduce((sum, item) => sum + item.quantity, 0),
+              itemCount: nextItems.length,
+            },
+          });
+        }
+      } catch {
+        // Keep server-seeded cart when runtime fetch fails.
+      }
+    }
+
+    void hydrateCart();
+  }, [auth.status, suggestedShopId]);
 
   async function handleSubmitOrder() {
     setSubmitting(true);
@@ -119,7 +153,7 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
       const shopId = customer.shopId.trim() || String(auth.user?.shopId || "");
       const cartPayload = {
         shopId,
-        items: cart.items.map((item) => ({
+        items: cartState.items.map((item) => ({
           productId: item.productId,
           quantity: item.quantity,
         })),
@@ -128,7 +162,7 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
 
       const order = await createOrder({
         shopId,
-        items: cart.items.map((item) => ({
+        items: cartState.items.map((item) => ({
           product: item.productId,
           quantity: item.quantity,
           price: item.price,
@@ -185,7 +219,7 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
           <Card>
             <CardTitle>Order Summary</CardTitle>
             <div className="mt-6 grid gap-3 text-sm">
-              {cart.items.map((item) => (
+              {cartState.items.map((item) => (
                 <div key={item.id} className="flex items-center justify-between gap-4">
                   <span>{item.name} x {item.quantity}</span>
                   <span>{item.price * item.quantity} BDT</span>
