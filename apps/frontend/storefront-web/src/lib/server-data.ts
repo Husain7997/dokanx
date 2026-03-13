@@ -113,7 +113,8 @@ export async function getProductsData(tenant: TenantConfig | null, query?: Recor
     { data: fallbackProducts, count: fallbackProducts.length },
   );
 
-  return response.data || fallbackProducts;
+  const data = response.data || fallbackProducts;
+  return data.length ? data : fallbackProducts;
 }
 
 export async function getCartData(tenant: TenantConfig | null) {
