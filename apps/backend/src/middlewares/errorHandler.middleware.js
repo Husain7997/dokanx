@@ -20,5 +20,6 @@ module.exports = function errorHandler(err, req, res, next) {
   res.status(status).json({
     success: false,
     message: t(lang, key),
+    requestId: req.requestId || null,
   });
 };

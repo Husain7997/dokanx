@@ -4,6 +4,7 @@ const router = express.Router();
 const { protect, allowRoles } = require("../middlewares");
 const checkUserNotBlocked = require("../middlewares/checkUserNotBlocked");
 const optionalAuth = require("../middlewares/optionalAuth.middleware");
+const optionalIdempotency = require("../core/idempotency/optional.middleware");
 const { canUpdateOrderStatus } = require("../middlewares/orderRole.guard");
 const { validateBody } = require("../middlewares/validateRequest");
 const orderValidator = require("../validators/order.validator");
@@ -21,6 +22,7 @@ router.post(
   optionalAuth,
   checkUserNotBlocked,
   allowRoles("CUSTOMER"),
+  optionalIdempotency,
   validateBody(orderValidator.validatePlaceOrderBody),
   placeOrder
 );
