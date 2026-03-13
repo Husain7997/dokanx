@@ -65,17 +65,18 @@ router.post("/e2e/bootstrap", async (_req, res) => {
     { upsert: true, returnDocument: "after" }
   ).select("+password");
 
-  let product = await Product.findOne({ shopId: shop._id, name: "E2E Lamp", isActive: true });
-  if (!product) {
-    product = await Product.create({
-      shopId: shop._id,
-      name: "E2E Lamp",
-      category: "Testing",
-      price: 1200,
-      stock: 25,
-      isActive: true,
-    });
-  }
+  const product = await Product.findOneAndUpdate(
+    { shopId: shop._id, name: "E2E Lamp" },
+    {
+      $set: {
+        category: "Testing",
+        price: 1200,
+        stock: 25,
+        isActive: true,
+      },
+    },
+    { upsert: true, returnDocument: "after" }
+  );
 
   await Inventory.findOneAndUpdate(
     { shopId: shop._id, product: product._id },
