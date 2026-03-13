@@ -70,7 +70,7 @@ function StorefrontProductCard({ product }: { product: Product & { _id?: string 
         <div className="p-5">
           <div className="flex items-center justify-between gap-3">
             {product.category ? <Badge>{product.category}</Badge> : <span />}
-            {!inStock ? <Badge variant="destructive">Out of stock</Badge> : null}
+            {!inStock ? <Badge variant="danger">Out of stock</Badge> : null}
           </div>
           <CardTitle className="mt-4">{product.name}</CardTitle>
           <div className="mt-2">
