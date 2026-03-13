@@ -126,6 +126,13 @@ function getAuthHeaders() {
   };
 }
 
+function buildIdempotencyKey(prefix: string) {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `${prefix}_${crypto.randomUUID()}`;
+  }
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${getApiBaseUrl()}${path}`, {
     ...init,
@@ -208,6 +215,9 @@ export function createOrder(payload: {
 }) {
   return request<MutationResponse>("/orders", {
     method: "POST",
+    headers: {
+      "Idempotency-Key": buildIdempotencyKey("order"),
+    },
     body: JSON.stringify(payload),
   });
 }
@@ -215,6 +225,9 @@ export function createOrder(payload: {
 export function initiatePayment(orderId: string, payload: { paymentMethod: string; hasOwnGateway?: boolean }) {
   return request<PaymentHandoffResponse>(`/payments/initiate/${orderId}`, {
     method: "POST",
+    headers: {
+      "Idempotency-Key": buildIdempotencyKey("payment"),
+    },
     body: JSON.stringify({
       ...payload,
       frontendOrigin: typeof window !== "undefined" ? window.location.origin : undefined,
