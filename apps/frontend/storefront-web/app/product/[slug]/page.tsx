@@ -23,6 +23,17 @@ export default async function ProductDetailPage({
   const slug = (await params).slug;
   const product = await getProductBySlug(tenant, slug);
 
+  if (!product) {
+    return (
+      <Card>
+        <CardTitle>Product unavailable</CardTitle>
+        <CardDescription className="mt-2">
+          The catalog service did not return a product for this slug.
+        </CardDescription>
+      </Card>
+    );
+  }
+
   return (
     <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
       <ProductGallery
