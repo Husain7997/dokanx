@@ -1,0 +1,42 @@
+{
+  "name": "dokanx",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "apps/backend",
+    "apps/backend/packages/*",
+    "apps/frontend/storefront-web",
+    "apps/frontend/merchant-dashboard",
+    "apps/frontend/admin-panel",
+    "apps/frontend/developer-portal",
+    "apps/frontend/mobile-app/customer",
+    "apps/frontend/mobile-app/merchent"
+  ],
+  "scripts": {
+    "dev:backend": "npm --prefix apps/backend run dev",
+    "start:backend": "npm --prefix apps/backend run start",
+    "test:backend": "npm --prefix apps/backend run test",
+    "test:backend:unit": "npm --prefix apps/backend run test:unit",
+    "test:e2e": "playwright test",
+    "build:e2e:storefront": "set NEXT_DIST_DIR=.next-e2e&& npm --prefix apps/frontend/storefront-web run build",
+    "build:e2e:merchant": "set NEXT_DIST_DIR=.next-e2e&& npm --prefix apps/frontend/merchant-dashboard run build",
+    "test:e2e:prebuild": "set E2E_USE_START=1&& npm run build:e2e:storefront && npm run build:e2e:merchant && playwright test",
+    "dev:storefront": "npm --prefix apps/frontend/storefront-web run dev",
+    "build:storefront": "npm --prefix apps/frontend/storefront-web run build",
+    "dev:merchant": "npm --prefix apps/frontend/merchant-dashboard run dev",
+    "build:merchant": "npm --prefix apps/frontend/merchant-dashboard run build",
+    "dev:admin": "npm --prefix apps/frontend/admin-panel run dev",
+    "build:admin": "npm --prefix apps/frontend/admin-panel run build",
+    "dev:developer": "npm --prefix apps/frontend/developer-portal run dev",
+    "build:developer": "npm --prefix apps/frontend/developer-portal run build"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.51.1",
+    "@react-native-community/cli": "^15.0.0"
+  },
+  "overrides": {
+    "react": "19.2.4",
+    "react-test-renderer": "19.2.4",
+    "react-dom": "19.2.4"
+  }
+}

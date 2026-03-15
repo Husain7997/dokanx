@@ -1,0 +1,19 @@
+{
+  "name": "@dokanx/config",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "tailwindcss": "^3.4.17"
+  },
+  "exports": {
+    "./tailwind-preset": {
+      "types": "./tailwind-preset.ts",
+      "import": "./tailwind-preset.ts",
+      "require": "./tailwind-preset.cjs"
+    },
+    "./tailwind-preset.cjs": "./tailwind-preset.cjs",
+    "./tsconfig/nextjs": "./tsconfig/nextjs.json",
+    "./tsconfig/package": "./tsconfig/package.json"
+  }
+}
