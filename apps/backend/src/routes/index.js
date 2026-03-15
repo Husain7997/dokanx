@@ -74,7 +74,7 @@ router.use(
  "/system", systemRoute);
 
 router.use(
-  "/api/inventory", inventoryRoutes);
+ "/inventory", inventoryRoutes);
 router.use(
  "/webhooks",webhookRoutes);
 

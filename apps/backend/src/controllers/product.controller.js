@@ -101,6 +101,96 @@ exports.createProduct = async (req, res) => {
   }
 };
 
+exports.updateProduct = async (req, res) => {
+  try {
+    if (!req.shop) {
+      return res.status(404).json({
+        success: false,
+        message: "Shop not found",
+      });
+    }
+
+    const { productId } = req.params;
+    const { name, price, stock } = req.body;
+
+    const product = await Product.findOne({ _id: productId, shopId: req.shop._id });
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    if (typeof name === "string" && name.trim()) {
+      product.name = name.trim();
+    }
+    if (typeof price === "number") {
+      product.price = price;
+    }
+    if (typeof stock === "number") {
+      product.stock = Math.max(0, stock);
+    }
+
+    await product.save();
+
+    if (typeof stock === "number") {
+      await Inventory.updateOne(
+        { shopId: req.shop._id, product: product._id },
+        { $set: { stock: Math.max(0, stock) } }
+      );
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: product,
+    });
+  } catch (err) {
+    console.error("UPDATE PRODUCT ERROR:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Product update failed",
+    });
+  }
+};
+
+exports.deleteProduct = async (req, res) => {
+  try {
+    if (!req.shop) {
+      return res.status(404).json({
+        success: false,
+        message: "Shop not found",
+      });
+    }
+
+    const { productId } = req.params;
+    const product = await Product.findOne({ _id: productId, shopId: req.shop._id });
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    product.isActive = false;
+    await product.save();
+
+    await Inventory.updateOne(
+      { shopId: req.shop._id, product: product._id },
+      { $set: { isActive: false } }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Product archived",
+    });
+  } catch (err) {
+    console.error("DELETE PRODUCT ERROR:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Product archive failed",
+    });
+  }
+};
 exports.getProductsByShop = async (req, res) => {
   try {
     const { shopId } = req.params;

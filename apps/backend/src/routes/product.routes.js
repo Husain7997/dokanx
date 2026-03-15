@@ -18,6 +18,22 @@ router.post(
   productController.createProduct
 );
 
+router.patch(
+  "/:productId",
+  protect,
+  role("OWNER"),
+  checkShopOwnership,
+  productController.updateProduct
+);
+
+router.delete(
+  "/:productId",
+  protect,
+  role("OWNER"),
+  checkShopOwnership,
+  productController.deleteProduct
+);
+
 router.get(
   "/shop/:shopId",
   productController.getProductsByShop
