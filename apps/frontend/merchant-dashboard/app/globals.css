@@ -1,0 +1,121 @@
+@import "../../../backend/packages/ui/src/styles.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "DM Serif Display", "Times New Roman", serif;
+}
+
+[data-theme="merchant-theme"] {
+  --background: 220 33% 98%;
+  --foreground: 222 30% 12%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 30% 12%;
+  --primary: 220 78% 46%;
+  --primary-foreground: 210 40% 96%;
+  --secondary: 215 32% 20%;
+  --secondary-foreground: 210 40% 96%;
+  --muted: 220 22% 94%;
+  --muted-foreground: 216 14% 40%;
+  --accent: 216 40% 95%;
+  --accent-foreground: 222 30% 12%;
+  --border: 220 16% 86%;
+  --input: 220 16% 86%;
+  --ring: 220 78% 46%;
+}
+
+body {
+  font-family: var(--font-sans);
+  background:
+    radial-gradient(circle at 10% 15%, hsl(210 90% 94%), transparent 50%),
+    radial-gradient(circle at 90% 5%, hsl(230 70% 92%), transparent 45%),
+    hsl(var(--background));
+  color: hsl(var(--foreground));
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+.dx-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.015em;
+}
+
+.dx-shell {
+  position: relative;
+  overflow: hidden;
+}
+
+.dx-shell::before {
+  content: "";
+  position: absolute;
+  inset: -35% -15%;
+  background:
+    radial-gradient(circle at 25% 25%, hsl(220 80% 70% / 0.14), transparent 45%),
+    radial-gradient(circle at 70% 25%, hsl(200 80% 72% / 0.12), transparent 45%),
+    radial-gradient(circle at 60% 80%, hsl(250 55% 75% / 0.1), transparent 55%);
+  animation: merchantGlow 20s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.dx-shell-inner {
+  position: relative;
+  z-index: 1;
+}
+
+.dx-shell-sidebar {
+  background: hsl(var(--card) / 0.75);
+  backdrop-filter: blur(16px);
+}
+
+.dx-shell-topbar {
+  background: hsl(var(--background) / 0.7);
+  backdrop-filter: blur(12px);
+}
+
+.dx-shell-link {
+  border: 1px solid transparent;
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+.dx-shell-link:hover {
+  border-color: hsl(var(--border));
+  background: hsl(var(--accent));
+  transform: translateX(2px);
+}
+
+.dx-shell-content {
+  animation: fadeUp 600ms ease both;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes merchantGlow {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(1%, -1%, 0) scale(1.02);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dx-shell::before,
+  .dx-shell-content {
+    animation: none;
+  }
+}

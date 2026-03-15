@@ -19,6 +19,7 @@ dist/
 build/
 .next/
 out/
+**/.next-e2e/
 
 # OS files
 .DS_Store
@@ -36,3 +37,6 @@ logs/
 *.log
 /apps/backend/src/test/.env.test
 /apps/backend/src/test/.env.test
+
+# Test artifacts
+test-results/
