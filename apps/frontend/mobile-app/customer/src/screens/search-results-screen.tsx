@@ -2,6 +2,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useCartStore } from "@/store/cart-store";
+
 const results = [
   { id: "r1", name: "City Runner Shoes", price: 1800 },
   { id: "r2", name: "Studio Backpack", price: 2100 },
@@ -9,6 +11,7 @@ const results = [
 
 export function SearchResultsScreen() {
   const navigation = useNavigation();
+  const addItem = useCartStore((state) => state.addItem);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -18,7 +21,18 @@ export function SearchResultsScreen() {
           <View key={item.id} style={styles.card}>
             <Text style={styles.cardTitle}>{item.name}</Text>
             <Text style={styles.cardSubtitle}>{item.price} BDT</Text>
-            <Pressable style={styles.actionButton} onPress={() => navigation.navigate("Cart" as never)}>
+            <Pressable
+              style={styles.actionButton}
+              onPress={() => {
+                addItem({
+                  id: item.id,
+                  productId: item.id,
+                  name: item.name,
+                  price: item.price,
+                });
+                navigation.navigate("Cart" as never);
+              }}
+            >
               <Text style={styles.actionText}>Add to cart</Text>
             </Pressable>
           </View>

@@ -3,6 +3,11 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-
 import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { placeOrderRequest } from "@/lib/api-client";
+import { DEFAULT_TENANT_ID } from "@/lib/config";
+import { useAuthStore } from "@/store/auth-store";
+import { useCartStore } from "@/store/cart-store";
+
 const deliveryOptions = [
   { id: "standard", label: "Standard delivery", fee: 120 },
   { id: "express", label: "Express delivery", fee: 220 },
@@ -16,18 +21,17 @@ const paymentMethods = [
   { id: "wallet_balance", label: "Wallet balance" },
 ];
 
-const checkoutItems = [
-  { id: "c1", name: "Aurora Headphones", price: 3200, quantity: 1 },
-  { id: "c2", name: "Nook Mixer", price: 2400, quantity: 2 },
-];
-
 export function CheckoutScreen() {
   const navigation = useNavigation();
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const cartItems = useCartStore((state) => state.items);
+  const clearCart = useCartStore((state) => state.clear);
   const [step, setStep] = useState(1);
   const [delivery, setDelivery] = useState("standard");
   const [payment, setPayment] = useState("cash_on_delivery");
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [address, setAddress] = useState({
     district: "Dhaka",
     thana: "Gulshan",
@@ -38,23 +42,47 @@ export function CheckoutScreen() {
   });
 
   const totals = useMemo(() => {
-    const subtotal = checkoutItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const shipping = deliveryOptions.find((item) => item.id === delivery)?.fee ?? 0;
     return {
       subtotal,
       shipping,
       total: subtotal + shipping,
     };
-  }, [delivery]);
+  }, [cartItems, delivery]);
 
-  function handleConfirm() {
+  async function handleConfirm() {
+    if (!cartItems.length) {
+      setError("Add items to your cart before checkout.");
+      return;
+    }
+    if (!accessToken) {
+      setError("Please sign in to place an order.");
+      navigation.navigate("Auth" as never);
+      return;
+    }
+
     setSubmitting(true);
     setStatus(null);
-    setTimeout(() => {
+    setError(null);
+    try {
+      await placeOrderRequest(
+        accessToken,
+        {
+          items: cartItems.map((item) => ({ product: item.productId, quantity: item.quantity })),
+          totalAmount: totals.total,
+        },
+        DEFAULT_TENANT_ID
+      );
+      clearCart();
       setSubmitting(false);
       setStatus("Order confirmed. Tracking is ready.");
       navigation.navigate("OrderTracking" as never);
-    }, 800);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Order failed";
+      setSubmitting(false);
+      setError(message);
+    }
   }
 
   return (
@@ -190,7 +218,7 @@ export function CheckoutScreen() {
               <Text style={styles.reviewLabel}>Payment</Text>
               <Text style={styles.reviewValue}>{payment.replaceAll("_", " ")}</Text>
             </View>
-            {checkoutItems.map((item) => (
+            {cartItems.map((item) => (
               <View key={item.id} style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>{item.name} x {item.quantity}</Text>
                 <Text style={styles.summaryValue}>{item.price * item.quantity} BDT</Text>
@@ -230,6 +258,11 @@ export function CheckoutScreen() {
             </Pressable>
           )}
         </View>
+        {error ? (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : null}
         {status ? (
           <View style={styles.statusCard}>
             <Text style={styles.statusText}>{status}</Text>
@@ -390,6 +423,18 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.5,
+  },
+  errorCard: {
+    backgroundColor: "#fef2f2",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#fecaca",
+  },
+  errorText: {
+    fontSize: 13,
+    color: "#b91c1c",
+    fontWeight: "600",
   },
   statusCard: {
     backgroundColor: "#ecfdf3",

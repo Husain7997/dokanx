@@ -3,13 +3,19 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useAuthStore } from "@/store/auth-store";
+
 export function AuthScreen() {
   const navigation = useNavigation();
-  const [phone, setPhone] = useState("");
+  const { signIn, isLoading, error } = useAuthStore();
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  function handleSignIn() {
-    navigation.navigate("Browse" as never);
+  async function handleSignIn() {
+    const ok = await signIn({ email, password });
+    if (ok) {
+      navigation.navigate("Browse" as never);
+    }
   }
 
   return (
@@ -22,10 +28,11 @@ export function AuthScreen() {
         <View style={styles.card}>
           <TextInput
             style={styles.input}
-            placeholder="Phone number"
-            keyboardType="phone-pad"
-            value={phone}
-            onChangeText={setPhone}
+            placeholder="Email address"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            value={email}
+            onChangeText={setEmail}
           />
           <TextInput
             style={styles.input}
@@ -34,8 +41,9 @@ export function AuthScreen() {
             value={password}
             onChangeText={setPassword}
           />
-          <Pressable style={styles.primaryButton} onPress={handleSignIn}>
-            <Text style={styles.primaryButtonText}>Sign in</Text>
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          <Pressable style={styles.primaryButton} onPress={handleSignIn} disabled={isLoading}>
+            <Text style={styles.primaryButtonText}>{isLoading ? "Signing in..." : "Sign in"}</Text>
           </Pressable>
           <Pressable style={styles.secondaryButton}>
             <Text style={styles.secondaryButtonText}>Create an account</Text>
@@ -105,6 +113,11 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: "#111827",
     fontSize: 14,
+    fontWeight: "600",
+  },
+  errorText: {
+    color: "#b91c1c",
+    fontSize: 12,
     fontWeight: "600",
   },
 });

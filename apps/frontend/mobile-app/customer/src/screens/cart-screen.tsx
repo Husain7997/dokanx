@@ -1,52 +1,22 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-type CartItem = {
-  id: string;
-  name: string;
-  shop: string;
-  location: string;
-  price: number;
-  quantity: number;
-};
-
-const initialItems: CartItem[] = [
-  {
-    id: "c1",
-    name: "Aurora Headphones",
-    shop: "Aurora Electronics",
-    location: "Gulshan-1",
-    price: 3200,
-    quantity: 1,
-  },
-  {
-    id: "c2",
-    name: "Nook Mixer",
-    shop: "Nook Home",
-    location: "Dhanmondi 27",
-    price: 2400,
-    quantity: 2,
-  },
-  {
-    id: "c3",
-    name: "Bazarika Rice Pack",
-    shop: "Bazarika Grocers",
-    location: "Zindabazar",
-    price: 640,
-    quantity: 3,
-  },
-];
+import type { CartItem } from "@/store/cart-store";
+import { useCartStore } from "@/store/cart-store";
 
 export function CartScreen() {
   const navigation = useNavigation();
-  const [items, setItems] = useState<CartItem[]>(initialItems);
+  const items = useCartStore((state) => state.items);
+  const updateQuantity = useCartStore((state) => state.updateQuantity);
+  const removeItem = useCartStore((state) => state.removeItem);
 
   const grouped = useMemo(() => {
     return items.reduce<Record<string, CartItem[]>>((acc, item) => {
-      if (!acc[item.shop]) acc[item.shop] = [];
-      acc[item.shop].push(item);
+      const key = item.shop || "General";
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(item);
       return acc;
     }, {});
   }, [items]);
@@ -59,17 +29,9 @@ export function CartScreen() {
   }, [items]);
 
   function adjustQuantity(id: string, delta: number) {
-    setItems((current) =>
-      current.map((item) =>
-        item.id === id
-          ? { ...item, quantity: Math.max(1, item.quantity + delta) }
-          : item
-      )
-    );
-  }
-
-  function removeItem(id: string) {
-    setItems((current) => current.filter((item) => item.id !== id));
+    const current = items.find((item) => item.id === id);
+    if (!current) return;
+    updateQuantity(id, current.quantity + delta);
   }
 
   function handleCheckout() {
@@ -80,6 +42,16 @@ export function CartScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>Cart Summary</Text>
+
+        {items.length === 0 ? (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Your cart is empty</Text>
+            <Text style={styles.emptyText}>Add items from the browse screen to get started.</Text>
+            <Pressable style={styles.checkoutButton} onPress={() => navigation.navigate("Browse" as never)}>
+              <Text style={styles.checkoutText}>Browse products</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {Object.keys(grouped).map((shop) => (
           <View key={shop} style={styles.card}>
@@ -108,24 +80,26 @@ export function CartScreen() {
           </View>
         ))}
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Order totals</Text>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Subtotal</Text>
-            <Text style={styles.summaryValue}>{totals.subtotal} BDT</Text>
+        {items.length ? (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Order totals</Text>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Subtotal</Text>
+              <Text style={styles.summaryValue}>{totals.subtotal} BDT</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Shipping</Text>
+              <Text style={styles.summaryValue}>{totals.shipping} BDT</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryTotalLabel}>Total</Text>
+              <Text style={styles.summaryTotalValue}>{totals.total} BDT</Text>
+            </View>
+            <Pressable style={styles.checkoutButton} onPress={handleCheckout}>
+              <Text style={styles.checkoutText}>Proceed to checkout</Text>
+            </Pressable>
           </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Shipping</Text>
-            <Text style={styles.summaryValue}>{totals.shipping} BDT</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryTotalLabel}>Total</Text>
-            <Text style={styles.summaryTotalValue}>{totals.total} BDT</Text>
-          </View>
-          <Pressable style={styles.checkoutButton} onPress={handleCheckout}>
-            <Text style={styles.checkoutText}>Proceed to checkout</Text>
-          </Pressable>
-        </View>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -157,6 +131,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600",
     color: "#111827",
+  },
+  emptyText: {
+    fontSize: 13,
+    color: "#6b7280",
   },
   itemRow: {
     borderTopWidth: 1,
