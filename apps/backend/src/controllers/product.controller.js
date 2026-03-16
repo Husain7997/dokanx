@@ -54,7 +54,7 @@ exports.createProduct = async (req, res) => {
       });
     }
 
-    const { name, price, stock } = req.body;
+    const { name, price, stock, barcode, slug } = req.body;
 
     /* =====================
        1️⃣ CREATE PRODUCT
@@ -63,6 +63,7 @@ exports.createProduct = async (req, res) => {
     const product = await Product.create({
       name,
       price,
+      slug: slug || null,
       barcode: barcode || null,
       shopId: req.shop._id,
       owner: req.user._id
@@ -112,7 +113,7 @@ exports.updateProduct = async (req, res) => {
     }
 
     const { productId } = req.params;
-    const { name, price, stock, barcode } = req.body;
+    const { name, price, stock, barcode, slug } = req.body;
 
     const product = await Product.findOne({ _id: productId, shopId: req.shop._id });
     if (!product) {
@@ -124,6 +125,9 @@ exports.updateProduct = async (req, res) => {
 
     if (typeof name === "string" && name.trim()) {
       product.name = name.trim();
+    }
+    if (typeof slug === "string" && slug.trim()) {
+      product.slug = slug.trim();
     }
     if (typeof price === "number") {
       product.price = price;
@@ -222,6 +226,38 @@ exports.getProductsByShop = async (req, res) => {
       success: false,
       message: "Failed to fetch products",
     });
+  }
+};
+
+exports.listProducts = async (req, res) => {
+  try {
+    const { shopId, q, limit, minStock, slug } = req.query;
+    const filter = { isActive: true };
+    if (shopId) filter.shopId = shopId;
+    if (slug) filter.slug = slug;
+    if (minStock) filter.stock = { $gte: Number(minStock) };
+    if (q) filter.name = { $regex: String(q), $options: "i" };
+
+    const query = Product.find(filter);
+    if (limit) query.limit(Number(limit));
+    const products = await query.lean();
+
+    res.json({
+      count: products.length,
+      data: products,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch products" });
+  }
+};
+
+exports.getProductDetail = async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.productId).lean();
+    if (!product) return res.status(404).json({ message: "Product not found" });
+    res.json({ data: product });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch product" });
   }
 };
 

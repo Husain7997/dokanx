@@ -18,6 +18,11 @@ router.post(
   productController.createProduct
 );
 
+router.get(
+  "/",
+  productController.listProducts
+);
+
 router.patch(
   "/:productId",
   protect,
@@ -49,5 +54,10 @@ router.get(
   protect,
   // resolveShop,
   productController.getProductInventory
+);
+
+router.get(
+  "/:productId",
+  productController.getProductDetail
 );
 module.exports = router;

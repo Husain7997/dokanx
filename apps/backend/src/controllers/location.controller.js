@@ -2,8 +2,9 @@ const ShopLocation = require("../models/shopLocation.model");
 
 exports.listLocations = async (req, res) => {
   const shopId = req.query.shopId || req.shop?._id || req.user?.shopId;
-  if (!shopId) return res.status(400).json({ message: "shopId required" });
-  const locations = await ShopLocation.find({ shopId, isActive: true }).lean();
+  const filter = { isActive: true };
+  if (shopId) filter.shopId = shopId;
+  const locations = await ShopLocation.find(filter).lean();
   res.json({ data: locations });
 };
 

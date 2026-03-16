@@ -1,6 +1,7 @@
 import type { Cart, MarketplaceApp, Order, Product, TenantConfig } from "@dokanx/types";
 
 import { createServerApi } from "./server-api";
+import { getApiBaseUrl } from "@dokanx/utils";
 
 const emptyCart: Cart = {
   id: "empty-cart",
@@ -109,5 +110,41 @@ export async function getProductBySlug(tenant: TenantConfig | null, slug: string
 }
 
 export async function getShopsDirectory() {
-  return [];
+  try {
+    const baseUrl = getApiBaseUrl();
+    const [shopsResponse, locationsResponse] = await Promise.all([
+      fetch(`${baseUrl}/shops/public`, { cache: "no-store" }).then((res) => res.json()),
+      fetch(`${baseUrl}/locations`, { cache: "no-store" }).then((res) => res.json()),
+    ]);
+
+    const shopMap = new Map(
+      (shopsResponse.data || []).map((shop: { _id?: string; id?: string; name?: string; slug?: string }) => [
+        String(shop._id || shop.id || ""),
+        shop,
+      ])
+    );
+
+    const locations = locationsResponse.data || [];
+
+    return locations.map((location: any, index: number) => {
+      const shop = shopMap.get(String(location.shopId)) || {};
+      const coords = location.coordinates?.coordinates || [90.4125 + index * 0.01, 23.8103 + index * 0.01];
+      return {
+        slug: shop.slug || `shop-${index + 1}`,
+        name: shop.name || location.name || `Shop ${index + 1}`,
+        description: "Multi-tenant storefront",
+        rating: "4.7",
+        verified: true,
+        district: location.city || "Dhaka",
+        thana: location.city || "Dhaka",
+        market: "Main Market",
+        category: "General",
+        address: location.address || "Address pending",
+        lat: coords[1],
+        lng: coords[0],
+      };
+    });
+  } catch {
+    return [];
+  }
 }
