@@ -1,5 +1,6 @@
 const Product = require("../models/product.model");
 const Shop = require("../models/shop.model");
+const ShopLocation = require("../models/shopLocation.model");
 const { searchIndex, rebuildIndex } = require("../services/searchIndex.service");
 
 exports.searchProducts = async (req, res) => {
@@ -16,11 +17,24 @@ exports.searchProducts = async (req, res) => {
 };
 
 exports.searchShops = async (req, res) => {
-  const { q } = req.query;
+  const { q, district, market } = req.query;
   const filter = { isActive: true, status: "ACTIVE" };
   if (q) {
     filter.name = { $regex: String(q), $options: "i" };
   }
+  if (district || market) {
+    const locationFilter = { isActive: true };
+    if (district) locationFilter.city = String(district);
+    if (market) locationFilter.name = String(market);
+    const locations = await ShopLocation.find(locationFilter).select("shopId").lean();
+    const shopIds = locations.map((row) => row.shopId);
+    if (shopIds.length) {
+      filter._id = { $in: shopIds };
+    } else {
+      return res.json({ data: [], count: 0 });
+    }
+  }
+
   const shops = await Shop.find(filter).select("name domain slug").lean();
   res.json({ data: shops, count: shops.length });
 };

@@ -4,7 +4,7 @@ import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Geolocation from "react-native-geolocation-service";
 
-import { listLocations, listPublicShops } from "@/lib/api-client";
+import { listLocations, listPublicShops, searchNearbyLocations } from "@/lib/api-client";
 
 type ShopOption = {
   id: string;
@@ -38,6 +38,7 @@ export function MapDiscoveryScreen() {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [radius, setRadius] = useState(3);
   const buttonPos = useRef(new Animated.ValueXY({ x: window.width - 74, y: window.height * 0.4 })).current;
+  const watchId = useRef<number | null>(null);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -79,7 +80,7 @@ export function MapDiscoveryScreen() {
           .map((location) => {
             const coords = location.coordinates?.coordinates || [];
             return {
-              id: String(location._id || location.shopId || ""),
+              id: String(location.shopId || location._id || ""),
               title: String(location.name || location.city || "Shop"),
               lat: Number(coords[1]),
               lng: Number(coords[0]),
@@ -126,10 +127,28 @@ export function MapDiscoveryScreen() {
         },
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
       );
+
+      watchId.current = Geolocation.watchPosition(
+        (position) => {
+          if (!active) return;
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+        },
+        () => {
+          if (!active) return;
+        },
+        { enableHighAccuracy: true, distanceFilter: 25, interval: 10000, fastestInterval: 5000 }
+      );
     }
     void requestLocation();
     return () => {
       active = false;
+      if (watchId.current !== null) {
+        Geolocation.clearWatch(watchId.current);
+        watchId.current = null;
+      }
     };
   }, []);
 
@@ -154,6 +173,42 @@ export function MapDiscoveryScreen() {
     const shopIds = new Set(filteredMarkers.map((marker) => marker.id));
     return shops.filter((shop) => shopIds.has(shop.id));
   }, [filteredMarkers, shops, userLocation]);
+
+  useEffect(() => {
+    let active = true;
+    async function refreshNearby() {
+      if (!userLocation) return;
+      try {
+        const response = await searchNearbyLocations({
+          lat: userLocation.lat,
+          lng: userLocation.lng,
+          distance: radius * 1000,
+        });
+        if (!active) return;
+        const nearby = (response.data || []) as LocationRow[];
+        const markerRows: MarkerRow[] = nearby
+          .map((location) => {
+            const coords = location.coordinates?.coordinates || [];
+            return {
+              id: String(location.shopId || location._id || ""),
+              title: String(location.name || location.city || "Shop"),
+              lat: Number(coords[1]),
+              lng: Number(coords[0]),
+            };
+          })
+          .filter((row) => Number.isFinite(row.lat) && Number.isFinite(row.lng));
+        if (markerRows.length) {
+          setMarkers(markerRows);
+        }
+      } catch {
+        if (!active) return;
+      }
+    }
+    void refreshNearby();
+    return () => {
+      active = false;
+    };
+  }, [radius, userLocation]);
 
   const panelStyle = useMemo(() => {
     if (mapState === "closed") {

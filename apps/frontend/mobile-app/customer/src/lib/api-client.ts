@@ -61,6 +61,17 @@ export function searchSuggestions(query: string) {
   return request<{ data?: Array<Record<string, unknown>> }>(`/api/search/index?${search}`);
 }
 
+export function searchNearbyLocations(params: { lat: number; lng: number; distance?: number }) {
+  const search = new URLSearchParams({
+    lat: String(params.lat),
+    lng: String(params.lng),
+    distance: String(params.distance ?? 5000),
+  });
+  return request<{ data?: Array<{ _id?: string; name?: string; city?: string; shopId?: string; coordinates?: { coordinates?: number[] } }> }>(
+    `/api/locations/nearby?${search.toString()}`
+  );
+}
+
 export function searchProducts(params: { shopId?: string; q?: string }) {
   const search = new URLSearchParams();
   if (params.shopId) search.set("shopId", params.shopId);

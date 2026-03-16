@@ -57,6 +57,16 @@ router.get(
 );
 
 router.get(
+  "/:productId/reviews",
+  productController.listProductReviews
+);
+
+router.post(
+  "/:productId/reviews",
+  productController.createProductReview
+);
+
+router.get(
   "/:productId",
   productController.getProductDetail
 );

@@ -1,5 +1,6 @@
 const Product = require("../models/product.model");
 const Inventory = require("../models/Inventory.model");
+const ProductReview = require("../models/productReview.model");
 const { createAudit } = require("../utils/audit.util");
 const { t } =
   require('@/core/infrastructure');
@@ -295,5 +296,45 @@ exports.getProductByBarcode = async (req, res) => {
     return res.json({ data: product });
   } catch (err) {
     return res.status(500).json({ message: "Barcode lookup failed" });
+  }
+};
+
+exports.listProductReviews = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const reviews = await ProductReview.find({ productId })
+      .sort({ createdAt: -1 })
+      .lean();
+    res.json({ data: reviews });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to load reviews" });
+  }
+};
+
+exports.createProductReview = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { rating, message, reviewerName } = req.body || {};
+    if (!rating || !message) {
+      return res.status(400).json({ message: "rating and message required" });
+    }
+
+    const product = await Product.findById(productId).lean();
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    const entry = await ProductReview.create({
+      productId,
+      shopId: product.shopId,
+      userId: req.user?._id || null,
+      reviewerName: reviewerName || req.user?.name || "Guest",
+      rating: Math.max(1, Math.min(5, Number(rating) || 1)),
+      message: String(message),
+    });
+
+    res.status(201).json({ message: "Review submitted", data: entry });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to submit review" });
   }
 };

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Badge, Button, Card, CardDescription, CardTitle, Input } from "@dokanx/ui";
 
-import { searchRuntimeProducts, searchShops, searchSuggestions } from "@/lib/runtime-api";
+import { listLocations, searchRuntimeProducts, searchShops, searchSuggestions } from "@/lib/runtime-api";
 import { StorefrontProductGrid } from "@/components/storefront-product-grid";
 
 type RuntimeProduct = {
@@ -30,6 +30,10 @@ export function SearchWorkspace() {
   const [category, setCategory] = useState<string>("all");
   const [sort, setSort] = useState<string>("popular");
   const [activeTab, setActiveTab] = useState<"products" | "shops" | "categories">("products");
+  const [district, setDistrict] = useState<string>("all");
+  const [market, setMarket] = useState<string>("all");
+  const [districts, setDistricts] = useState<string[]>([]);
+  const [markets, setMarkets] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -91,7 +95,10 @@ export function SearchWorkspace() {
       try {
         const [productsResponse, shopsResponse] = await Promise.all([
           searchRuntimeProducts({ q: query.trim() }),
-          searchShops(query.trim()),
+          searchShops(query.trim(), {
+            district: district !== "all" ? district : undefined,
+            market: market !== "all" ? market : undefined,
+          }),
         ]);
         if (!active) return;
         setProducts(productsResponse.data || []);
@@ -110,7 +117,28 @@ export function SearchWorkspace() {
     return () => {
       active = false;
     };
-  }, [query]);
+  }, [query, district, market]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadLocations() {
+      try {
+        const response = await listLocations();
+        if (!active) return;
+        const rows = response.data || [];
+        const nextDistricts = Array.from(new Set(rows.map((row) => row.city).filter(Boolean))).sort();
+        const nextMarkets = Array.from(new Set(rows.map((row) => row.name).filter(Boolean))).sort();
+        setDistricts(nextDistricts as string[]);
+        setMarkets(nextMarkets as string[]);
+      } catch {
+        if (!active) return;
+      }
+    }
+    void loadLocations();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   function handleSubmit(value: string) {
     const next = value.trim();
@@ -205,6 +233,30 @@ export function SearchWorkspace() {
       {activeTab === "products" && sortedProducts.length ? <StorefrontProductGrid products={sortedProducts} /> : null}
       {activeTab === "shops" ? (
         <div className="grid gap-4 md:grid-cols-2">
+          <Card className="md:col-span-2">
+            <CardTitle>Shop filters</CardTitle>
+            <CardDescription className="mt-2">Filter shops by district and market.</CardDescription>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Badge variant={district === "all" ? "success" : "neutral"} onClick={() => setDistrict("all")}>
+                All districts
+              </Badge>
+              {districts.map((value) => (
+                <Badge key={value} variant={district === value ? "success" : "neutral"} onClick={() => setDistrict(value)}>
+                  {value}
+                </Badge>
+              ))}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Badge variant={market === "all" ? "success" : "neutral"} onClick={() => setMarket("all")}>
+                All markets
+              </Badge>
+              {markets.map((value) => (
+                <Badge key={value} variant={market === value ? "success" : "neutral"} onClick={() => setMarket(value)}>
+                  {value}
+                </Badge>
+              ))}
+            </div>
+          </Card>
           {shops.map((shop) => (
             <Card key={String(shop._id || shop.slug || shop.domain)}>
               <CardTitle>{shop.name || "Shop"}</CardTitle>

@@ -96,7 +96,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
           ) : null}
         </Card>
 
-        <ProductReviewsPanel />
+        <ProductReviewsPanel productId={String(product._id || product.id || "")} />
       </div>
 
       <div className="grid gap-6">

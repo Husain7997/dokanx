@@ -112,6 +112,16 @@ type OrderDetailResponse = {
   data?: JsonValue;
 };
 
+type ProductReviewResponse = {
+  data?: Array<{
+    _id?: string;
+    reviewerName?: string;
+    rating?: number;
+    message?: string;
+    createdAt?: string;
+  }>;
+};
+
 const guestCartStorageKey = "dokanx.guest-cart-token";
 
 function getGuestToken() {
@@ -210,9 +220,15 @@ export function searchSuggestions(query: string) {
   return request<SearchSuggestionResponse>(`/search/index?${search}`);
 }
 
-export function searchShops(query: string) {
-  const search = new URLSearchParams({ q: query }).toString();
-  return request<ShopSearchResponse>(`/search/shops?${search}`);
+export function searchShops(query: string, filters?: { district?: string; market?: string }) {
+  const params = new URLSearchParams({ q: query });
+  if (filters?.district) params.set("district", filters.district);
+  if (filters?.market) params.set("market", filters.market);
+  return request<ShopSearchResponse>(`/search/shops?${params.toString()}`);
+}
+
+export function listLocations() {
+  return request<{ data?: Array<{ _id?: string; name?: string; city?: string; shopId?: string }> }>("/locations");
 }
 
 export function saveCart(payload: {
@@ -299,4 +315,15 @@ export function getMyOrders() {
 
 export function getOrderDetail(orderId: string) {
   return request<OrderDetailResponse>(`/orders/${orderId}`);
+}
+
+export function getProductReviews(productId: string) {
+  return request<ProductReviewResponse>(`/products/${productId}/reviews`);
+}
+
+export function submitProductReview(productId: string, payload: { reviewerName?: string; rating: number; message: string }) {
+  return request<{ message?: string; data?: JsonValue }>(`/products/${productId}/reviews`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }

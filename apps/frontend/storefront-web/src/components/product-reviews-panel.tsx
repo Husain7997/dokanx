@@ -1,7 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button, Card, CardDescription, CardTitle, Input } from "@dokanx/ui";
+
+import { getProductReviews, submitProductReview } from "@/lib/runtime-api";
 
 type ReviewRow = {
   id: string;
@@ -10,16 +12,41 @@ type ReviewRow = {
   message: string;
 };
 
-export function ProductReviewsPanel() {
-  const [reviews, setReviews] = useState<ReviewRow[]>([
-    { id: "r1", name: "Nadia", rating: 5, message: "Fast delivery and great quality." },
-    { id: "r2", name: "Rafi", rating: 4, message: "Good value for money." },
-    { id: "r3", name: "Tahsin", rating: 5, message: "Loved the packaging and support." },
-  ]);
+export function ProductReviewsPanel({ productId }: { productId: string }) {
+  const [reviews, setReviews] = useState<ReviewRow[]>([]);
   const [name, setName] = useState("");
   const [rating, setRating] = useState("5");
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      if (!productId) return;
+      setLoading(true);
+      try {
+        const response = await getProductReviews(productId);
+        if (!active) return;
+        const rows =
+          response.data?.map((review) => ({
+            id: String(review._id || ""),
+            name: review.reviewerName || "Guest",
+            rating: Number(review.rating || 0),
+            message: String(review.message || ""),
+          })) || [];
+        setReviews(rows.filter((row) => row.id));
+      } catch {
+        if (!active) return;
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      active = false;
+    };
+  }, [productId]);
 
   const breakdown = useMemo(() => {
     const counts = [5, 4, 3, 2, 1].map((value) => ({
@@ -31,25 +58,36 @@ export function ProductReviewsPanel() {
     return { counts, average: average.toFixed(1), total: reviews.length };
   }, [reviews]);
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!name.trim() || !message.trim()) {
       setStatus("Name and review message are required.");
       return;
     }
     const parsedRating = Math.max(1, Math.min(5, Number(rating) || 5));
-    setReviews((current) => [
-      {
-        id: `r-${Date.now()}`,
-        name: name.trim(),
+    setStatus(null);
+    try {
+      const response = await submitProductReview(productId, {
+        reviewerName: name.trim(),
         rating: parsedRating,
         message: message.trim(),
-      },
-      ...current,
-    ]);
-    setName("");
-    setRating("5");
-    setMessage("");
-    setStatus("Thanks! Your review has been submitted.");
+      });
+      const created = response.data || {};
+      setReviews((current) => [
+        {
+          id: String(created._id || `r-${Date.now()}`),
+          name: String(created.reviewerName || name.trim()),
+          rating: Number(created.rating || parsedRating),
+          message: String(created.message || message.trim()),
+        },
+        ...current,
+      ]);
+      setName("");
+      setRating("5");
+      setMessage("");
+      setStatus("Thanks! Your review has been submitted.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Unable to submit review.");
+    }
   }
 
   return (
@@ -88,6 +126,7 @@ export function ProductReviewsPanel() {
       </Card>
 
       <div className="grid gap-4">
+        {loading ? <CardDescription>Loading reviews...</CardDescription> : null}
         {reviews.map((review) => (
           <Card key={review.id} className="border-border/60">
             <CardTitle>{review.name}</CardTitle>
