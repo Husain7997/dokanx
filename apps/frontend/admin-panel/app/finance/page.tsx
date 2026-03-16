@@ -1,3 +1,5 @@
+import { AdminFinanceOverview } from "@/components/admin-finance-overview";
+
 export const dynamic = "force-dynamic";
 
 export default function Page() {
@@ -8,12 +10,7 @@ export default function Page() {
         <h1 className="dx-display text-3xl">Finance</h1>
         <p className="text-sm text-muted-foreground">Platform revenue and ledger snapshots</p>
       </div>
-      <div className="grid gap-3 rounded-3xl border border-white/40 bg-white/70 p-6 shadow-sm">
-        <p className="text-sm font-semibold text-foreground">Workspace ready</p>
-        <p className="text-sm text-muted-foreground">
-          Connect the API data sources to populate this view with live admin insights.
-        </p>
-      </div>
+      <AdminFinanceOverview />
     </div>
   );
 }

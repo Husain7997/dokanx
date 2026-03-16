@@ -3,6 +3,7 @@ import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useCartStore } from "@/store/cart-store";
+import { useTenantStore } from "@/store/tenant-store";
 
 const results = [
   { id: "r1", name: "City Runner Shoes", price: 1800 },
@@ -12,6 +13,7 @@ const results = [
 export function SearchResultsScreen() {
   const navigation = useNavigation();
   const addItem = useCartStore((state) => state.addItem);
+  const selectedShop = useTenantStore((state) => state.shop);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -24,11 +26,16 @@ export function SearchResultsScreen() {
             <Pressable
               style={styles.actionButton}
               onPress={() => {
+                if (!selectedShop) {
+                  navigation.navigate("ShopSelect" as never);
+                  return;
+                }
                 addItem({
                   id: item.id,
                   productId: item.id,
                   name: item.name,
                   price: item.price,
+                  shopId: selectedShop.id,
                 });
                 navigation.navigate("Cart" as never);
               }}

@@ -3,6 +3,7 @@ import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useCartStore } from "@/store/cart-store";
+import { useTenantStore } from "@/store/tenant-store";
 
 const products = [
   { id: "p1", name: "Aurora Headphones", price: 3200, shop: "Aurora Electronics" },
@@ -13,11 +14,18 @@ const products = [
 export function ProductBrowsingScreen() {
   const navigation = useNavigation();
   const addItem = useCartStore((state) => state.addItem);
+  const selectedShop = useTenantStore((state) => state.shop);
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>Browse products</Text>
+        {!selectedShop ? (
+          <Pressable style={styles.noticeCard} onPress={() => navigation.navigate("ShopSelect" as never)}>
+            <Text style={styles.noticeTitle}>Select a shop first</Text>
+            <Text style={styles.noticeSubtitle}>Tap here to choose the storefront for this session.</Text>
+          </Pressable>
+        ) : null}
         {products.map((item) => (
           <View key={item.id} style={styles.card}>
             <Text style={styles.cardTitle}>{item.name}</Text>
@@ -27,11 +35,16 @@ export function ProductBrowsingScreen() {
               <Pressable
                 style={styles.actionButton}
                 onPress={() => {
+                  if (!selectedShop) {
+                    navigation.navigate("ShopSelect" as never);
+                    return;
+                  }
                   addItem({
                     id: item.id,
                     productId: item.id,
                     name: item.name,
                     price: item.price,
+                    shopId: selectedShop.id,
                     shop: item.shop,
                   });
                   navigation.navigate("Cart" as never);
@@ -81,4 +94,14 @@ const styles = StyleSheet.create({
     borderColor: "#d1d5db",
   },
   searchText: { fontSize: 13, fontWeight: "600", color: "#111827" },
+  noticeCard: {
+    backgroundColor: "#fff7ed",
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#fed7aa",
+    gap: 6,
+  },
+  noticeTitle: { fontSize: 14, fontWeight: "600", color: "#c2410c" },
+  noticeSubtitle: { fontSize: 12, color: "#9a3412" },
 });

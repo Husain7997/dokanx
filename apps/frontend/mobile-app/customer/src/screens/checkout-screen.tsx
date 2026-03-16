@@ -4,9 +4,9 @@ import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { placeOrderRequest } from "@/lib/api-client";
-import { DEFAULT_TENANT_ID } from "@/lib/config";
 import { useAuthStore } from "@/store/auth-store";
 import { useCartStore } from "@/store/cart-store";
+import { useTenantStore } from "@/store/tenant-store";
 
 const deliveryOptions = [
   { id: "standard", label: "Standard delivery", fee: 120 },
@@ -26,6 +26,7 @@ export function CheckoutScreen() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const cartItems = useCartStore((state) => state.items);
   const clearCart = useCartStore((state) => state.clear);
+  const selectedShop = useTenantStore((state) => state.shop);
   const [step, setStep] = useState(1);
   const [delivery, setDelivery] = useState("standard");
   const [payment, setPayment] = useState("cash_on_delivery");
@@ -61,6 +62,11 @@ export function CheckoutScreen() {
       navigation.navigate("Auth" as never);
       return;
     }
+    if (!selectedShop) {
+      setError("Select a shop before checkout.");
+      navigation.navigate("ShopSelect" as never);
+      return;
+    }
 
     setSubmitting(true);
     setStatus(null);
@@ -72,7 +78,7 @@ export function CheckoutScreen() {
           items: cartItems.map((item) => ({ product: item.productId, quantity: item.quantity })),
           totalAmount: totals.total,
         },
-        DEFAULT_TENANT_ID
+        selectedShop.id
       );
       clearCart();
       setSubmitting(false);

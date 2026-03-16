@@ -4,17 +4,19 @@ import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuthStore } from "@/store/auth-store";
+import { useTenantStore } from "@/store/tenant-store";
 
 export function AuthScreen() {
   const navigation = useNavigation();
   const { signIn, isLoading, error } = useAuthStore();
+  const selectedShop = useTenantStore((state) => state.shop);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   async function handleSignIn() {
     const ok = await signIn({ email, password });
     if (ok) {
-      navigation.navigate("Browse" as never);
+      navigation.navigate((selectedShop ? "Browse" : "ShopSelect") as never);
     }
   }
 

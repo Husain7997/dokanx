@@ -18,6 +18,8 @@ const gateway =
 
 const requestContext =
   require("./middlewares/requestContext");
+const tenantResolver =
+  require("./middlewares/tenant.middleware");
 
 const languageMiddleware =
   require("./middlewares/language.middleware");
@@ -56,6 +58,7 @@ app.use(express.json());
 app.use(requestContext);
 app.use(languageMiddleware);
 app.use(httpLogger);
+app.use(tenantResolver);
 
 app.use(passport.initialize());
 

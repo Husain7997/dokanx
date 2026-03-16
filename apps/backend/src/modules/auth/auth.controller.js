@@ -4,6 +4,7 @@ const generateToken = require("../../utils/generateToken");
 const { t } =
   require('@/core/infrastructure');
 const jwt = require("jsonwebtoken");
+const { randomUUID } = require("crypto");
 /**
  * ===============================
  * REGISTER
@@ -88,4 +89,48 @@ exports.login = async (req, res) => {
     success: true,
     token,
   });
+};
+
+/**
+ * ===============================
+ * ACCEPT INVITATION
+ * ===============================
+ */
+exports.acceptInvitation = async (req, res) => {
+  try {
+    const { token, password, name } = req.body || {};
+    if (!token || !password) {
+      return res.status(400).json({ message: "Token and password are required" });
+    }
+
+    const user = await User.findOne({
+      invitationToken: token,
+      invitationExpiresAt: { $gt: new Date() },
+    }).select("+password");
+
+    if (!user) {
+      return res.status(404).json({ message: "Invitation not found or expired" });
+    }
+
+    user.password = await bcrypt.hash(password, 10);
+    if (name) user.name = name;
+    user.invitationToken = null;
+    user.invitationExpiresAt = null;
+    await user.save();
+
+    const accessToken = jwt.sign(
+      { id: user._id, role: user.role, shopId: user.shopId || null },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.json({
+      message: "Invitation accepted",
+      token: accessToken,
+      user,
+      inviteId: randomUUID(),
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 };

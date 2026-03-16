@@ -75,10 +75,36 @@ exports.updateOrderStatus = async (req, res) => {
  */
 exports.getMyShops = async (req, res) => {
   try {
-    const shops = await Shop.find({ owner: req.user._id });
+    let shops = [];
+    if (req.user?.role === "STAFF" && req.user?.shopId) {
+      const staffShop = await Shop.findById(req.user.shopId);
+      shops = staffShop ? [staffShop] : [];
+    } else {
+      shops = await Shop.find({ owner: req.user._id });
+    }
 
     res.json({
       message: t('common.updated', req.lang),
+      data: shops,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch shops",
+    });
+  }
+};
+
+/**
+ * LIST PUBLIC SHOPS
+ */
+exports.listPublicShops = async (_req, res) => {
+  try {
+    const shops = await Shop.find({ isActive: true, status: "ACTIVE" })
+      .select("name domain slug")
+      .lean();
+
+    res.json({
       data: shops,
     });
   } catch (error) {

@@ -42,6 +42,12 @@ export function loginRequest(payload: { email: string; password: string }) {
   });
 }
 
+export function listPublicShops() {
+  return request<{ data?: Array<{ _id?: string; id?: string; name?: string; domain?: string; slug?: string }> }>(
+    "/api/shops/public"
+  );
+}
+
 export function placeOrderRequest(
   token: string,
   payload: {

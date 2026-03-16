@@ -8,6 +8,7 @@ const shopSchema = new mongoose.Schema(
     },
 
     domain: String,
+    slug: String,
 
     owner: {
       type: mongoose.Schema.Types.ObjectId,
@@ -26,6 +27,17 @@ const shopSchema = new mongoose.Schema(
       type: String,
       enum: ["ACTIVE", "SUSPENDED"],
       default: "ACTIVE",
+    },
+    supportEmail: String,
+    whatsapp: String,
+    payoutSchedule: String,
+    logoUrl: String,
+    brandPrimaryColor: String,
+    brandAccentColor: String,
+    themeId: String,
+    themeOverrides: {
+      type: Object,
+      default: null,
     },
   },
   {

@@ -4,8 +4,18 @@ const router = express.Router();
 const {
   createShop,
   updateOrderStatus,
-  blockCustomer
+  blockCustomer,
+  getMyShops,
+  listPublicShops
 } = require('../controllers/shop.controller');
+
+const {
+  getShopSettings,
+  updateShopSettings,
+  listTeamMembers,
+  addTeamMember,
+  updateTeamMember,
+} = require("../controllers/shop.settings.controller");
 
 const { protect,  allowRoles } = require("../middlewares");
 // const allowRoles = require('../middlewares/rbac.middleware');
@@ -20,6 +30,50 @@ router.put(
   protect,
   allowRoles("OWNER"),
   blockCustomer
+);
+
+router.get("/public", listPublicShops);
+
+router.get(
+  "/me",
+  protect,
+  allowRoles("OWNER", "STAFF", "ADMIN"),
+  getMyShops
+);
+
+router.get(
+  "/me/settings",
+  protect,
+  allowRoles("OWNER", "STAFF", "ADMIN"),
+  getShopSettings
+);
+
+router.put(
+  "/me/settings",
+  protect,
+  allowRoles("OWNER", "STAFF", "ADMIN"),
+  updateShopSettings
+);
+
+router.get(
+  "/me/team",
+  protect,
+  allowRoles("OWNER", "ADMIN"),
+  listTeamMembers
+);
+
+router.post(
+  "/me/team",
+  protect,
+  allowRoles("OWNER", "ADMIN"),
+  addTeamMember
+);
+
+router.patch(
+  "/me/team/:userId",
+  protect,
+  allowRoles("OWNER", "ADMIN"),
+  updateTeamMember
 );
 
 router.put(

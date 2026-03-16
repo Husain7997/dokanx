@@ -14,5 +14,6 @@ if (process.env.GOOGLE_CLIENT_ID) {
 // Register & Login
 router.post("/register", authController.register);
 router.post("/login", authController.login);
+router.post("/invitations/accept", authController.acceptInvitation);
 
 module.exports = router;

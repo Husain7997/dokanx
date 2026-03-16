@@ -13,6 +13,10 @@ const userSchema = new mongoose.Schema(
     unique: true,
     lowercase: true,
   },
+  phone: {
+    type: String,
+    default: null,
+  },
 
   password: {
     type: String,
@@ -35,6 +39,18 @@ const userSchema = new mongoose.Schema(
   isBlocked: {
     type: Boolean,
     default: false,
+  },
+  permissionOverrides: {
+    type: [String],
+    default: [],
+  },
+  invitationToken: {
+    type: String,
+    default: null,
+  },
+  invitationExpiresAt: {
+    type: Date,
+    default: null,
   },
 },
 { timestamps: true }

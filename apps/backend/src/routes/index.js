@@ -11,6 +11,7 @@ const authRoutes = require("../modules/auth/auth.routes");
 const shopRoutes = require("./shop.routes");
 const productRoutes = require("./product.routes");
 const orderRoutes = require("./order.routes");
+const checkoutRoutes = require("./checkout.routes");
 const adminRoutes = require("./admin.routes");
 const paymentRoutes = require("./payment.routes");
 const settlementRoutes = require("./settlement.routes");
@@ -20,6 +21,7 @@ const inventoryRoutes = require('./inventory.routes');
 const reportRoutes = require("../modules/reporting/report.routes");
 const settlementAdminRoutes = require('./admin/settlement.routes');
 const walletShopRoutes = require('./shop/wallet.routes');
+const walletRoutes = require("./wallet.routes");
 const adminMetricsRoutes  = require('./admin.metrics.routes');
 const financeAdminRoutes = require('./admin/finance.routes');
 const adjustmentAdminRoutes = require('./admin/adjustment.routes');
@@ -31,23 +33,24 @@ const approvalAdminRoutes = require('./admin/approval.routes');
 const healthRoute = require('./health.routes');
 const systemRoute = require("../infrastructure/monitoring/health.routes");
 const webhookRoutes = require('../infrastructure/webhook/webhook.routes');
-
-console.log("ADMIN FINANCE ROUTES LOADED");
-router.use('/admin/finance', require('./admin/finance.routes'));
+const themeRoutes = require("./theme.routes");
 
 router.use("/financial-test", require("./financial.test.routes"));
 // ---- Routes ----
-router.use("/api", meRoutes);
+router.use("/", meRoutes);
 router.use('/platform', platformRoutes);
 router.use("/auth", authRoutes);
 router.use("/shops", shopRoutes);
 router.use("/shop/payouts", shopPayoutRoutes);
 router.use("/products", productRoutes);
 router.use("/orders", orderRoutes);
+router.use("/checkout", checkoutRoutes);
 router.use("/admin", adminRoutes);
 router.use("/payments", paymentRoutes);
 router.use("/settlements", settlementRoutes);
 router.use("/report", reportRoutes);
+router.use("/wallet", walletRoutes);
+router.use("/themes", themeRoutes);
 
 // temporary dev routes
 router.use("/reports", require("../modules/reporting/report.routes"));
@@ -55,7 +58,6 @@ router.use("/dev", require("./dev.routes"));
 
 
 
-router.use('/shop', shopPayoutRoutes);
 // router.use('/admin', adminRoutes);
 
 router.use('/admin/settlements', settlementAdminRoutes);
