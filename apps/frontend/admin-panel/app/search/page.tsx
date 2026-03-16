@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { AdminEtaHealth } from "@/components/admin-eta-health";
 import { getSearchStatus, triggerDeltaReindex, triggerFullReindex } from "@/lib/admin-search-api";
 
 export default function SearchAdminPage() {
@@ -41,27 +42,30 @@ export default function SearchAdminPage() {
         <p className="text-sm text-muted-foreground">Monitor and trigger search indexing jobs.</p>
       </div>
 
-      <div className="grid gap-4 rounded-3xl border border-white/40 bg-white/70 p-6">
-        <p className="text-sm font-semibold text-foreground">Index status</p>
-        <p className="text-xs text-muted-foreground">
-          Last delta run: {lastRunAt ? new Date(lastRunAt).toLocaleString() : "Not yet"}
-        </p>
-        <p className="text-xs text-muted-foreground">Indexed documents: {totalDocs ?? "Unknown"}</p>
-        <div className="flex flex-wrap gap-3">
-          <button
-            className="rounded-full border border-white/60 bg-black px-4 py-2 text-xs font-semibold text-white"
-            onClick={handleFullReindex}
-          >
-            Force full reindex
-          </button>
-          <button
-            className="rounded-full border border-white/60 bg-white px-4 py-2 text-xs font-semibold text-foreground"
-            onClick={handleDeltaReindex}
-          >
-            Run delta reindex
-          </button>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 rounded-3xl border border-white/40 bg-white/70 p-6">
+          <p className="text-sm font-semibold text-foreground">Index status</p>
+          <p className="text-xs text-muted-foreground">
+            Last delta run: {lastRunAt ? new Date(lastRunAt).toLocaleString() : "Not yet"}
+          </p>
+          <p className="text-xs text-muted-foreground">Indexed documents: {totalDocs ?? "Unknown"}</p>
+          <div className="flex flex-wrap gap-3">
+            <button
+              className="rounded-full border border-white/60 bg-black px-4 py-2 text-xs font-semibold text-white"
+              onClick={handleFullReindex}
+            >
+              Force full reindex
+            </button>
+            <button
+              className="rounded-full border border-white/60 bg-white px-4 py-2 text-xs font-semibold text-foreground"
+              onClick={handleDeltaReindex}
+            >
+              Run delta reindex
+            </button>
+          </div>
+          {status ? <p className="text-xs text-emerald-700">{status}</p> : null}
         </div>
-        {status ? <p className="text-xs text-emerald-700">{status}</p> : null}
+        <AdminEtaHealth />
       </div>
 
       <div className="grid gap-3 rounded-3xl border border-white/40 bg-white/70 p-6">

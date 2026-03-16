@@ -177,6 +177,19 @@ export default function SettingsPage() {
         <Button onClick={handleSave} disabled={saving}>
           {saving ? "Saving..." : "Save settings"}
         </Button>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            setBasePerKm(defaultEtaSettings.basePerKm);
+            setMinEta(defaultEtaSettings.minEta);
+            setFallbackEta(defaultEtaSettings.fallbackEta);
+            setTrafficFactors(defaultEtaSettings.trafficFactors);
+            setDistanceBrackets(defaultEtaSettings.distanceBrackets);
+            setStatus("Defaults restored. Remember to save.");
+          }}
+        >
+          Reset to defaults
+        </Button>
         {status ? <p className="text-xs text-muted-foreground">{status}</p> : null}
       </div>
     </div>
@@ -194,24 +207,30 @@ function EtaBracketEditor({
   distanceError?: string | null;
   minutesError?: string | null;
 }) {
+  const orderWarnings = getOrderWarnings(value);
   return (
     <div className="mt-4 grid gap-3">
       {value.map((row, index) => (
         <div key={`${row.maxDistanceKm}-${index}`} className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
-          <Input
-            type="number"
-            inputMode="decimal"
-            min={BRACKET_DISTANCE_RANGE.min}
-            max={BRACKET_DISTANCE_RANGE.max}
-            step="0.5"
-            value={String(row.maxDistanceKm)}
-            onChange={(event) => {
-              const next = [...value];
-              next[index] = { ...next[index], maxDistanceKm: toNumber(event.target.value, next[index].maxDistanceKm) };
-              onChange(next);
-            }}
-            placeholder="Max distance (km)"
-          />
+          <div className="grid gap-1">
+            <Input
+              type="number"
+              inputMode="decimal"
+              min={BRACKET_DISTANCE_RANGE.min}
+              max={BRACKET_DISTANCE_RANGE.max}
+              step="0.5"
+              value={String(row.maxDistanceKm)}
+              onChange={(event) => {
+                const next = [...value];
+                next[index] = { ...next[index], maxDistanceKm: toNumber(event.target.value, next[index].maxDistanceKm) };
+                onChange(next);
+              }}
+              placeholder="Max distance (km)"
+            />
+            {orderWarnings[index] ? (
+              <span className="text-[11px] text-amber-600">{orderWarnings[index]}</span>
+            ) : null}
+          </div>
           <Input
             type="number"
             inputMode="numeric"
@@ -337,4 +356,16 @@ function validateBracketMinutes(rows: EtaBracket[], label: string) {
     return `${label} must be between ${BRACKET_MINUTES_RANGE.min} and ${BRACKET_MINUTES_RANGE.max} minutes.`;
   }
   return null;
+}
+
+function getOrderWarnings(rows: EtaBracket[]) {
+  return rows.map((row, index) => {
+    if (index === 0) return null;
+    const prev = rows[index - 1];
+    if (!Number.isFinite(row.maxDistanceKm) || !Number.isFinite(prev.maxDistanceKm)) return null;
+    if (row.maxDistanceKm <= prev.maxDistanceKm) {
+      return `Should be greater than previous (${prev.maxDistanceKm} km).`;
+    }
+    return null;
+  });
 }
