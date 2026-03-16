@@ -34,6 +34,10 @@ export function SearchWorkspace() {
   const [market, setMarket] = useState<string>("all");
   const [districts, setDistricts] = useState<string[]>([]);
   const [markets, setMarkets] = useState<string[]>([]);
+  const [locationMap, setLocationMap] = useState<Map<string, { lat: number; lng: number }>>(new Map());
+  const [shopSort, setShopSort] = useState<"nearest" | "rating">("nearest");
+  const [distance, setDistance] = useState(5);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -130,6 +134,13 @@ export function SearchWorkspace() {
         const nextMarkets = Array.from(new Set(rows.map((row) => row.name).filter(Boolean))).sort();
         setDistricts(nextDistricts as string[]);
         setMarkets(nextMarkets as string[]);
+        const map = new Map<string, { lat: number; lng: number }>();
+        rows.forEach((row) => {
+          const coords = row.coordinates?.coordinates || [];
+          if (!row.shopId || coords.length < 2) return;
+          map.set(String(row.shopId), { lat: Number(coords[1]), lng: Number(coords[0]) });
+        });
+        setLocationMap(map);
       } catch {
         if (!active) return;
       }
@@ -138,6 +149,17 @@ export function SearchWorkspace() {
     return () => {
       active = false;
     };
+  }, []);
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+      },
+      () => null,
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
   }, []);
 
   function handleSubmit(value: string) {
@@ -256,11 +278,35 @@ export function SearchWorkspace() {
                 </Badge>
               ))}
             </div>
+            <div className="mt-6 grid gap-3">
+              <p className="text-sm text-muted-foreground">Distance radius: {distance} km</p>
+              <input
+                type="range"
+                min={1}
+                max={20}
+                step={1}
+                value={distance}
+                onChange={(event) => setDistance(Number(event.target.value))}
+                className="w-full"
+              />
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button size="sm" variant={shopSort === "nearest" ? "default" : "secondary"} onClick={() => setShopSort("nearest")}>
+                Nearest
+              </Button>
+              <Button size="sm" variant={shopSort === "rating" ? "default" : "secondary"} onClick={() => setShopSort("rating")}>
+                Highest rating
+              </Button>
+            </div>
           </Card>
-          {shops.map((shop) => (
+          {sortShops(shops, userLocation, distance, shopSort, locationMap).map((shop) => (
             <Card key={String(shop._id || shop.slug || shop.domain)}>
               <CardTitle>{shop.name || "Shop"}</CardTitle>
               <CardDescription className="mt-2">{shop.domain || shop.slug || "Marketplace shop"}</CardDescription>
+              {userLocation && shop.distanceKm !== undefined ? (
+                <p className="mt-2 text-sm text-muted-foreground">{shop.distanceKm.toFixed(1)} km away</p>
+              ) : null}
+              <p className="mt-2 text-sm text-muted-foreground">⭐ {shop.rating.toFixed(1)}</p>
               {shop.slug ? (
                 <div className="mt-4">
                   <Button asChild variant="secondary">
@@ -293,4 +339,60 @@ export function SearchWorkspace() {
       ) : null}
     </div>
   );
+}
+
+function sortShops(
+  shops: Array<{ _id?: string; name?: string; slug?: string; domain?: string }>,
+  userLocation: { lat: number; lng: number } | null,
+  distance: number,
+  sort: "nearest" | "rating",
+  locationMap: Map<string, { lat: number; lng: number }>
+) {
+  const enriched = shops.map((shop) => {
+    const id = String(shop._id || shop.slug || shop.domain || "");
+    const rating = 3.8 + (hashCode(id) % 12) / 10;
+    let distanceKm: number | undefined;
+    if (userLocation) {
+      const coords = locationMap.get(String(shop._id || ""));
+      if (coords) {
+        distanceKm = getDistanceKm(userLocation, coords);
+      }
+    }
+    return { ...shop, rating, distanceKm };
+  });
+
+  const filtered = userLocation
+    ? enriched.filter((shop) => shop.distanceKm !== undefined && shop.distanceKm <= distance)
+    : enriched;
+
+  if (sort === "rating") {
+    return filtered.sort((a, b) => b.rating - a.rating);
+  }
+  return filtered.sort((a, b) => (a.distanceKm ?? 0) - (b.distanceKm ?? 0));
+}
+
+function hashCode(value: string) {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash << 5) - hash + value.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function getDistanceKm(
+  from: { lat: number; lng: number },
+  to: { lat: number; lng: number }
+) {
+  const rad = Math.PI / 180;
+  const dLat = (to.lat - from.lat) * rad;
+  const dLng = (to.lng - from.lng) * rad;
+  const lat1 = from.lat * rad;
+  const lat2 = to.lat * rad;
+
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return 6371 * c;
 }

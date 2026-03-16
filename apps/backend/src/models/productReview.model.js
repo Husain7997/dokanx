@@ -35,6 +35,21 @@ const productReviewSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    status: {
+      type: String,
+      enum: ["PENDING", "APPROVED", "REJECTED"],
+      default: "PENDING",
+      index: true,
+    },
+    approvedAt: {
+      type: Date,
+      default: null,
+    },
+    approvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
   },
   { timestamps: true }
 );

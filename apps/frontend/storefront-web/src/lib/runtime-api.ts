@@ -228,7 +228,7 @@ export function searchShops(query: string, filters?: { district?: string; market
 }
 
 export function listLocations() {
-  return request<{ data?: Array<{ _id?: string; name?: string; city?: string; shopId?: string }> }>("/locations");
+  return request<{ data?: Array<{ _id?: string; name?: string; city?: string; shopId?: string; coordinates?: { coordinates?: number[] } }> }>("/locations");
 }
 
 export function saveCart(payload: {

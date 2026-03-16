@@ -84,6 +84,18 @@ type AdminAuditResponse = {
   } & JsonValue>;
 };
 
+type AdminReviewResponse = {
+  data?: Array<{
+    _id?: string;
+    productId?: string;
+    reviewerName?: string;
+    rating?: number;
+    message?: string;
+    status?: string;
+    createdAt?: string;
+  }>;
+};
+
 type AdminSettlementResponse = {
   data?: Array<{
     _id?: string;
@@ -223,5 +235,22 @@ export function approveShop(shopId: string) {
 export function suspendShop(shopId: string) {
   return request<{ message?: string }>(`/admin/shops/${shopId}/suspend`, {
     method: "PUT",
+  });
+}
+
+export function listProductReviews(status = "PENDING") {
+  const search = new URLSearchParams({ status });
+  return request<AdminReviewResponse>(`/admin/reviews?${search.toString()}`);
+}
+
+export function approveProductReview(reviewId: string) {
+  return request<{ message?: string }>(`/admin/reviews/${reviewId}/approve`, {
+    method: "POST",
+  });
+}
+
+export function rejectProductReview(reviewId: string) {
+  return request<{ message?: string }>(`/admin/reviews/${reviewId}/reject`, {
+    method: "POST",
   });
 }

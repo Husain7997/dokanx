@@ -302,7 +302,7 @@ exports.getProductByBarcode = async (req, res) => {
 exports.listProductReviews = async (req, res) => {
   try {
     const { productId } = req.params;
-    const reviews = await ProductReview.find({ productId })
+    const reviews = await ProductReview.find({ productId, status: "APPROVED" })
       .sort({ createdAt: -1 })
       .lean();
     res.json({ data: reviews });
@@ -331,6 +331,7 @@ exports.createProductReview = async (req, res) => {
       reviewerName: reviewerName || req.user?.name || "Guest",
       rating: Math.max(1, Math.min(5, Number(rating) || 1)),
       message: String(message),
+      status: "PENDING",
     });
 
     res.status(201).json({ message: "Review submitted", data: entry });

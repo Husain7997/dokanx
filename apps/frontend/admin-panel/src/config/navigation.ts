@@ -68,5 +68,10 @@ export const adminNavigation = [
     label: "Users",
     href: "/users",
     description: "Platform users"
+  },
+  {
+    label: "Reviews",
+    href: "/reviews",
+    description: "Product review moderation"
   }
 ];

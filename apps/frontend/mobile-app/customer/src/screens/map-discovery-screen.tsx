@@ -37,6 +37,8 @@ export function MapDiscoveryScreen() {
   const [shops, setShops] = useState<ShopOption[]>([]);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [radius, setRadius] = useState(3);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const buttonPos = useRef(new Animated.ValueXY({ x: window.width - 74, y: window.height * 0.4 })).current;
   const watchId = useRef<number | null>(null);
 
@@ -178,6 +180,7 @@ export function MapDiscoveryScreen() {
     let active = true;
     async function refreshNearby() {
       if (!userLocation) return;
+      setRefreshing(true);
       try {
         const response = await searchNearbyLocations({
           lat: userLocation.lat,
@@ -200,8 +203,11 @@ export function MapDiscoveryScreen() {
         if (markerRows.length) {
           setMarkers(markerRows);
         }
+        setLastUpdated(new Date());
       } catch {
         if (!active) return;
+      } finally {
+        if (active) setRefreshing(false);
       }
     }
     void refreshNearby();
@@ -226,6 +232,55 @@ export function MapDiscoveryScreen() {
         <View style={styles.header}>
           <Text style={styles.title}>Map discovery</Text>
           <Text style={styles.subtitle}>Nearby shops and delivery radius</Text>
+        </View>
+
+        <View style={styles.indicatorCard}>
+          <Text style={styles.indicatorTitle}>Live location</Text>
+          <Text style={styles.indicatorMeta}>
+            {userLocation
+              ? `${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}`
+              : "Location unavailable"}
+          </Text>
+          <View style={styles.indicatorRow}>
+            <Text style={styles.indicatorMeta}>
+              {lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : "Waiting for updates"}
+            </Text>
+            <Pressable
+              style={[styles.refreshButton, refreshing ? styles.refreshButtonDisabled : null]}
+              onPress={async () => {
+                if (!userLocation) return;
+                setRefreshing(true);
+                try {
+                  const response = await searchNearbyLocations({
+                    lat: userLocation.lat,
+                    lng: userLocation.lng,
+                    distance: radius * 1000,
+                  });
+                  const nearby = (response.data || []) as LocationRow[];
+                  const markerRows: MarkerRow[] = nearby
+                    .map((location) => {
+                      const coords = location.coordinates?.coordinates || [];
+                      return {
+                        id: String(location.shopId || location._id || ""),
+                        title: String(location.name || location.city || "Shop"),
+                        lat: Number(coords[1]),
+                        lng: Number(coords[0]),
+                      };
+                    })
+                    .filter((row) => Number.isFinite(row.lat) && Number.isFinite(row.lng));
+                  if (markerRows.length) {
+                    setMarkers(markerRows);
+                  }
+                  setLastUpdated(new Date());
+                } finally {
+                  setRefreshing(false);
+                }
+              }}
+              disabled={refreshing}
+            >
+              <Text style={styles.refreshText}>{refreshing ? "Refreshing..." : "Refresh"}</Text>
+            </Pressable>
+          </View>
         </View>
 
         <Animated.View style={[styles.mapPanel, panelStyle]}>
@@ -366,6 +421,25 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
   },
   fabText: { color: "#ffffff", fontSize: 12, fontWeight: "600" },
+  indicatorCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    gap: 6,
+  },
+  indicatorTitle: { fontSize: 13, fontWeight: "600", color: "#111827" },
+  indicatorMeta: { fontSize: 11, color: "#6b7280" },
+  indicatorRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4 },
+  refreshButton: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: "#111827",
+  },
+  refreshButtonDisabled: { opacity: 0.6 },
+  refreshText: { color: "#ffffff", fontSize: 11, fontWeight: "600" },
 });
 
 function getDistanceKm(

@@ -5,6 +5,7 @@ const { protect } = require("../middlewares");
 const allowRoles = require("../middlewares/allowRoles");
 
 const adminController = require("../controllers/admin.controller");
+const reviewController = require("../controllers/admin/review.controller");
 
 // ❗❗ খুব গুরুত্বপূর্ণ: function হিসেবে পাঠাচ্ছি
 router.get("/users",
@@ -58,6 +59,24 @@ router.get("/shops",
   protect,
   allowRoles("ADMIN"),
   adminController.listShops
+);
+
+router.get("/reviews",
+  protect,
+  allowRoles("ADMIN"),
+  reviewController.listReviews
+);
+
+router.post("/reviews/:reviewId/approve",
+  protect,
+  allowRoles("ADMIN"),
+  reviewController.approveReview
+);
+
+router.post("/reviews/:reviewId/reject",
+  protect,
+  allowRoles("ADMIN"),
+  reviewController.rejectReview
 );
 
 module.exports = router;
