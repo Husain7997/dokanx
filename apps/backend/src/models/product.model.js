@@ -13,6 +13,11 @@ const productSchema = new mongoose.Schema(
     type: String,
     required: true,
   },
+  barcode: {
+    type: String,
+    default: null,
+    index: true,
+  },
 
   price: {
     type: Number,
@@ -49,6 +54,7 @@ isReconciling: {
 
 productSchema.index({ shopId: 1, name: 1 });
 productSchema.index({ shopId: 1, createdAt: -1 });
+productSchema.index({ shopId: 1, barcode: 1 });
 
 module.exports =
   mongoose.models.Product ||

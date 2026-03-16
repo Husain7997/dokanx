@@ -23,6 +23,7 @@ const shipmentSchema = new mongoose.Schema(
     },
     events: { type: [shipmentEventSchema], default: [] },
     metadata: { type: Object, default: null },
+    lastSyncedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

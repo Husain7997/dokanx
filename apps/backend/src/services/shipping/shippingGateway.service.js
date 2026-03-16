@@ -21,7 +21,14 @@ async function parseWebhook(carrier, payload) {
   return adapter.parseWebhook(payload);
 }
 
+async function verifyWebhook(carrier, payload, signature) {
+  const adapter = resolveCarrier(carrier);
+  if (!adapter.verifyWebhook) return true;
+  return adapter.verifyWebhook(payload, signature);
+}
+
 module.exports = {
   createShipment,
   parseWebhook,
+  verifyWebhook,
 };

@@ -23,6 +23,12 @@ const { startRecoveryWorker } =
 const { startAIObserver } =
   require("@/core/ai/agents/ai.observer");
 
+const { startSearchReindexCron } =
+  require("../jobs/searchReindex.job");
+
+const { runShippingSync } =
+  require("../jobs/shippingSync.job");
+
  
 
   const {
@@ -45,10 +51,13 @@ function registerWorkers() {
   1000 * 60 * 5
 );
 
+    setInterval(runShippingSync, 1000 * 60 * 10);
+
     /* 🔥 INVENTORY PROJECTION WORKER */
     setInterval(runInventoryProjection, 1000);
 
   startSnapshotWorker();
+  startSearchReindexCron();
  /* ---------- SYSTEM AGENTS ---------- */
     startRecoveryWorker();
     startAIObserver();

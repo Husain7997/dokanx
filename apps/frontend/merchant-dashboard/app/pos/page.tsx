@@ -1,15 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import { useAuthStore } from "@dokanx/auth";
 
-import { createPosOrder, openPosSession, closePosSession } from "@/lib/runtime-api";
+import { createPosOrder, openPosSession, closePosSession, getProductByBarcode } from "@/lib/runtime-api";
 
 export default function PosPage() {
+  const tenantId = useAuthStore((state) => state.tenant?.id || "");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [productId, setProductId] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [barcode, setBarcode] = useState("");
+  const [cart, setCart] = useState<Array<{ product: string; name: string; price: number; quantity: number }>>([]);
 
   async function handleOpenSession() {
     const response = await openPosSession({ openingBalance: 0 });
@@ -25,11 +28,33 @@ export default function PosPage() {
   }
 
   async function handleCreateOrder() {
-    const qty = Math.max(1, Number(quantity) || 1);
-    const response = await createPosOrder({
-      items: [{ product: productId, quantity: qty }],
-    });
+    const items = cart.length
+      ? cart.map((item) => ({ product: item.product, quantity: item.quantity }))
+      : [{ product: productId, quantity: Math.max(1, Number(quantity) || 1) }];
+
+    const response = await createPosOrder({ items });
     setStatus(`POS order created: ${response.data?._id || ""}`);
+    setCart([]);
+  }
+
+  async function handleBarcodeLookup(value: string) {
+    if (!value || !tenantId) return;
+    try {
+      const response = await getProductByBarcode(value, tenantId);
+      const product = response.data as { _id?: string; name?: string; price?: number } | undefined;
+      if (!product?._id) return;
+      setCart((current) => {
+        const existing = current.find((item) => item.product === product._id);
+        if (existing) {
+          return current.map((item) =>
+            item.product === product._id ? { ...item, quantity: item.quantity + 1 } : item
+          );
+        }
+        return [...current, { product: product._id, name: product.name || "Item", price: product.price || 0, quantity: 1 }];
+      });
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Barcode lookup failed");
+    }
   }
 
   return (
@@ -72,7 +97,12 @@ export default function PosPage() {
               const value = event.target.value;
               setBarcode(value);
               if (value.length >= 8) {
-                setProductId(value);
+                void handleBarcodeLookup(value);
+              }
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                void handleBarcodeLookup(barcode);
               }
             }}
           />
@@ -95,6 +125,18 @@ export default function PosPage() {
         >
           Create order
         </button>
+        {cart.length ? (
+          <div className="grid gap-2 text-xs text-muted-foreground">
+            {cart.map((item) => (
+              <div key={item.product} className="flex items-center justify-between">
+                <span>{item.name}</span>
+                <span>
+                  {item.quantity} x {item.price}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {status ? <p className="text-xs text-emerald-700">{status}</p> : null}

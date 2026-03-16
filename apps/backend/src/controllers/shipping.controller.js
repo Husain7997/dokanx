@@ -70,6 +70,11 @@ exports.createShipment = async (req, res) => {
 exports.handleWebhook = async (req, res) => {
   const carrier = req.headers["x-shipping-carrier"] || req.body.carrier;
   if (!carrier) return res.status(400).json({ message: "carrier required" });
+  const signature = req.headers["x-shipping-signature"] || "";
+  const verified = await shippingGateway.verifyWebhook(carrier, req.body, signature);
+  if (!verified) {
+    return res.status(400).json({ message: "Invalid webhook signature" });
+  }
 
   const parsed = await shippingGateway.parseWebhook(carrier, req.body);
   const shipment = await Shipment.findOne({ trackingNumber: parsed.trackingNumber });

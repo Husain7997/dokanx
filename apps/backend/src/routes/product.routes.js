@@ -40,6 +40,11 @@ router.get(
 );
 
 router.get(
+  "/barcode/:barcode",
+  productController.getProductByBarcode
+);
+
+router.get(
   "/:productId/inventory",
   protect,
   // resolveShop,

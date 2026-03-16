@@ -1,6 +1,11 @@
+const crypto = require("crypto");
 const { randomToken } = require("../../../utils/crypto.util");
 
 exports.createPayment = async ({ amount, currency, orderId }) => {
+  const secretKey = process.env.STRIPE_SECRET_KEY || "";
+  if (process.env.NODE_ENV === "production" && !secretKey) {
+    throw new Error("Stripe secret key missing");
+  }
   return {
     provider: "stripe",
     providerPaymentId: `stripe_${randomToken(10)}`,
@@ -10,6 +15,9 @@ exports.createPayment = async ({ amount, currency, orderId }) => {
   };
 };
 
-exports.verifyWebhook = async (_payload, _signature) => {
-  return true;
+exports.verifyWebhook = async (payload, signature) => {
+  const secret = process.env.STRIPE_WEBHOOK_SECRET || "";
+  if (!secret) return process.env.NODE_ENV !== "production";
+  const expected = crypto.createHmac("sha256", secret).update(JSON.stringify(payload)).digest("hex");
+  return expected === signature;
 };

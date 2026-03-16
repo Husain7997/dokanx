@@ -272,3 +272,7 @@ export function createPosOrder(payload: {
     body: JSON.stringify(payload),
   });
 }
+
+export function getProductByBarcode(barcode: string, shopId: string) {
+  return request<{ data?: JsonValue }>(`/products/barcode/${barcode}?shopId=${encodeURIComponent(shopId)}`);
+}

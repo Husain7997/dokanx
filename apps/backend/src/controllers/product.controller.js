@@ -63,6 +63,7 @@ exports.createProduct = async (req, res) => {
     const product = await Product.create({
       name,
       price,
+      barcode: barcode || null,
       shopId: req.shop._id,
       owner: req.user._id
     });
@@ -111,7 +112,7 @@ exports.updateProduct = async (req, res) => {
     }
 
     const { productId } = req.params;
-    const { name, price, stock } = req.body;
+    const { name, price, stock, barcode } = req.body;
 
     const product = await Product.findOne({ _id: productId, shopId: req.shop._id });
     if (!product) {
@@ -126,6 +127,9 @@ exports.updateProduct = async (req, res) => {
     }
     if (typeof price === "number") {
       product.price = price;
+    }
+    if (typeof barcode === "string" && barcode.trim()) {
+      product.barcode = barcode.trim();
     }
     if (typeof stock === "number") {
       product.stock = Math.max(0, stock);
@@ -239,4 +243,21 @@ exports.getProductInventory = async (req, res) => {
     available: inventory.stock,
     reserved: inventory.reserved
   });
+};
+
+exports.getProductByBarcode = async (req, res) => {
+  try {
+    const { barcode } = req.params;
+    const shopId = req.query.shopId || req.shop?._id;
+    if (!barcode || !shopId) {
+      return res.status(400).json({ message: "barcode and shopId required" });
+    }
+
+    const product = await Product.findOne({ shopId, barcode });
+    if (!product) return res.status(404).json({ message: "Product not found" });
+
+    return res.json({ data: product });
+  } catch (err) {
+    return res.status(500).json({ message: "Barcode lookup failed" });
+  }
 };
