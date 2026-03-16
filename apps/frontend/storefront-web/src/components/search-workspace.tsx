@@ -306,7 +306,11 @@ export function SearchWorkspace() {
               {userLocation && shop.distanceKm !== undefined ? (
                 <p className="mt-2 text-sm text-muted-foreground">{shop.distanceKm.toFixed(1)} km away</p>
               ) : null}
-              <p className="mt-2 text-sm text-muted-foreground">⭐ {shop.rating.toFixed(1)}</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                <span>⭐ {shop.rating.toFixed(1)}</span>
+                <span>{shop.isOpen ? "Open" : "Closed"}</span>
+                <span>ETA {shop.etaMinutes} min</span>
+              </div>
               {shop.slug ? (
                 <div className="mt-4">
                   <Button asChild variant="secondary">
@@ -351,6 +355,7 @@ function sortShops(
   const enriched = shops.map((shop) => {
     const id = String(shop._id || shop.slug || shop.domain || "");
     const rating = 3.8 + (hashCode(id) % 12) / 10;
+    const isOpen = hashCode(id) % 2 === 0;
     let distanceKm: number | undefined;
     if (userLocation) {
       const coords = locationMap.get(String(shop._id || ""));
@@ -358,7 +363,8 @@ function sortShops(
         distanceKm = getDistanceKm(userLocation, coords);
       }
     }
-    return { ...shop, rating, distanceKm };
+    const etaMinutes = distanceKm !== undefined ? Math.max(15, Math.round(distanceKm * 12)) : 45;
+    return { ...shop, rating, distanceKm, etaMinutes, isOpen };
   });
 
   const filtered = userLocation

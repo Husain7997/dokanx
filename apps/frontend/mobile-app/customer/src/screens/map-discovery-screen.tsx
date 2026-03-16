@@ -3,6 +3,7 @@ import { Animated, Dimensions, PanResponder, PermissionsAndroid, Platform, Press
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Geolocation from "react-native-geolocation-service";
+import Slider from "@react-native-community/slider";
 
 import { listLocations, listPublicShops, searchNearbyLocations } from "@/lib/api-client";
 
@@ -39,6 +40,7 @@ export function MapDiscoveryScreen() {
   const [radius, setRadius] = useState(3);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [sortBy, setSortBy] = useState<"nearest" | "rating">("nearest");
   const buttonPos = useRef(new Animated.ValueXY({ x: window.width - 74, y: window.height * 0.4 })).current;
   const watchId = useRef<number | null>(null);
 
@@ -171,10 +173,24 @@ export function MapDiscoveryScreen() {
   }, [markers, radius, userLocation]);
 
   const filteredShops = useMemo(() => {
-    if (!userLocation) return shops;
     const shopIds = new Set(filteredMarkers.map((marker) => marker.id));
-    return shops.filter((shop) => shopIds.has(shop.id));
-  }, [filteredMarkers, shops, userLocation]);
+    const base = shops
+      .filter((shop) => shopIds.has(shop.id))
+      .map((shop) => {
+        const marker = markerForShop(filteredMarkers, shop.id);
+        const distanceKm =
+          userLocation && marker ? getDistanceKm(userLocation, { lat: marker.lat, lng: marker.lng }) : null;
+        return {
+          ...shop,
+          rating: buildRating(shop.id),
+          distanceKm,
+        };
+      });
+    if (sortBy === "rating") {
+      return base.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    }
+    return base.sort((a, b) => (a.distanceKm ?? 0) - (b.distanceKm ?? 0));
+  }, [filteredMarkers, shops, sortBy, userLocation]);
 
   useEffect(() => {
     let active = true;
@@ -307,16 +323,30 @@ export function MapDiscoveryScreen() {
 
         <View style={styles.filterRow}>
           <Text style={styles.filterLabel}>Nearby radius</Text>
-          <View style={styles.filterChips}>
-            {[1, 3, 5, 8].map((value) => (
-              <Pressable
-                key={value}
-                style={[styles.filterChip, radius === value ? styles.filterChipActive : null]}
-                onPress={() => setRadius(value)}
-              >
-                <Text style={[styles.filterChipText, radius === value ? styles.filterChipTextActive : null]}>{value} km</Text>
-              </Pressable>
-            ))}
+          <Text style={styles.filterValue}>{radius} km</Text>
+          <Slider
+            value={radius}
+            minimumValue={1}
+            maximumValue={20}
+            step={1}
+            minimumTrackTintColor="#111827"
+            maximumTrackTintColor="#e5e7eb"
+            thumbTintColor="#111827"
+            onValueChange={(value) => setRadius(Math.round(value))}
+          />
+          <View style={styles.sortRow}>
+            <Pressable
+              style={[styles.sortChip, sortBy === "nearest" ? styles.sortChipActive : null]}
+              onPress={() => setSortBy("nearest")}
+            >
+              <Text style={[styles.sortChipText, sortBy === "nearest" ? styles.sortChipTextActive : null]}>Nearest</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.sortChip, sortBy === "rating" ? styles.sortChipActive : null]}
+              onPress={() => setSortBy("rating")}
+            >
+              <Text style={[styles.sortChipText, sortBy === "rating" ? styles.sortChipTextActive : null]}>Highest rating</Text>
+            </Pressable>
           </View>
         </View>
 
@@ -325,7 +355,11 @@ export function MapDiscoveryScreen() {
           {filteredShops.slice(0, 6).map((shop) => (
             <View key={shop.id} style={styles.shopRow}>
               <Text style={styles.shopName}>{shop.name}</Text>
-              <Text style={styles.shopMeta}>{shop.slug || "Shop profile"}</Text>
+              <Text style={styles.shopMeta}>
+                {shop.distanceKm !== null && shop.distanceKm !== undefined
+                  ? `${shop.distanceKm.toFixed(1)} km â€¢ â˜… ${shop.rating.toFixed(1)}`
+                  : shop.slug || "Shop profile"}
+              </Text>
             </View>
           ))}
         </View>
@@ -383,6 +417,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   filterLabel: { fontSize: 12, color: "#6b7280" },
+  filterValue: { fontSize: 12, color: "#111827", fontWeight: "600" },
   filterChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   filterChip: {
     borderRadius: 999,
@@ -395,6 +430,18 @@ const styles = StyleSheet.create({
   filterChipActive: { backgroundColor: "#111827", borderColor: "#111827" },
   filterChipText: { fontSize: 12, color: "#111827" },
   filterChipTextActive: { color: "#ffffff" },
+  sortRow: { flexDirection: "row", gap: 8, marginTop: 8 },
+  sortChip: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    backgroundColor: "#f9fafb",
+  },
+  sortChipActive: { backgroundColor: "#111827", borderColor: "#111827" },
+  sortChipText: { fontSize: 12, color: "#111827" },
+  sortChipTextActive: { color: "#ffffff" },
   listCard: {
     backgroundColor: "#ffffff",
     borderRadius: 18,
@@ -457,4 +504,18 @@ function getDistanceKm(
     Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return 6371 * c;
+}
+
+function markerForShop(markers: MarkerRow[], shopId: string) {
+  return markers.find((marker) => marker.id === shopId) || null;
+}
+
+function markerLocation(marker: MarkerRow | null) {
+  if (!marker) return { lat: 0, lng: 0 };
+  return { lat: marker.lat, lng: marker.lng };
+}
+
+function buildRating(seed: string) {
+  const hash = seed.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return 3.8 + (hash % 12) / 10;
 }
