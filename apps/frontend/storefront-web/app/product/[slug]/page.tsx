@@ -3,6 +3,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 
 import { ProductPurchasePanel } from "@/components/product-purchase-panel";
+import { ProductReviewsPanel } from "@/components/product-reviews-panel";
 import { StorefrontProductGrid } from "@/components/storefront-product-grid";
 import { getProductBySlug, getProductsData, getShopBySlug } from "@/lib/server-data";
 import { getTenantConfig } from "@/lib/tenant";
@@ -95,22 +96,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
           ) : null}
         </Card>
 
-        <Card>
-          <CardTitle>Reviews</CardTitle>
-          <CardDescription className="mt-2">Real customer feedback for this product.</CardDescription>
-          <div className="mt-6 grid gap-4">
-            {[
-              ["Great quality", "Fast delivery and sturdy packaging."],
-              ["Worth the price", "Product matched the description perfectly."],
-              ["Repeat purchase", "Second time buying and still happy."],
-            ].map(([title, detail]) => (
-              <div key={title} className="rounded-2xl border border-border/60 p-4">
-                <p className="font-semibold">{title}</p>
-                <p className="text-sm text-muted-foreground">{detail}</p>
-              </div>
-            ))}
-          </div>
-        </Card>
+        <ProductReviewsPanel />
       </div>
 
       <div className="grid gap-6">

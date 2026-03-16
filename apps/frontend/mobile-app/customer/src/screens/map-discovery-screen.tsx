@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Dimensions, PanResponder, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Dimensions, PanResponder, PermissionsAndroid, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Geolocation from "react-native-geolocation-service";
 
 import { listLocations, listPublicShops } from "@/lib/api-client";
 
@@ -34,6 +35,8 @@ export function MapDiscoveryScreen() {
   const [mapState, setMapState] = useState<"closed" | "minimized" | "expanded">("expanded");
   const [markers, setMarkers] = useState<MarkerRow[]>([]);
   const [shops, setShops] = useState<ShopOption[]>([]);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [radius, setRadius] = useState(3);
   const buttonPos = useRef(new Animated.ValueXY({ x: window.width - 74, y: window.height * 0.4 })).current;
 
   const panResponder = useRef(
@@ -94,13 +97,63 @@ export function MapDiscoveryScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    async function requestLocation() {
+      if (Platform.OS === "android") {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: "Location access",
+            message: "Allow DokanX to show nearby shops on the map.",
+            buttonPositive: "Allow",
+            buttonNegative: "Deny",
+          }
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) return;
+      }
+
+      Geolocation.getCurrentPosition(
+        (position) => {
+          if (!active) return;
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+        },
+        () => {
+          if (!active) return;
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+      );
+    }
+    void requestLocation();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const initialRegion = useMemo(() => {
+    if (userLocation) {
+      return { latitude: userLocation.lat, longitude: userLocation.lng, latitudeDelta: 0.08, longitudeDelta: 0.08 };
+    }
     if (markers.length) {
       const { lat, lng } = markers[0];
       return { latitude: lat, longitude: lng, latitudeDelta: 0.08, longitudeDelta: 0.08 };
     }
     return { latitude: 23.8103, longitude: 90.4125, latitudeDelta: 0.2, longitudeDelta: 0.2 };
-  }, [markers]);
+  }, [markers, userLocation]);
+
+  const filteredMarkers = useMemo(() => {
+    if (!userLocation) return markers;
+    return markers.filter((marker) => getDistanceKm(userLocation, { lat: marker.lat, lng: marker.lng }) <= radius);
+  }, [markers, radius, userLocation]);
+
+  const filteredShops = useMemo(() => {
+    if (!userLocation) return shops;
+    const shopIds = new Set(filteredMarkers.map((marker) => marker.id));
+    return shops.filter((shop) => shopIds.has(shop.id));
+  }, [filteredMarkers, shops, userLocation]);
 
   const panelStyle = useMemo(() => {
     if (mapState === "closed") {
@@ -126,25 +179,40 @@ export function MapDiscoveryScreen() {
               provider={PROVIDER_GOOGLE}
               style={StyleSheet.absoluteFill}
               initialRegion={initialRegion}
-              showsUserLocation={false}
-              showsMyLocationButton={false}
+              showsUserLocation={Boolean(userLocation)}
+              showsMyLocationButton={true}
             >
-              {markers.map((marker) => (
+              {filteredMarkers.map((marker) => (
                 <Marker key={marker.id} coordinate={{ latitude: marker.lat, longitude: marker.lng }} title={marker.title} />
               ))}
             </MapView>
           ) : null}
           {mapState === "closed" ? null : (
             <View style={styles.mapFooter}>
-              <Text style={styles.footerTitle}>Live shops: {shops.length}</Text>
-              <Text style={styles.footerSubtitle}>Tap a marker for shop details</Text>
+              <Text style={styles.footerTitle}>Live shops: {filteredShops.length}</Text>
+              <Text style={styles.footerSubtitle}>Radius {radius} km • Tap a marker for shop details</Text>
             </View>
           )}
         </Animated.View>
 
+        <View style={styles.filterRow}>
+          <Text style={styles.filterLabel}>Nearby radius</Text>
+          <View style={styles.filterChips}>
+            {[1, 3, 5, 8].map((value) => (
+              <Pressable
+                key={value}
+                style={[styles.filterChip, radius === value ? styles.filterChipActive : null]}
+                onPress={() => setRadius(value)}
+              >
+                <Text style={[styles.filterChipText, radius === value ? styles.filterChipTextActive : null]}>{value} km</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
         <View style={styles.listCard}>
           <Text style={styles.cardTitle}>Shop list</Text>
-          {shops.slice(0, 6).map((shop) => (
+          {filteredShops.slice(0, 6).map((shop) => (
             <View key={shop.id} style={styles.shopRow}>
               <Text style={styles.shopName}>{shop.name}</Text>
               <Text style={styles.shopMeta}>{shop.slug || "Shop profile"}</Text>
@@ -196,6 +264,27 @@ const styles = StyleSheet.create({
   },
   footerTitle: { color: "#fff", fontSize: 12, fontWeight: "600" },
   footerSubtitle: { color: "#e5e7eb", fontSize: 10 },
+  filterRow: {
+    backgroundColor: "#ffffff",
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    gap: 10,
+  },
+  filterLabel: { fontSize: 12, color: "#6b7280" },
+  filterChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  filterChip: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    backgroundColor: "#f9fafb",
+  },
+  filterChipActive: { backgroundColor: "#111827", borderColor: "#111827" },
+  filterChipText: { fontSize: 12, color: "#111827" },
+  filterChipTextActive: { color: "#ffffff" },
   listCard: {
     backgroundColor: "#ffffff",
     borderRadius: 18,
@@ -223,3 +312,20 @@ const styles = StyleSheet.create({
   },
   fabText: { color: "#ffffff", fontSize: 12, fontWeight: "600" },
 });
+
+function getDistanceKm(
+  from: { lat: number; lng: number },
+  to: { lat: number; lng: number }
+) {
+  const rad = Math.PI / 180;
+  const dLat = (to.lat - from.lat) * rad;
+  const dLng = (to.lng - from.lng) * rad;
+  const lat1 = from.lat * rad;
+  const lat2 = to.lat * rad;
+
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return 6371 * c;
+}

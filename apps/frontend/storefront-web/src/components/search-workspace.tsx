@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Badge, Button, Card, CardDescription, CardTitle, Input } from "@dokanx/ui";
 
-import { searchRuntimeProducts, searchSuggestions } from "@/lib/runtime-api";
+import { searchRuntimeProducts, searchShops, searchSuggestions } from "@/lib/runtime-api";
 import { StorefrontProductGrid } from "@/components/storefront-product-grid";
 
 type RuntimeProduct = {
@@ -26,8 +26,10 @@ export function SearchWorkspace() {
   const [query, setQuery] = useState(initialQuery);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [products, setProducts] = useState<RuntimeProduct[]>([]);
+  const [shops, setShops] = useState<Array<{ _id?: string; name?: string; slug?: string; domain?: string }>>([]);
   const [category, setCategory] = useState<string>("all");
   const [sort, setSort] = useState<string>("popular");
+  const [activeTab, setActiveTab] = useState<"products" | "shops" | "categories">("products");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -80,16 +82,21 @@ export function SearchWorkspace() {
     async function load() {
       if (!query.trim()) {
         setProducts([]);
+        setShops([]);
         setMessage("Search products, shops, or categories.");
         return;
       }
       setLoading(true);
       setMessage(null);
       try {
-        const response = await searchRuntimeProducts({ q: query.trim() });
+        const [productsResponse, shopsResponse] = await Promise.all([
+          searchRuntimeProducts({ q: query.trim() }),
+          searchShops(query.trim()),
+        ]);
         if (!active) return;
-        setProducts(response.data || []);
-        if (!response.data?.length) {
+        setProducts(productsResponse.data || []);
+        setShops(shopsResponse.data || []);
+        if (!productsResponse.data?.length && !shopsResponse.data?.length) {
           setMessage("No products matched your search.");
         }
       } catch (error) {
@@ -117,6 +124,22 @@ export function SearchWorkspace() {
         <CardDescription className="mt-2">
           Google-style suggestions with category filters and price sorting.
         </CardDescription>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {[
+            ["products", "Products"],
+            ["shops", "Shops"],
+            ["categories", "Categories"],
+          ].map(([value, label]) => (
+            <Button
+              key={value}
+              variant={activeTab === value ? "default" : "secondary"}
+              size="sm"
+              onClick={() => setActiveTab(value as "products" | "shops" | "categories")}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
         <div className="relative mt-6">
           <Input
             placeholder="Search products, shops, categories, brands"
@@ -145,27 +168,31 @@ export function SearchWorkspace() {
             </div>
           ) : null}
         </div>
-        <div className="mt-6 flex flex-wrap gap-2">
-          <Badge variant={category === "all" ? "success" : "neutral"} onClick={() => setCategory("all")}>
-            All
-          </Badge>
-          {categories.map((value) => (
-            <Badge key={value} variant={category === value ? "success" : "neutral"} onClick={() => setCategory(value)}>
-              {value}
-            </Badge>
-          ))}
-        </div>
-        <div className="mt-4 flex flex-wrap gap-3 text-sm">
-          {[
-            ["popular", "Popular"],
-            ["lowest", "Lowest Price"],
-            ["highest", "Highest Price"],
-          ].map(([value, label]) => (
-            <Button key={value} variant={sort === value ? "default" : "secondary"} size="sm" onClick={() => setSort(value)}>
-              {label}
-            </Button>
-          ))}
-        </div>
+        {activeTab === "products" ? (
+          <>
+            <div className="mt-6 flex flex-wrap gap-2">
+              <Badge variant={category === "all" ? "success" : "neutral"} onClick={() => setCategory("all")}>
+                All
+              </Badge>
+              {categories.map((value) => (
+                <Badge key={value} variant={category === value ? "success" : "neutral"} onClick={() => setCategory(value)}>
+                  {value}
+                </Badge>
+              ))}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-3 text-sm">
+              {[
+                ["popular", "Popular"],
+                ["lowest", "Lowest Price"],
+                ["highest", "Highest Price"],
+              ].map(([value, label]) => (
+                <Button key={value} variant={sort === value ? "default" : "secondary"} size="sm" onClick={() => setSort(value)}>
+                  {label}
+                </Button>
+              ))}
+            </div>
+          </>
+        ) : null}
       </Card>
 
       {loading ? <p className="text-sm text-muted-foreground">Loading results...</p> : null}
@@ -175,7 +202,43 @@ export function SearchWorkspace() {
           <CardDescription className="mt-2">{message}</CardDescription>
         </Card>
       ) : null}
-      {sortedProducts.length ? <StorefrontProductGrid products={sortedProducts} /> : null}
+      {activeTab === "products" && sortedProducts.length ? <StorefrontProductGrid products={sortedProducts} /> : null}
+      {activeTab === "shops" ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          {shops.map((shop) => (
+            <Card key={String(shop._id || shop.slug || shop.domain)}>
+              <CardTitle>{shop.name || "Shop"}</CardTitle>
+              <CardDescription className="mt-2">{shop.domain || shop.slug || "Marketplace shop"}</CardDescription>
+              {shop.slug ? (
+                <div className="mt-4">
+                  <Button asChild variant="secondary">
+                    <a href={`/shop/${shop.slug}`}>Visit shop</a>
+                  </Button>
+                </div>
+              ) : null}
+            </Card>
+          ))}
+          {!shops.length ? (
+            <Card className="border-dashed border-border/60 bg-card/60">
+              <CardTitle>No shops found</CardTitle>
+              <CardDescription className="mt-2">Try searching with a different keyword.</CardDescription>
+            </Card>
+          ) : null}
+        </div>
+      ) : null}
+      {activeTab === "categories" ? (
+        <Card>
+          <CardTitle>Categories</CardTitle>
+          <CardDescription className="mt-2">Tap a category to focus your search.</CardDescription>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {(categories.length ? categories : ["Groceries", "Electronics", "Fashion", "Medicine"]).map((value) => (
+              <Badge key={value} variant="secondary" onClick={() => setCategory(value)}>
+                {value}
+              </Badge>
+            ))}
+          </div>
+        </Card>
+      ) : null}
     </div>
   );
 }

@@ -81,6 +81,16 @@ type SearchSuggestionResponse = {
   count?: number;
 };
 
+type ShopSearchResponse = {
+  data?: Array<{
+    _id?: string;
+    name?: string;
+    slug?: string;
+    domain?: string;
+  }>;
+  count?: number;
+};
+
 type PaymentHandoffResponse = {
   message?: string;
   attemptId?: string;
@@ -198,6 +208,11 @@ export function searchRuntimeProducts(query: Record<string, string>) {
 export function searchSuggestions(query: string) {
   const search = new URLSearchParams({ q: query }).toString();
   return request<SearchSuggestionResponse>(`/search/index?${search}`);
+}
+
+export function searchShops(query: string) {
+  const search = new URLSearchParams({ q: query }).toString();
+  return request<ShopSearchResponse>(`/search/shops?${search}`);
 }
 
 export function saveCart(payload: {
