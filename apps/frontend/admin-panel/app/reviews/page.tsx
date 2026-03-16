@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Button, Card, CardDescription, CardTitle, DataTable, Input } from "@dokanx/ui";
+import { Button, Card, CardDescription, CardTitle, DataTable, Input, Modal, ModalContent, ModalDescription, ModalFooter, ModalHeader, ModalTitle } from "@dokanx/ui";
 
 import { approveProductReview, listProductReviews, rejectProductReview } from "@/lib/admin-runtime-api";
 
@@ -24,6 +24,7 @@ export default function Page() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkAction, setBulkAction] = useState<null | "approve" | "reject">(null);
 
   const filteredReviews = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -102,34 +103,51 @@ export default function Page() {
         <Button
           variant="secondary"
           disabled={!selectedIds.size}
-          onClick={async () => {
-            const ids = Array.from(selectedIds);
-            for (const id of ids) {
-              await approveProductReview(id);
-            }
-            const response = await listProductReviews(status);
-            setReviews(Array.isArray(response.data) ? (response.data as ReviewRow[]) : []);
-            setSelectedIds(new Set());
-          }}
+          onClick={() => setBulkAction("approve")}
         >
           Bulk approve
         </Button>
         <Button
           variant="secondary"
           disabled={!selectedIds.size}
-          onClick={async () => {
-            const ids = Array.from(selectedIds);
-            for (const id of ids) {
-              await rejectProductReview(id);
-            }
-            const response = await listProductReviews(status);
-            setReviews(Array.isArray(response.data) ? (response.data as ReviewRow[]) : []);
-            setSelectedIds(new Set());
-          }}
+          onClick={() => setBulkAction("reject")}
         >
           Bulk reject
         </Button>
       </div>
+      <Modal open={bulkAction !== null} onOpenChange={(open) => { if (!open) setBulkAction(null); }}>
+        <ModalContent>
+          <ModalHeader>
+            <ModalTitle>{bulkAction === "approve" ? "Approve reviews?" : "Reject reviews?"}</ModalTitle>
+            <ModalDescription>
+              This will {bulkAction === "approve" ? "approve" : "reject"} {selectedIds.size} reviews.
+            </ModalDescription>
+          </ModalHeader>
+          <ModalFooter>
+            <Button variant="secondary" onClick={() => setBulkAction(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                const ids = Array.from(selectedIds);
+                for (const id of ids) {
+                  if (bulkAction === "approve") {
+                    await approveProductReview(id);
+                  } else {
+                    await rejectProductReview(id);
+                  }
+                }
+                const response = await listProductReviews(status);
+                setReviews(Array.isArray(response.data) ? (response.data as ReviewRow[]) : []);
+                setSelectedIds(new Set());
+                setBulkAction(null);
+              }}
+            >
+              {bulkAction === "approve" ? "Approve all" : "Reject all"}
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
       <DataTable
         columns={[
           {

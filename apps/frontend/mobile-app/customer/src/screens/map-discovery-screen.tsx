@@ -41,8 +41,10 @@ export function MapDiscoveryScreen() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [sortBy, setSortBy] = useState<"nearest" | "rating">("nearest");
+  const [autoRecenter, setAutoRecenter] = useState(true);
   const buttonPos = useRef(new Animated.ValueXY({ x: window.width - 74, y: window.height * 0.4 })).current;
   const watchId = useRef<number | null>(null);
+  const mapRef = useRef<MapView | null>(null);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -135,10 +137,22 @@ export function MapDiscoveryScreen() {
       watchId.current = Geolocation.watchPosition(
         (position) => {
           if (!active) return;
-          setUserLocation({
+          const nextLocation = {
             lat: position.coords.latitude,
             lng: position.coords.longitude,
-          });
+          };
+          setUserLocation(nextLocation);
+          if (autoRecenter && mapRef.current) {
+            mapRef.current.animateToRegion(
+              {
+                latitude: nextLocation.lat,
+                longitude: nextLocation.lng,
+                latitudeDelta: 0.05,
+                longitudeDelta: 0.05,
+              },
+              650
+            );
+          }
         },
         () => {
           if (!active) return;
@@ -171,6 +185,19 @@ export function MapDiscoveryScreen() {
     if (!userLocation) return markers;
     return markers.filter((marker) => getDistanceKm(userLocation, { lat: marker.lat, lng: marker.lng }) <= radius);
   }, [markers, radius, userLocation]);
+
+  useEffect(() => {
+    if (!userLocation || !autoRecenter || !mapRef.current) return;
+    mapRef.current.animateToRegion(
+      {
+        latitude: userLocation.lat,
+        longitude: userLocation.lng,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      },
+      650
+    );
+  }, [autoRecenter, userLocation]);
 
   const filteredShops = useMemo(() => {
     const shopIds = new Set(filteredMarkers.map((marker) => marker.id));
@@ -261,41 +288,51 @@ export function MapDiscoveryScreen() {
             <Text style={styles.indicatorMeta}>
               {lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : "Waiting for updates"}
             </Text>
-            <Pressable
-              style={[styles.refreshButton, refreshing ? styles.refreshButtonDisabled : null]}
-              onPress={async () => {
-                if (!userLocation) return;
-                setRefreshing(true);
-                try {
-                  const response = await searchNearbyLocations({
-                    lat: userLocation.lat,
-                    lng: userLocation.lng,
-                    distance: radius * 1000,
-                  });
-                  const nearby = (response.data || []) as LocationRow[];
-                  const markerRows: MarkerRow[] = nearby
-                    .map((location) => {
-                      const coords = location.coordinates?.coordinates || [];
-                      return {
-                        id: String(location.shopId || location._id || ""),
-                        title: String(location.name || location.city || "Shop"),
-                        lat: Number(coords[1]),
-                        lng: Number(coords[0]),
-                      };
-                    })
-                    .filter((row) => Number.isFinite(row.lat) && Number.isFinite(row.lng));
-                  if (markerRows.length) {
-                    setMarkers(markerRows);
+            <View style={styles.indicatorActions}>
+              <Pressable
+                style={[styles.refreshButton, refreshing ? styles.refreshButtonDisabled : null]}
+                onPress={async () => {
+                  if (!userLocation) return;
+                  setRefreshing(true);
+                  try {
+                    const response = await searchNearbyLocations({
+                      lat: userLocation.lat,
+                      lng: userLocation.lng,
+                      distance: radius * 1000,
+                    });
+                    const nearby = (response.data || []) as LocationRow[];
+                    const markerRows: MarkerRow[] = nearby
+                      .map((location) => {
+                        const coords = location.coordinates?.coordinates || [];
+                        return {
+                          id: String(location.shopId || location._id || ""),
+                          title: String(location.name || location.city || "Shop"),
+                          lat: Number(coords[1]),
+                          lng: Number(coords[0]),
+                        };
+                      })
+                      .filter((row) => Number.isFinite(row.lat) && Number.isFinite(row.lng));
+                    if (markerRows.length) {
+                      setMarkers(markerRows);
+                    }
+                    setLastUpdated(new Date());
+                  } finally {
+                    setRefreshing(false);
                   }
-                  setLastUpdated(new Date());
-                } finally {
-                  setRefreshing(false);
-                }
-              }}
-              disabled={refreshing}
-            >
-              <Text style={styles.refreshText}>{refreshing ? "Refreshing..." : "Refresh"}</Text>
-            </Pressable>
+                }}
+                disabled={refreshing}
+              >
+                <Text style={styles.refreshText}>{refreshing ? "Refreshing..." : "Refresh"}</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.refreshButton, styles.refreshButtonOutline]}
+                onPress={() => setAutoRecenter((current) => !current)}
+              >
+                <Text style={[styles.refreshText, styles.refreshTextDark]}>
+                  {autoRecenter ? "Auto-center" : "Manual"}
+                </Text>
+              </Pressable>
+            </View>
           </View>
         </View>
 
@@ -307,6 +344,9 @@ export function MapDiscoveryScreen() {
               initialRegion={initialRegion}
               showsUserLocation={Boolean(userLocation)}
               showsMyLocationButton={true}
+              ref={(ref) => {
+                mapRef.current = ref;
+              }}
             >
               {filteredMarkers.map((marker) => (
                 <Marker key={marker.id} coordinate={{ latitude: marker.lat, longitude: marker.lng }} title={marker.title} />
@@ -479,14 +519,21 @@ const styles = StyleSheet.create({
   indicatorTitle: { fontSize: 13, fontWeight: "600", color: "#111827" },
   indicatorMeta: { fontSize: 11, color: "#6b7280" },
   indicatorRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4 },
+  indicatorActions: { flexDirection: "row", gap: 8, alignItems: "center" },
   refreshButton: {
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 6,
     backgroundColor: "#111827",
   },
+  refreshButtonOutline: {
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#111827",
+  },
   refreshButtonDisabled: { opacity: 0.6 },
   refreshText: { color: "#ffffff", fontSize: 11, fontWeight: "600" },
+  refreshTextDark: { color: "#111827" },
 });
 
 function getDistanceKm(
