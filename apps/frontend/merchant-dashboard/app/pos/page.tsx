@@ -10,6 +10,7 @@ export default function PosPage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [productId, setProductId] = useState("");
+  const [sku, setSku] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [barcode, setBarcode] = useState("");
   const [cart, setCart] = useState<Array<{ product: string; name: string; price: number; quantity: number }>>([]);
@@ -59,6 +60,11 @@ export default function PosPage() {
     } catch (err) {
       setStatus(err instanceof Error ? err.message : "Barcode lookup failed");
     }
+  }
+
+  async function handleSkuLookup() {
+    if (!sku || !tenantId) return;
+    await handleBarcodeLookup(sku);
   }
 
   useEffect(() => {
@@ -183,6 +189,17 @@ export default function PosPage() {
           />
           <input
             className="rounded-xl border border-white/60 bg-white px-3 py-2 text-sm"
+            placeholder="SKU / Barcode manual"
+            value={sku}
+            onChange={(event) => setSku(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                void handleSkuLookup();
+              }
+            }}
+          />
+          <input
+            className="rounded-xl border border-white/60 bg-white px-3 py-2 text-sm"
             placeholder="Quantity"
             value={quantity}
             onChange={(event) => setQuantity(event.target.value)}
@@ -193,6 +210,12 @@ export default function PosPage() {
           onClick={handleCreateOrder}
         >
           Create order
+        </button>
+        <button
+          className="w-fit rounded-full border border-white/60 bg-white px-4 py-2 text-xs font-semibold text-foreground"
+          onClick={handleSkuLookup}
+        >
+          Add by SKU
         </button>
         {cart.length ? (
           <div className="grid gap-2 text-xs text-muted-foreground">

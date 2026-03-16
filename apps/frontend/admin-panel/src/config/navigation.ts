@@ -45,6 +45,11 @@ export const adminNavigation = [
     description: "Insights and KPIs"
   },
   {
+    label: "Search",
+    href: "/search",
+    description: "Search index controls"
+  },
+  {
     label: "Couriers",
     href: "/couriers",
     description: "Delivery partners"

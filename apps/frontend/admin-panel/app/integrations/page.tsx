@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { listIntegrations, saveIntegration } from "@/lib/admin-integrations-api";
+import { listIntegrations, saveIntegration, testIntegration } from "@/lib/admin-integrations-api";
 
 type Integration = {
   provider: string;
@@ -37,6 +37,12 @@ export default function IntegrationsPage() {
     await refresh();
   }
 
+  async function handleTest(provider: string) {
+    const response = await testIntegration(provider);
+    const result = response.data as { message?: string } | undefined;
+    setStatus(result?.message ? `${provider}: ${result.message}` : `${provider}: test ok`);
+  }
+
   return (
     <div className="grid gap-6">
       <div>
@@ -54,6 +60,7 @@ export default function IntegrationsPage() {
               provider={provider}
               current={current}
               onSave={handleSave}
+              onTest={handleTest}
             />
           );
         })}
@@ -68,10 +75,12 @@ function IntegrationCard({
   provider,
   current,
   onSave,
+  onTest,
 }: {
   provider: string;
   current?: Integration;
   onSave: (provider: string, secret: string, status: string, publicKey: string) => void;
+  onTest: (provider: string) => void;
 }) {
   const [secret, setSecret] = useState("");
   const [publicKey, setPublicKey] = useState(String(current?.publicData?.key || current?.publicData?.appKey || current?.publicData?.merchantId || current?.publicData?.apiKey || ""));
@@ -110,6 +119,12 @@ function IntegrationCard({
         onClick={() => onSave(provider, secret, statusValue, publicKey)}
       >
         Save
+      </button>
+      <button
+        className="w-fit rounded-full border border-white/60 bg-white px-4 py-2 text-xs font-semibold text-foreground"
+        onClick={() => onTest(provider)}
+      >
+        Test connection
       </button>
     </div>
   );

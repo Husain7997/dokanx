@@ -53,3 +53,18 @@ exports.upsertCredential = async (req, res) => {
     },
   });
 };
+
+exports.testCredential = async (req, res) => {
+  const { provider } = req.params;
+  const record = await ProviderCredential.findOne({ provider });
+  if (!record) return res.status(404).json({ message: "Credential not found" });
+
+  res.json({
+    data: {
+      provider,
+      status: record.status,
+      reachable: true,
+      message: "Test successful (stubbed).",
+    },
+  });
+};

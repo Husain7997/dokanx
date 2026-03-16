@@ -32,22 +32,18 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return payload as T;
 }
 
-export function listIntegrations() {
-  return request<{ data?: JsonValue[] }>("/admin/integrations");
+export function getSearchStatus() {
+  return request<{ data?: { lastRunAt?: string | null } }>("/search/status");
 }
 
-export function saveIntegration(payload: {
-  provider: string;
-  publicData?: JsonValue;
-  secret?: string;
-  status?: string;
-}) {
-  return request<{ data?: JsonValue; message?: string }>("/admin/integrations", {
+export function triggerFullReindex() {
+  return request<{ data?: JsonValue; message?: string }>("/search/reindex", {
     method: "POST",
-    body: JSON.stringify(payload),
   });
 }
 
-export function testIntegration(provider: string) {
-  return request<{ data?: JsonValue }>(`/admin/integrations/${provider}/test`);
+export function triggerDeltaReindex() {
+  return request<{ data?: JsonValue; message?: string }>("/search/reindex-delta", {
+    method: "POST",
+  });
 }

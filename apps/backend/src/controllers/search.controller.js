@@ -36,3 +36,19 @@ exports.searchIndex = async (req, res) => {
   const results = await searchIndex(String(q));
   res.json({ data: results, count: results.length });
 };
+
+exports.searchStatus = async (_req, res) => {
+  const SearchSyncState = require("../models/searchSyncState.model");
+  const state = await SearchSyncState.findOne({ key: "search" }).lean();
+  res.json({
+    data: {
+      lastRunAt: state?.lastRunAt || null,
+    },
+  });
+};
+
+exports.reindexDelta = async (_req, res) => {
+  const { updateIncrementalIndex } = require("../services/searchIndex.service");
+  const result = await updateIncrementalIndex();
+  res.json({ message: "Search delta indexed", data: result });
+};
