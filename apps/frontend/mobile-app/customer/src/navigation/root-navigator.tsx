@@ -8,12 +8,14 @@ import { ProductBrowsingScreen } from "../screens/product-browsing-screen";
 import { SearchResultsScreen } from "../screens/search-results-screen";
 import { LiveChatScreen } from "../screens/live-chat-screen";
 import { ShopSelectScreen } from "../screens/shop-select-screen";
+import { HomeScreen } from "../screens/home-screen";
 
 const Stack = createNativeStackNavigator();
 
 export function RootNavigator() {
   return (
-    <Stack.Navigator initialRouteName="Auth">
+    <Stack.Navigator initialRouteName="Home">
+      <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="Auth" component={AuthScreen} />
       <Stack.Screen name="ShopSelect" component={ShopSelectScreen} />
       <Stack.Screen name="Browse" component={ProductBrowsingScreen} />

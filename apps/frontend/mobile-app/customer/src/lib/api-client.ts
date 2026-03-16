@@ -50,6 +50,17 @@ export function listPublicShops() {
   );
 }
 
+export function listLocations() {
+  return request<{ data?: Array<{ _id?: string; name?: string; city?: string; country?: string; address?: string; shopId?: string; coordinates?: { coordinates?: number[] } }> }>(
+    "/api/locations"
+  );
+}
+
+export function searchSuggestions(query: string) {
+  const search = new URLSearchParams({ q: query }).toString();
+  return request<{ data?: Array<Record<string, unknown>> }>(`/api/search/index?${search}`);
+}
+
 export function searchProducts(params: { shopId?: string; q?: string }) {
   const search = new URLSearchParams();
   if (params.shopId) search.set("shopId", params.shopId);

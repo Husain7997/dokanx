@@ -76,6 +76,11 @@ type RuntimeProductListResponse = {
   count?: number;
 };
 
+type SearchSuggestionResponse = {
+  data?: Array<Record<string, unknown>>;
+  count?: number;
+};
+
 type PaymentHandoffResponse = {
   message?: string;
   attemptId?: string;
@@ -188,6 +193,11 @@ export function getRuntimeCart(shopId?: string) {
 export function searchRuntimeProducts(query: Record<string, string>) {
   const search = new URLSearchParams(query).toString();
   return request<RuntimeProductListResponse>(`/search/products${search ? `?${search}` : ""}`);
+}
+
+export function searchSuggestions(query: string) {
+  const search = new URLSearchParams({ q: query }).toString();
+  return request<SearchSuggestionResponse>(`/search/index?${search}`);
 }
 
 export function saveCart(payload: {
