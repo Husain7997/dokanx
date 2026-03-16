@@ -332,6 +332,23 @@ export function MapDiscoveryScreen() {
                   {autoRecenter ? "Auto-center" : "Manual"}
                 </Text>
               </Pressable>
+              <Pressable
+                style={[styles.refreshButton, styles.refreshButtonOutline]}
+                onPress={() => {
+                  if (!userLocation || !mapRef.current) return;
+                  mapRef.current.animateToRegion(
+                    {
+                      latitude: userLocation.lat,
+                      longitude: userLocation.lng,
+                      latitudeDelta: 0.05,
+                      longitudeDelta: 0.05,
+                    },
+                    650
+                  );
+                }}
+              >
+                <Text style={[styles.refreshText, styles.refreshTextDark]}>Recenter</Text>
+              </Pressable>
             </View>
           </View>
         </View>

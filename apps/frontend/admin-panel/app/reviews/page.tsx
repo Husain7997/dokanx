@@ -25,6 +25,7 @@ export default function Page() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkAction, setBulkAction] = useState<null | "approve" | "reject">(null);
+  const [bulkProgress, setBulkProgress] = useState<{ total: number; done: number; failures: number } | null>(null);
 
   const filteredReviews = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -130,20 +131,39 @@ export default function Page() {
             <Button
               onClick={async () => {
                 const ids = Array.from(selectedIds);
+                setBulkProgress({ total: ids.length, done: 0, failures: 0 });
+                let failures = 0;
+                let done = 0;
                 for (const id of ids) {
-                  if (bulkAction === "approve") {
-                    await approveProductReview(id);
-                  } else {
-                    await rejectProductReview(id);
+                  try {
+                    if (bulkAction === "approve") {
+                      await approveProductReview(id);
+                    } else {
+                      await rejectProductReview(id);
+                    }
+                  } catch {
+                    failures += 1;
+                  } finally {
+                    done += 1;
+                    setBulkProgress({ total: ids.length, done, failures });
                   }
                 }
                 const response = await listProductReviews(status);
                 setReviews(Array.isArray(response.data) ? (response.data as ReviewRow[]) : []);
                 setSelectedIds(new Set());
                 setBulkAction(null);
+                if (failures) {
+                  setError(`${failures} reviews failed during bulk action. Please retry.`);
+                }
+                setBulkProgress(null);
               }}
+              disabled={bulkProgress !== null}
             >
-              {bulkAction === "approve" ? "Approve all" : "Reject all"}
+              {bulkProgress
+                ? `Processing ${bulkProgress.done}/${bulkProgress.total}`
+                : bulkAction === "approve"
+                  ? "Approve all"
+                  : "Reject all"}
             </Button>
           </ModalFooter>
         </ModalContent>

@@ -363,7 +363,9 @@ function sortShops(
         distanceKm = getDistanceKm(userLocation, coords);
       }
     }
-    const etaMinutes = distanceKm !== undefined ? Math.max(15, Math.round(distanceKm * 12)) : 45;
+    const etaMinutes = distanceKm !== undefined
+      ? Math.max(15, Math.round(distanceKm * 10 + trafficFactor(distanceKm) + distanceBracket(distanceKm)))
+      : 45;
     return { ...shop, rating, distanceKm, etaMinutes, isOpen };
   });
 
@@ -401,4 +403,18 @@ function getDistanceKm(
     Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return 6371 * c;
+}
+
+function trafficFactor(distanceKm: number) {
+  if (distanceKm <= 2) return 8;
+  if (distanceKm <= 5) return 12;
+  if (distanceKm <= 10) return 18;
+  return 24;
+}
+
+function distanceBracket(distanceKm: number) {
+  if (distanceKm <= 2) return 5;
+  if (distanceKm <= 5) return 8;
+  if (distanceKm <= 10) return 12;
+  return 18;
 }
