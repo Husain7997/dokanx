@@ -30,6 +30,11 @@ export const adminNavigation = [
     description: "Revenue and ledger"
   },
   {
+    label: "Integrations",
+    href: "/integrations",
+    description: "Payment and carrier credentials"
+  },
+  {
     label: "Risk",
     href: "/risk",
     description: "Compliance posture"

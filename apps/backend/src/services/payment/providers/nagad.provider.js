@@ -1,9 +1,9 @@
 const crypto = require("crypto");
 const { randomToken } = require("../../../utils/crypto.util");
 
-exports.createPayment = async ({ amount, currency, orderId }) => {
-  const merchantId = process.env.NAGAD_MERCHANT_ID || "";
-  const merchantKey = process.env.NAGAD_MERCHANT_KEY || "";
+exports.createPayment = async ({ amount, currency, orderId, credentials }) => {
+  const merchantId = credentials?.publicData?.merchantId || process.env.NAGAD_MERCHANT_ID || "";
+  const merchantKey = credentials?.secret || process.env.NAGAD_MERCHANT_KEY || "";
   if (process.env.NODE_ENV === "production" && (!merchantId || !merchantKey)) {
     throw new Error("Nagad credentials missing");
   }
@@ -16,8 +16,8 @@ exports.createPayment = async ({ amount, currency, orderId }) => {
   };
 };
 
-exports.verifyWebhook = async (payload, signature) => {
-  const secret = process.env.NAGAD_WEBHOOK_SECRET || "";
+exports.verifyWebhook = async (payload, signature, credentials) => {
+  const secret = credentials?.secret || process.env.NAGAD_WEBHOOK_SECRET || "";
   if (!secret) return process.env.NODE_ENV !== "production";
   const expected = crypto.createHmac("sha256", secret).update(JSON.stringify(payload)).digest("hex");
   return expected === signature;

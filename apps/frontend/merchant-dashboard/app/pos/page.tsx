@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuthStore } from "@dokanx/auth";
 
 import { createPosOrder, openPosSession, closePosSession, getProductByBarcode } from "@/lib/runtime-api";
@@ -13,6 +13,10 @@ export default function PosPage() {
   const [quantity, setQuantity] = useState("1");
   const [barcode, setBarcode] = useState("");
   const [cart, setCart] = useState<Array<{ product: string; name: string; price: number; quantity: number }>>([]);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const scanRef = useRef<number | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   async function handleOpenSession() {
     const response = await openPosSession({ openingBalance: 0 });
@@ -56,6 +60,65 @@ export default function PosPage() {
       setStatus(err instanceof Error ? err.message : "Barcode lookup failed");
     }
   }
+
+  useEffect(() => {
+    async function startScanner() {
+      if (!scannerOpen) return;
+      if (!("BarcodeDetector" in window)) {
+        setStatus("Barcode scanning not supported in this browser.");
+        setScannerOpen(false);
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+
+        const detector = new (window as unknown as { BarcodeDetector: typeof BarcodeDetector }).BarcodeDetector({
+          formats: ["qr_code", "code_128", "ean_13", "ean_8"],
+        });
+
+        const scan = async () => {
+          if (!videoRef.current) return;
+          try {
+            const barcodes = await detector.detect(videoRef.current);
+            if (barcodes.length) {
+              const value = barcodes[0]?.rawValue || "";
+              if (value) {
+                setBarcode(value);
+                await handleBarcodeLookup(value);
+                setScannerOpen(false);
+                return;
+              }
+            }
+          } catch {
+            // ignore scan errors
+          }
+          scanRef.current = requestAnimationFrame(scan);
+        };
+
+        scanRef.current = requestAnimationFrame(scan);
+      } catch (err) {
+        setStatus(err instanceof Error ? err.message : "Camera access denied");
+        setScannerOpen(false);
+      }
+    }
+
+    void startScanner();
+
+    return () => {
+      if (scanRef.current) cancelAnimationFrame(scanRef.current);
+      scanRef.current = null;
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+    };
+  }, [scannerOpen]);
 
   return (
     <div className="grid gap-6">
@@ -106,6 +169,12 @@ export default function PosPage() {
               }
             }}
           />
+          <button
+            className="w-fit rounded-full border border-white/60 bg-white px-4 py-2 text-xs font-semibold text-foreground md:col-span-2"
+            onClick={() => setScannerOpen(true)}
+          >
+            Open camera scanner
+          </button>
           <input
             className="rounded-xl border border-white/60 bg-white px-3 py-2 text-sm"
             placeholder="Product ID"
@@ -138,6 +207,19 @@ export default function PosPage() {
           </div>
         ) : null}
       </div>
+
+      {scannerOpen ? (
+        <div className="grid gap-3 rounded-3xl border border-white/40 bg-white/70 p-6">
+          <p className="text-sm font-semibold text-foreground">Scanner</p>
+          <video ref={videoRef} className="w-full rounded-2xl border border-white/60" muted playsInline />
+          <button
+            className="w-fit rounded-full border border-white/60 bg-white px-4 py-2 text-xs font-semibold text-foreground"
+            onClick={() => setScannerOpen(false)}
+          >
+            Close scanner
+          </button>
+        </div>
+      ) : null}
 
       {status ? <p className="text-xs text-emerald-700">{status}</p> : null}
     </div>

@@ -2,6 +2,7 @@ const SearchIndex = require("../models/searchIndex.model");
 const Product = require("../models/product.model");
 const Shop = require("../models/shop.model");
 const externalSearch = require("./search/externalSearch.service");
+const SearchSyncState = require("../models/searchSyncState.model");
 
 async function rebuildIndex() {
   await SearchIndex.deleteMany({});
@@ -44,7 +45,52 @@ async function searchIndex(query) {
   return results;
 }
 
+async function updateIncrementalIndex() {
+  const state = await SearchSyncState.findOneAndUpdate(
+    { key: "search" },
+    { $setOnInsert: { lastRunAt: null } },
+    { new: true, upsert: true }
+  );
+
+  const since = state.lastRunAt || new Date(0);
+  const products = await Product.find({ updatedAt: { $gt: since } }).lean();
+  const shops = await Shop.find({ updatedAt: { $gt: since } }).lean();
+
+  const productDocs = products.map((product) => ({
+    entityType: "product",
+    entityId: product._id,
+    shopId: product.shopId || null,
+    text: `${product.name || ""} ${product.category || ""} ${product.barcode || ""}`.trim(),
+  }));
+
+  const shopDocs = shops.map((shop) => ({
+    entityType: "shop",
+    entityId: shop._id,
+    shopId: shop._id,
+    text: `${shop.name || ""} ${shop.domain || ""} ${shop.slug || ""}`.trim(),
+  }));
+
+  const ops = [...productDocs, ...shopDocs].map((doc) => ({
+    updateOne: {
+      filter: { entityType: doc.entityType, entityId: doc.entityId },
+      update: { $set: doc },
+      upsert: true,
+    },
+  }));
+
+  if (ops.length) {
+    await SearchIndex.bulkWrite(ops);
+    await externalSearch.indexDocuments([...productDocs, ...shopDocs]);
+  }
+
+  state.lastRunAt = new Date();
+  await state.save();
+
+  return { products: productDocs.length, shops: shopDocs.length };
+}
+
 module.exports = {
   rebuildIndex,
   searchIndex,
+  updateIncrementalIndex,
 };
