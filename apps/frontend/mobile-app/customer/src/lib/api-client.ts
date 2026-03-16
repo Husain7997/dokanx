@@ -12,6 +12,7 @@ type RequestOptions = {
   body?: Record<string, unknown> | null;
   token?: string | null;
   tenantId?: string | null;
+  cartToken?: string | null;
 };
 
 export async function request<T>(path: string, options: RequestOptions = {}) {
@@ -22,6 +23,7 @@ export async function request<T>(path: string, options: RequestOptions = {}) {
       "Content-Type": "application/json",
       ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
       ...(options.tenantId ? { "x-tenant-id": options.tenantId } : {}),
+      ...(options.cartToken ? { "x-cart-token": options.cartToken } : {}),
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
@@ -70,5 +72,69 @@ export function placeOrderRequest(
     body: payload,
     token,
     tenantId: tenantId || undefined,
+  });
+}
+
+export function getCartRequest(params: {
+  shopId: string;
+  token?: string | null;
+  cartToken?: string | null;
+}) {
+  const search = new URLSearchParams({ shopId: params.shopId });
+  return request<{
+    data?: {
+      items?: Array<{
+        productId?: string;
+        name?: string;
+        price?: number;
+        quantity?: number;
+      }>;
+      totals?: Record<string, number>;
+    } | null;
+    guestToken?: string;
+  }>(`/api/cart?${search.toString()}`, {
+    token: params.token || undefined,
+    cartToken: params.cartToken || undefined,
+  });
+}
+
+export function saveCartRequest(params: {
+  shopId: string;
+  items: Array<{ productId: string; quantity: number; name?: string; price?: number }>;
+  token?: string | null;
+  cartToken?: string | null;
+}) {
+  return request<{
+    data?: {
+      items?: Array<{
+        productId?: string;
+        name?: string;
+        price?: number;
+        quantity?: number;
+      }>;
+      totals?: Record<string, number>;
+    } | null;
+    guestToken?: string;
+  }>("/api/cart", {
+    method: "PUT",
+    body: {
+      shopId: params.shopId,
+      items: params.items,
+    },
+    token: params.token || undefined,
+    cartToken: params.cartToken || undefined,
+  });
+}
+
+export function clearCartRequest(params: {
+  shopId: string;
+  token?: string | null;
+  cartToken?: string | null;
+}) {
+  const search = new URLSearchParams({ shopId: params.shopId });
+  return request<{ message?: string; guestToken?: string }>(`/api/cart?${search.toString()}`, {
+    method: "DELETE",
+    token: params.token || undefined,
+    cartToken: params.cartToken || undefined,
   });
 }

@@ -77,6 +77,77 @@ type ShopSettingsResponse = {
   } & JsonValue;
 };
 
+type CustomerListResponse = {
+  data?: Array<{
+    _id?: string;
+    name?: string;
+    email?: string;
+    phone?: string;
+    createdAt?: string;
+  } & JsonValue>;
+};
+
+type ShopSummaryResponse = {
+  data?: {
+    sales?: {
+      totalSales?: number;
+      totalOrders?: number;
+    };
+    settlements?: {
+      settledAmount?: number;
+      totalSettlements?: number;
+    };
+  } & JsonValue;
+};
+
+type SettlementResponse = {
+  data?: Array<{
+    _id?: string;
+    totalAmount?: number;
+    netAmount?: number;
+    status?: string;
+    createdAt?: string;
+  } & JsonValue>;
+};
+
+type WalletSummaryResponse = {
+  data?: {
+    balance?: number;
+    updatedAt?: string;
+  } & JsonValue;
+};
+
+type CarrierResponse = {
+  data?: Array<{
+    id?: string;
+    name?: string;
+    supportsTracking?: boolean;
+  } & JsonValue>;
+};
+
+type TrackingResponse = {
+  data?: {
+    trackingNumber?: string;
+    carrier?: string;
+    status?: string;
+    events?: Array<{
+      status?: string;
+      message?: string;
+      timestamp?: string;
+    }>;
+  } & JsonValue;
+};
+
+type MarketplaceAppsResponse = {
+  data?: Array<{
+    _id?: string;
+    name?: string;
+    tagline?: string;
+    description?: string;
+    category?: string;
+  } & JsonValue>;
+};
+
 function getHeaders() {
   const store = useAuthStore.getState();
   return {
@@ -196,6 +267,10 @@ export function listTeamMembers() {
   return request<TeamMemberResponse>("/shops/me/team");
 }
 
+export function listCustomers() {
+  return request<CustomerListResponse>("/shops/me/customers");
+}
+
 export function addTeamMember(payload: {
   name: string;
   email: string;
@@ -286,4 +361,28 @@ export function createPosOrder(payload: {
 
 export function getProductByBarcode(barcode: string, shopId: string) {
   return request<{ data?: JsonValue }>(`/products/barcode/${barcode}?shopId=${encodeURIComponent(shopId)}`);
+}
+
+export function getShopSummary() {
+  return request<ShopSummaryResponse>("/report/shop/summary");
+}
+
+export function getShopSettlements() {
+  return request<SettlementResponse>("/report/shop/settlements");
+}
+
+export function getWalletSummary() {
+  return request<WalletSummaryResponse>("/shop/wallet/summary");
+}
+
+export function listCarriers() {
+  return request<CarrierResponse>("/shipping/carriers");
+}
+
+export function trackShipment(trackingNumber: string) {
+  return request<TrackingResponse>(`/shipping/track/${encodeURIComponent(trackingNumber)}`);
+}
+
+export function listMarketplaceApps() {
+  return request<MarketplaceAppsResponse>("/marketplace/apps");
 }

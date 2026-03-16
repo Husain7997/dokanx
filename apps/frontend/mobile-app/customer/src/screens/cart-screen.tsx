@@ -1,16 +1,26 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { clearCartRequest, getCartRequest, saveCartRequest } from "@/lib/api-client";
+import { useAuthStore } from "@/store/auth-store";
 import type { CartItem } from "@/store/cart-store";
 import { useCartStore } from "@/store/cart-store";
+import { useTenantStore } from "@/store/tenant-store";
 
 export function CartScreen() {
   const navigation = useNavigation();
   const items = useCartStore((state) => state.items);
+  const guestToken = useCartStore((state) => state.guestToken);
+  const setGuestToken = useCartStore((state) => state.setGuestToken);
+  const setItems = useCartStore((state) => state.setItems);
   const updateQuantity = useCartStore((state) => state.updateQuantity);
   const removeItem = useCartStore((state) => state.removeItem);
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const selectedShop = useTenantStore((state) => state.shop);
+  const [syncing, setSyncing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const grouped = useMemo(() => {
     return items.reduce<Record<string, CartItem[]>>((acc, item) => {
@@ -28,20 +38,117 @@ export function CartScreen() {
     return { subtotal, shipping, total };
   }, [items]);
 
+  function buildPayloadRows(nextItems: CartItem[]) {
+    return nextItems.map((item) => ({
+      productId: item.productId,
+      quantity: item.quantity,
+      name: item.name,
+      price: item.price,
+    }));
+  }
+
+  function normalizeRemoteItems(remoteItems: Array<{
+    productId?: string;
+    name?: string;
+    price?: number;
+    quantity?: number;
+  }>) {
+    return remoteItems
+      .map((item) => ({
+        id: String(item.productId || ""),
+        productId: String(item.productId || ""),
+        name: String(item.name || "Item"),
+        price: Number(item.price || 0),
+        quantity: Math.max(1, Number(item.quantity || 1)),
+        shopId: selectedShop?.id || "",
+        shop: selectedShop?.name,
+      }))
+      .filter((item) => item.id);
+  }
+
+  async function syncCart(nextItems: CartItem[]) {
+    if (!selectedShop?.id) return;
+    setSyncing(true);
+    setError(null);
+    try {
+      const response = await saveCartRequest({
+        shopId: selectedShop.id,
+        items: buildPayloadRows(nextItems),
+        token: accessToken,
+        cartToken: guestToken,
+      });
+      if (response.guestToken) {
+        setGuestToken(response.guestToken);
+      }
+      const remoteItems = response.data?.items || [];
+      if (remoteItems.length) {
+        setItems(normalizeRemoteItems(remoteItems));
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to sync cart.";
+      setError(message);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   function adjustQuantity(id: string, delta: number) {
     const current = items.find((item) => item.id === id);
     if (!current) return;
-    updateQuantity(id, current.quantity + delta);
+    const nextQuantity = Math.max(1, current.quantity + delta);
+    const nextItems = items.map((entry) =>
+      entry.id === id ? { ...entry, quantity: nextQuantity } : entry
+    );
+    updateQuantity(id, nextQuantity);
+    void syncCart(nextItems);
   }
 
   function handleCheckout() {
     navigation.navigate("Checkout" as never);
   }
 
+  useEffect(() => {
+    let active = true;
+    async function hydrateCart() {
+      if (!selectedShop?.id) return;
+      setSyncing(true);
+      setError(null);
+      try {
+        const response = await getCartRequest({
+          shopId: selectedShop.id,
+          token: accessToken,
+          cartToken: guestToken,
+        });
+        if (!active) return;
+        if (response.guestToken) {
+          setGuestToken(response.guestToken);
+        }
+        const remoteItems = response.data?.items || [];
+        if (remoteItems.length) {
+          setItems(normalizeRemoteItems(remoteItems));
+        } else if (items.length) {
+          await syncCart(items);
+        }
+      } catch (err) {
+        if (!active) return;
+        const message = err instanceof Error ? err.message : "Unable to load cart.";
+        setError(message);
+      } finally {
+        if (active) setSyncing(false);
+      }
+    }
+    void hydrateCart();
+    return () => {
+      active = false;
+    };
+  }, [accessToken, guestToken, items.length, selectedShop?.id]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>Cart Summary</Text>
+        {syncing ? <Text style={styles.infoText}>Syncing cart...</Text> : null}
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
         {items.length === 0 ? (
           <View style={styles.card}>
@@ -71,7 +178,14 @@ export function CartScreen() {
                   <Pressable style={styles.qtyButton} onPress={() => adjustQuantity(item.id, 1)}>
                     <Text style={styles.qtyText}>+</Text>
                   </Pressable>
-                  <Pressable style={styles.removeButton} onPress={() => removeItem(item.id)}>
+                  <Pressable
+                    style={styles.removeButton}
+                    onPress={() => {
+                      const nextItems = items.filter((entry) => entry.id !== item.id);
+                      removeItem(item.id);
+                      void syncCart(nextItems);
+                    }}
+                  >
                     <Text style={styles.removeText}>Remove</Text>
                   </Pressable>
                 </View>
@@ -95,8 +209,38 @@ export function CartScreen() {
               <Text style={styles.summaryTotalLabel}>Total</Text>
               <Text style={styles.summaryTotalValue}>{totals.total} BDT</Text>
             </View>
-            <Pressable style={styles.checkoutButton} onPress={handleCheckout}>
+            <Pressable style={styles.checkoutButton} onPress={handleCheckout} disabled={syncing}>
               <Text style={styles.checkoutText}>Proceed to checkout</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.checkoutButton, styles.clearButton]}
+              onPress={async () => {
+                if (!selectedShop?.id) {
+                  setItems([]);
+                  return;
+                }
+                setSyncing(true);
+                setError(null);
+                try {
+                  const response = await clearCartRequest({
+                    shopId: selectedShop.id,
+                    token: accessToken,
+                    cartToken: guestToken,
+                  });
+                  if (response.guestToken) {
+                    setGuestToken(response.guestToken);
+                  }
+                  setItems([]);
+                } catch (err) {
+                  const message = err instanceof Error ? err.message : "Unable to clear cart.";
+                  setError(message);
+                } finally {
+                  setSyncing(false);
+                }
+              }}
+              disabled={syncing}
+            >
+              <Text style={styles.checkoutText}>Clear cart</Text>
             </Pressable>
           </View>
         ) : null}
@@ -118,6 +262,14 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700",
     color: "#1f2937",
+  },
+  infoText: {
+    fontSize: 12,
+    color: "#6b7280",
+  },
+  errorText: {
+    fontSize: 12,
+    color: "#b91c1c",
   },
   card: {
     backgroundColor: "#ffffff",
@@ -223,6 +375,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: "center",
+  },
+  clearButton: {
+    backgroundColor: "#374151",
   },
   checkoutText: {
     color: "#ffffff",

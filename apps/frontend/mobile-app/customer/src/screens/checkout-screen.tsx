@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-
 import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { placeOrderRequest } from "@/lib/api-client";
+import { clearCartRequest, placeOrderRequest } from "@/lib/api-client";
 import { useAuthStore } from "@/store/auth-store";
 import { useCartStore } from "@/store/cart-store";
 import { useTenantStore } from "@/store/tenant-store";
@@ -26,6 +26,8 @@ export function CheckoutScreen() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const cartItems = useCartStore((state) => state.items);
   const clearCart = useCartStore((state) => state.clear);
+  const guestToken = useCartStore((state) => state.guestToken);
+  const setGuestToken = useCartStore((state) => state.setGuestToken);
   const selectedShop = useTenantStore((state) => state.shop);
   const [step, setStep] = useState(1);
   const [delivery, setDelivery] = useState("standard");
@@ -80,6 +82,20 @@ export function CheckoutScreen() {
         },
         selectedShop.id
       );
+      if (selectedShop?.id) {
+        try {
+          const response = await clearCartRequest({
+            shopId: selectedShop.id,
+            token: accessToken,
+            cartToken: guestToken,
+          });
+          if (response.guestToken) {
+            setGuestToken(response.guestToken);
+          }
+        } catch {
+          // Ignore cart clear errors after order placement.
+        }
+      }
       clearCart();
       setSubmitting(false);
       setStatus("Order confirmed. Tracking is ready.");

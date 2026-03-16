@@ -9,15 +9,16 @@ const {
 } = require('../../controllers/shop/shopPayout.controller');
 
 router.use(protect);
-router.use(allowRoles("SHOP"));
+router.use(allowRoles("OWNER", "STAFF", "ADMIN"));
 router.post(
   '/payouts',
   protect,
-  allowRoles('shop_owner'),
+  allowRoles("OWNER", "ADMIN"),
   requestPayout
 );
 
 router.post("/topup", WalletController.topupWallet);
 router.post("/transfer", WalletController.transferWallet);
+router.get("/summary", WalletController.getWalletSummary);
 
 module.exports = router;

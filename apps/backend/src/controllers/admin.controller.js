@@ -9,6 +9,21 @@ exports.getAllUsers = async (req, res) => {
   res.json({ message: t('common.updated', req.lang), data: users });
 };
 
+exports.listMerchants = async (_req, res) => {
+  const merchants = await User.find({ role: "OWNER" })
+    .populate("shopId", "name domain slug isActive")
+    .lean();
+  res.json({ data: merchants });
+};
+
+exports.listShops = async (_req, res) => {
+  const shops = await Shop.find()
+    .select("name domain slug isActive owner createdAt")
+    .populate("owner", "name email")
+    .lean();
+  res.json({ data: shops });
+};
+
 exports.blockUser = async (req, res) => {
   const user = await User.findByIdAndUpdate(
     req.params.id,

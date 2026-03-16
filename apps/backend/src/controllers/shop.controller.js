@@ -114,6 +114,29 @@ exports.listPublicShops = async (_req, res) => {
     });
   }
 };
+
+exports.listCustomers = async (req, res) => {
+  try {
+    const shopId = req.shop?._id || req.user?.shopId;
+    if (!shopId) {
+      return res.status(400).json({ message: "Shop context required" });
+    }
+
+    const customers = await User.find({ role: "CUSTOMER", shopId })
+      .select("name email phone createdAt")
+      .lean();
+
+    res.json({
+      message: t("common.updated", req.lang),
+      data: customers,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch customers",
+    });
+  }
+};
 exports.approveShop = async (req, res) => {
   try {
     const shop = await Shop.findById(req.params.id);

@@ -6,7 +6,8 @@ const {
   updateOrderStatus,
   blockCustomer,
   getMyShops,
-  listPublicShops
+  listPublicShops,
+  listCustomers
 } = require('../controllers/shop.controller');
 
 const {
@@ -46,6 +47,13 @@ router.get(
   protect,
   allowRoles("OWNER", "STAFF", "ADMIN"),
   getShopSettings
+);
+
+router.get(
+  "/me/customers",
+  protect,
+  allowRoles("OWNER", "STAFF", "ADMIN"),
+  listCustomers
 );
 
 router.put(

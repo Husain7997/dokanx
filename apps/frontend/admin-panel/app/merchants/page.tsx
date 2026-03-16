@@ -1,6 +1,42 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Card, CardDescription, CardTitle, DataTable } from "@dokanx/ui";
+
+import { listMerchants } from "@/lib/admin-runtime-api";
+
+type MerchantRow = {
+  _id?: string;
+  name?: string;
+  email?: string;
+  isBlocked?: boolean;
+  shopId?: { name?: string; domain?: string };
+};
+
 export const dynamic = "force-dynamic";
 
 export default function Page() {
+  const [merchants, setMerchants] = useState<MerchantRow[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      try {
+        const response = await listMerchants();
+        if (!active) return;
+        setMerchants(Array.isArray(response.data) ? (response.data as MerchantRow[]) : []);
+      } catch (err) {
+        if (!active) return;
+        setError(err instanceof Error ? err.message : "Unable to load merchants.");
+      }
+    }
+    void load();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <div className="grid gap-6">
       <div>
@@ -8,12 +44,26 @@ export default function Page() {
         <h1 className="dx-display text-3xl">Merchants</h1>
         <p className="text-sm text-muted-foreground">Merchant lifecycle and access</p>
       </div>
-      <div className="grid gap-3 rounded-3xl border border-white/40 bg-white/70 p-6 shadow-sm">
-        <p className="text-sm font-semibold text-foreground">Workspace ready</p>
-        <p className="text-sm text-muted-foreground">
-          Connect the API data sources to populate this view with live admin insights.
-        </p>
-      </div>
+      {error ? (
+        <Card>
+          <CardTitle>Merchants</CardTitle>
+          <CardDescription className="mt-2">{error}</CardDescription>
+        </Card>
+      ) : null}
+      <DataTable
+        columns={[
+          { key: "merchant", header: "Merchant" },
+          { key: "email", header: "Email" },
+          { key: "shop", header: "Shop" },
+          { key: "status", header: "Status" },
+        ]}
+        rows={merchants.map((merchant) => ({
+          merchant: merchant.name || "Merchant",
+          email: merchant.email || "Unknown",
+          shop: merchant.shopId?.name || merchant.shopId?.domain || "Unassigned",
+          status: merchant.isBlocked ? "Blocked" : "Active",
+        }))}
+      />
     </div>
   );
 }

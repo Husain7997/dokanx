@@ -9,43 +9,55 @@ const adminController = require("../controllers/admin.controller");
 // ❗❗ খুব গুরুত্বপূর্ণ: function হিসেবে পাঠাচ্ছি
 router.get("/users",
   protect,
-  allowRoles("admin"),
+  allowRoles("ADMIN"),
   adminController.getAllUsers
 );
 
 router.put("/users/:id/block",
   protect,
-  allowRoles("admin"),
+  allowRoles("ADMIN"),
   adminController.blockUser
 );
 router.put("/users/:id/unblock",
   protect,
-  allowRoles("admin"),
+  allowRoles("ADMIN"),
   adminController.unblockUser
 );
 
 router.put("/shops/:id/approve",
   protect,
-  allowRoles("admin"),
+  allowRoles("ADMIN"),
   adminController.approveShop
 );
 
 router.put("/shops/:id/suspend",
   protect,
-  allowRoles("admin"),
+  allowRoles("ADMIN"),
   adminController.suspendShop
 );
 
 router.get("/orders",
   protect,
-  allowRoles("admin"),
+  allowRoles("ADMIN"),
   adminController.getAllOrders
 );
 
 router.get("/audit-logs",
   protect,
-  allowRoles("admin"),
+  allowRoles("ADMIN"),
   adminController.getAuditLogs
+);
+
+router.get("/merchants",
+  protect,
+  allowRoles("ADMIN"),
+  adminController.listMerchants
+);
+
+router.get("/shops",
+  protect,
+  allowRoles("ADMIN"),
+  adminController.listShops
 );
 
 module.exports = router;

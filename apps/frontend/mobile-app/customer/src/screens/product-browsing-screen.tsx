@@ -3,13 +3,19 @@ import { useEffect, useState } from "react";
 import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { searchProducts } from "@/lib/api-client";
+import { saveCartRequest, searchProducts } from "@/lib/api-client";
+import { useAuthStore } from "@/store/auth-store";
 import { useCartStore } from "@/store/cart-store";
 import { useTenantStore } from "@/store/tenant-store";
 
 export function ProductBrowsingScreen() {
   const navigation = useNavigation();
   const addItem = useCartStore((state) => state.addItem);
+  const items = useCartStore((state) => state.items);
+  const guestToken = useCartStore((state) => state.guestToken);
+  const setGuestToken = useCartStore((state) => state.setGuestToken);
+  const setItems = useCartStore((state) => state.setItems);
+  const accessToken = useAuthStore((state) => state.accessToken);
   const selectedShop = useTenantStore((state) => state.shop);
   const [products, setProducts] = useState<Array<{ id: string; name: string; price: number }>>([]);
   const [loading, setLoading] = useState(false);
@@ -58,11 +64,31 @@ export function ProductBrowsingScreen() {
               <Text style={styles.price}>{item.price} BDT</Text>
               <Pressable
                 style={styles.actionButton}
-                onPress={() => {
+                onPress={async () => {
                   if (!selectedShop) {
                     navigation.navigate("ShopSelect" as never);
                     return;
                   }
+                  const nextItems = (() => {
+                    const existing = items.find((entry) => entry.id === item.id);
+                    if (existing) {
+                      return items.map((entry) =>
+                        entry.id === item.id ? { ...entry, quantity: entry.quantity + 1 } : entry
+                      );
+                    }
+                    return [
+                      ...items,
+                      {
+                        id: item.id,
+                        productId: item.id,
+                        name: item.name,
+                        price: item.price,
+                        shopId: selectedShop.id,
+                        shop: item.shop,
+                        quantity: 1,
+                      },
+                    ];
+                  })();
                   addItem({
                     id: item.id,
                     productId: item.id,
@@ -71,7 +97,41 @@ export function ProductBrowsingScreen() {
                     shopId: selectedShop.id,
                     shop: item.shop,
                   });
-                  navigation.navigate("Cart" as never);
+                  try {
+                    const response = await saveCartRequest({
+                      shopId: selectedShop.id,
+                      items: nextItems.map((entry) => ({
+                        productId: entry.productId,
+                        quantity: entry.quantity,
+                        name: entry.name,
+                        price: entry.price,
+                      })),
+                      token: accessToken,
+                      cartToken: guestToken,
+                    });
+                    if (response.guestToken) {
+                      setGuestToken(response.guestToken);
+                    }
+                    if (response.data?.items?.length) {
+                      setItems(
+                        response.data.items
+                          .map((entry) => ({
+                            id: String(entry.productId || ""),
+                            productId: String(entry.productId || ""),
+                            name: String(entry.name || "Item"),
+                            price: Number(entry.price || 0),
+                            quantity: Math.max(1, Number(entry.quantity || 1)),
+                            shopId: selectedShop.id,
+                            shop: selectedShop.name,
+                          }))
+                          .filter((entry) => entry.id)
+                      );
+                    }
+                  } catch {
+                    // Ignore cart sync errors while browsing.
+                  } finally {
+                    navigation.navigate("Cart" as never);
+                  }
                 }}
               >
                 <Text style={styles.actionText}>Add to cart</Text>
