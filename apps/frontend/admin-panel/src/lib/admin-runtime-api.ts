@@ -201,3 +201,27 @@ export function getSystemHealth() {
 export function listMarketplaceApps() {
   return request<MarketplaceAppsResponse>("/marketplace/apps");
 }
+
+export function blockUser(userId: string) {
+  return request<{ message?: string }>(`/admin/users/${userId}/block`, {
+    method: "PUT",
+  });
+}
+
+export function unblockUser(userId: string) {
+  return request<{ message?: string }>(`/admin/users/${userId}/unblock`, {
+    method: "PUT",
+  });
+}
+
+export function approveShop(shopId: string) {
+  return request<{ message?: string }>(`/admin/shops/${shopId}/approve`, {
+    method: "PUT",
+  });
+}
+
+export function suspendShop(shopId: string) {
+  return request<{ message?: string }>(`/admin/shops/${shopId}/suspend`, {
+    method: "PUT",
+  });
+}

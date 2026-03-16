@@ -1,5 +1,6 @@
 const Shop = require("../models/shop.model");
 const User = require("../models/user.model");
+const Order = require("../models/order.model");
 const { createAudit } = require("../utils/audit.util");
 const jwt = require("jsonwebtoken");
 const { t } =
@@ -126,9 +127,34 @@ exports.listCustomers = async (req, res) => {
       .select("name email phone createdAt")
       .lean();
 
+    const customerIds = customers.map((customer) => customer._id).filter(Boolean);
+    const orderStats = await Order.aggregate([
+      { $match: { shopId, user: { $in: customerIds } } },
+      {
+        $group: {
+          _id: "$user",
+          orderCount: { $sum: 1 },
+          totalSpend: { $sum: "$totalAmount" },
+        },
+      },
+    ]);
+
+    const statsMap = new Map(
+      orderStats.map((row) => [String(row._id), { orderCount: row.orderCount, totalSpend: row.totalSpend }])
+    );
+
+    const enriched = customers.map((customer) => {
+      const stats = statsMap.get(String(customer._id)) || { orderCount: 0, totalSpend: 0 };
+      return {
+        ...customer,
+        orderCount: stats.orderCount,
+        totalSpend: stats.totalSpend,
+      };
+    });
+
     res.json({
       message: t("common.updated", req.lang),
-      data: customers,
+      data: enriched,
     });
   } catch (error) {
     res.status(500).json({

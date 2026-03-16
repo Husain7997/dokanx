@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardDescription, CardTitle, DataTable } from "@dokanx/ui";
+import { Button, Card, CardDescription, CardTitle, DataTable } from "@dokanx/ui";
 
-import { listMerchants } from "@/lib/admin-runtime-api";
+import { blockUser, listMerchants, unblockUser } from "@/lib/admin-runtime-api";
 
 type MerchantRow = {
   _id?: string;
@@ -18,6 +18,7 @@ export const dynamic = "force-dynamic";
 export default function Page() {
   const [merchants, setMerchants] = useState<MerchantRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -56,8 +57,40 @@ export default function Page() {
           { key: "email", header: "Email" },
           { key: "shop", header: "Shop" },
           { key: "status", header: "Status" },
+          {
+            key: "actions",
+            header: "Actions",
+            render: (row) => (
+              <Button
+                size="sm"
+                variant={row.isBlocked ? "secondary" : "default"}
+                onClick={async () => {
+                  if (!row.id) return;
+                  setBusyId(row.id);
+                  try {
+                    if (row.isBlocked) {
+                      await unblockUser(row.id);
+                    } else {
+                      await blockUser(row.id);
+                    }
+                    const response = await listMerchants();
+                    setMerchants(Array.isArray(response.data) ? (response.data as MerchantRow[]) : []);
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : "Unable to update merchant.");
+                  } finally {
+                    setBusyId(null);
+                  }
+                }}
+                disabled={busyId === row.id}
+              >
+                {busyId === row.id ? "Updating..." : row.isBlocked ? "Unblock" : "Block"}
+              </Button>
+            ),
+          },
         ]}
         rows={merchants.map((merchant) => ({
+          id: String(merchant._id || ""),
+          isBlocked: Boolean(merchant.isBlocked),
           merchant: merchant.name || "Merchant",
           email: merchant.email || "Unknown",
           shop: merchant.shopId?.name || merchant.shopId?.domain || "Unassigned",

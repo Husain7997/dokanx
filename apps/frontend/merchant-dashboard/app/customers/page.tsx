@@ -11,6 +11,8 @@ type CustomerRow = {
   email?: string;
   phone?: string;
   createdAt?: string;
+  orderCount?: number;
+  totalSpend?: number;
 };
 
 export default function CustomersPage() {
@@ -57,8 +59,8 @@ export default function CustomersPage() {
         rows={customers.map((customer) => ({
           customer: customer.name || "Customer",
           email: customer.email || "Unknown",
-          orders: "0",
-          value: "0 BDT",
+          orders: String(customer.orderCount ?? 0),
+          value: `${customer.totalSpend ?? 0} BDT`,
         }))}
       />
     </div>

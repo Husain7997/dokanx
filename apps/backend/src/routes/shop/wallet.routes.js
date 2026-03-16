@@ -20,5 +20,6 @@ router.post(
 router.post("/topup", WalletController.topupWallet);
 router.post("/transfer", WalletController.transferWallet);
 router.get("/summary", WalletController.getWalletSummary);
+router.get("/ledger", WalletController.listLedger);
 
 module.exports = router;

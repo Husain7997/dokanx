@@ -4,6 +4,8 @@ const walletService =
   require("../../services/wallet.service");
 const ShopWallet =
   require("../../models/ShopWallet");
+const Ledger =
+  require("../../modules/ledger/ledger.model");
 
 const { t } =
   require("@/core/infrastructure");
@@ -11,10 +13,14 @@ const { t } =
 exports.topupWallet =
 async (req, res, next) => {
   try {
+    const shopId = req.shop?._id || req.user?.shopId;
+    if (!shopId) {
+      return res.status(400).json({ message: "Shop context required" });
+    }
 
     const result =
       await walletService.creditWallet({
-        shopId: req.user._id,
+        shopId,
         amount: req.body.amount,
         reference: `manual-topup-${Date.now()}`,
       });
@@ -32,9 +38,13 @@ async (req, res, next) => {
 exports.transferWallet =
 async (req, res, next) => {
   try {
+    const shopId = req.shop?._id || req.user?.shopId;
+    if (!shopId) {
+      return res.status(400).json({ message: "Shop context required" });
+    }
 
     await walletService.debitWallet({
-      shopId: req.user._id,
+      shopId,
       amount: req.body.amount,
       reference: `transfer-${Date.now()}`,
     });
@@ -71,6 +81,29 @@ async (req, res, next) => {
     res.json({
       message: t(req.lang, "wallet.summary_ready"),
       data: wallet,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.listLedger =
+async (req, res, next) => {
+  try {
+    const shopId = req.shop?._id || req.user?.shopId;
+    if (!shopId) {
+      return res.status(400).json({ message: "Shop context required" });
+    }
+
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const entries = await Ledger.find({ shopId })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    res.json({
+      message: t(req.lang, "wallet.ledger_ready"),
+      data: entries,
     });
   } catch (err) {
     next(err);

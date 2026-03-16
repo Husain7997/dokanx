@@ -84,6 +84,8 @@ type CustomerListResponse = {
     email?: string;
     phone?: string;
     createdAt?: string;
+    orderCount?: number;
+    totalSpend?: number;
   } & JsonValue>;
 };
 
@@ -115,6 +117,16 @@ type WalletSummaryResponse = {
     balance?: number;
     updatedAt?: string;
   } & JsonValue;
+};
+
+type WalletLedgerResponse = {
+  data?: Array<{
+    _id?: string;
+    amount?: number;
+    type?: string;
+    referenceId?: string;
+    createdAt?: string;
+  } & JsonValue>;
 };
 
 type CarrierResponse = {
@@ -373,6 +385,25 @@ export function getShopSettlements() {
 
 export function getWalletSummary() {
   return request<WalletSummaryResponse>("/shop/wallet/summary");
+}
+
+export function listWalletLedger(limit = 50) {
+  const search = new URLSearchParams({ limit: String(limit) });
+  return request<WalletLedgerResponse>(`/shop/wallet/ledger?${search.toString()}`);
+}
+
+export function topupWallet(amount: number) {
+  return request<MutationResponse>("/shop/wallet/topup", {
+    method: "POST",
+    body: JSON.stringify({ amount }),
+  });
+}
+
+export function transferWallet(payload: { toShopId: string; amount: number }) {
+  return request<MutationResponse>("/shop/wallet/transfer", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function listCarriers() {
