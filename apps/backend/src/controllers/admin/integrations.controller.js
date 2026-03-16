@@ -59,12 +59,17 @@ exports.testCredential = async (req, res) => {
   const record = await ProviderCredential.findOne({ provider });
   if (!record) return res.status(404).json({ message: "Credential not found" });
 
+  const hasSecret = !!record.secretCipher;
+  const status = record.status || "ACTIVE";
+
   res.json({
     data: {
       provider,
-      status: record.status,
-      reachable: true,
-      message: "Test successful (stubbed).",
+      status,
+      reachable: hasSecret && status === "ACTIVE",
+      message: hasSecret
+        ? "Credential stored and active."
+        : "Missing secret for provider.",
     },
   });
 };

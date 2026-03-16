@@ -39,10 +39,16 @@ exports.searchIndex = async (req, res) => {
 
 exports.searchStatus = async (_req, res) => {
   const SearchSyncState = require("../models/searchSyncState.model");
+  const SearchIndex = require("../models/searchIndex.model");
+  const SearchSyncLog = require("../models/searchSyncLog.model");
   const state = await SearchSyncState.findOne({ key: "search" }).lean();
+  const totalDocs = await SearchIndex.countDocuments();
+  const recentLogs = await SearchSyncLog.find().sort({ createdAt: -1 }).limit(10).lean();
   res.json({
     data: {
       lastRunAt: state?.lastRunAt || null,
+      totalDocs,
+      logs: recentLogs,
     },
   });
 };

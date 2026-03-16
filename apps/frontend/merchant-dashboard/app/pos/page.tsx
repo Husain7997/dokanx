@@ -222,9 +222,49 @@ export default function PosPage() {
             {cart.map((item) => (
               <div key={item.product} className="flex items-center justify-between">
                 <span>{item.name}</span>
-                <span>
-                  {item.quantity} x {item.price}
-                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="rounded-full border border-white/60 bg-white px-2 py-0.5 text-xs"
+                    onClick={() =>
+                      setCart((current) =>
+                        current
+                          .map((entry) =>
+                            entry.product === item.product
+                              ? { ...entry, quantity: Math.max(1, entry.quantity - 1) }
+                              : entry
+                          )
+                          .filter((entry) => entry.quantity > 0)
+                      )
+                    }
+                  >
+                    -
+                  </button>
+                  <span>
+                    {item.quantity} x {item.price}
+                  </span>
+                  <button
+                    className="rounded-full border border-white/60 bg-white px-2 py-0.5 text-xs"
+                    onClick={() =>
+                      setCart((current) =>
+                        current.map((entry) =>
+                          entry.product === item.product
+                            ? { ...entry, quantity: entry.quantity + 1 }
+                            : entry
+                        )
+                      )
+                    }
+                  >
+                    +
+                  </button>
+                  <button
+                    className="rounded-full border border-white/60 bg-white px-2 py-0.5 text-xs"
+                    onClick={() =>
+                      setCart((current) => current.filter((entry) => entry.product !== item.product))
+                    }
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
             ))}
           </div>

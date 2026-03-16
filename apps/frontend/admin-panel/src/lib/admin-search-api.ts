@@ -33,7 +33,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export function getSearchStatus() {
-  return request<{ data?: { lastRunAt?: string | null } }>("/search/status");
+  return request<{
+    data?: {
+      lastRunAt?: string | null;
+      totalDocs?: number;
+      logs?: Array<Record<string, unknown>>;
+    };
+  }>("/search/status");
 }
 
 export function triggerFullReindex() {
