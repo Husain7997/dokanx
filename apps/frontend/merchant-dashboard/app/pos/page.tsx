@@ -9,6 +9,7 @@ export default function PosPage() {
   const [status, setStatus] = useState<string | null>(null);
   const [productId, setProductId] = useState("");
   const [quantity, setQuantity] = useState("1");
+  const [barcode, setBarcode] = useState("");
 
   async function handleOpenSession() {
     const response = await openPosSession({ openingBalance: 0 });
@@ -63,6 +64,18 @@ export default function PosPage() {
       <div className="grid gap-4 rounded-3xl border border-white/40 bg-white/70 p-6">
         <p className="text-sm font-semibold text-foreground">Create POS order</p>
         <div className="grid gap-3 md:grid-cols-2">
+          <input
+            className="rounded-xl border border-white/60 bg-white px-3 py-2 text-sm md:col-span-2"
+            placeholder="Barcode (scan input)"
+            value={barcode}
+            onChange={(event) => {
+              const value = event.target.value;
+              setBarcode(value);
+              if (value.length >= 8) {
+                setProductId(value);
+              }
+            }}
+          />
           <input
             className="rounded-xl border border-white/60 bg-white px-3 py-2 text-sm"
             placeholder="Product ID"

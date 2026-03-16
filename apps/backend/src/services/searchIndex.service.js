@@ -1,6 +1,7 @@
 const SearchIndex = require("../models/searchIndex.model");
 const Product = require("../models/product.model");
 const Shop = require("../models/shop.model");
+const externalSearch = require("./search/externalSearch.service");
 
 async function rebuildIndex() {
   await SearchIndex.deleteMany({});
@@ -24,6 +25,8 @@ async function rebuildIndex() {
   if (productDocs.length) await SearchIndex.insertMany(productDocs);
   if (shopDocs.length) await SearchIndex.insertMany(shopDocs);
 
+  await externalSearch.indexDocuments([...productDocs, ...shopDocs]);
+
   return {
     products: productDocs.length,
     shops: shopDocs.length,
@@ -32,9 +35,12 @@ async function rebuildIndex() {
 
 async function searchIndex(query) {
   if (!query) return [];
-  const results = await SearchIndex.find({ $text: { $search: query } })
-    .limit(20)
-    .lean();
+  const externalResults = await externalSearch.searchExternal(query);
+  if (externalResults && externalResults.length) {
+    return externalResults;
+  }
+
+  const results = await SearchIndex.find({ $text: { $search: query } }).limit(20).lean();
   return results;
 }
 

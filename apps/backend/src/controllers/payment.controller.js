@@ -17,6 +17,7 @@ const { handlePaymentWebhook } = require("../services/payment.service");
 const paymentService = require("../services/payment.service");
 const Settlement = require("../models/settlement.model");
 const { ensureIdempotent } = require('../utils/idempotency');
+const paymentGateway = require("../services/payment/paymentGateway.service");
 
 // const features = require('../config/features');
 
@@ -32,13 +33,21 @@ console.log("✅ payment.controller.js LOADED");
 exports.initiatePayment = async (req, res, next) => {
   try {
     const { orderId } = req.params;
+    const { provider } = req.body || {};
 
     const order = await Order.findById(orderId);
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    const providerPaymentId = `pay_${order._id}`;
+    const gateway = provider || process.env.DEFAULT_PAYMENT_PROVIDER || "bkash";
+
+    const gatewayResult = await paymentGateway.createPayment({
+      provider: gateway,
+      amount: order.totalAmount,
+      currency: "BDT",
+      orderId: order._id,
+    });
 
 let attempt = await PaymentAttempt.findOne({
   order: order._id,
@@ -54,11 +63,11 @@ if (!attempt) {
     shopId: order.shop,
     amount: order.totalAmount,
 
-    provider: "sandbox",
-    gateway: "sandbox",
+    provider: gatewayResult.provider,
+    gateway: gateway,
 
     // 🔥 UNIQUE but random
-    providerPaymentId: "pay_" + new mongoose.Types.ObjectId(),
+    providerPaymentId: gatewayResult.providerPaymentId,
 
     status: "PENDING",
     processed: false
@@ -68,8 +77,11 @@ if (!attempt) {
 
     res.status(201).json({
       message: t('common.updated', req.lang),
-      providerPaymentId,
-      attemptId: attempt._id
+      providerPaymentId: gatewayResult.providerPaymentId,
+      attemptId: attempt._id,
+      paymentUrl: gatewayResult.paymentUrl,
+      provider: gatewayResult.provider,
+      gateway
     });
   } catch (err) {
     next(err);
@@ -93,6 +105,13 @@ exports.paymentWebhook = async (req, res) => {
         || req.body.eventId,
       "payment"
     );
+
+    const provider = req.headers["x-payment-provider"] || req.body.provider || "bkash";
+    const signature = req.headers["x-payment-signature"] || "";
+    const verified = await paymentGateway.verifyWebhook(provider, req.body, signature);
+    if (!verified) {
+      return res.status(400).json({ success: false, message: "Invalid signature" });
+    }
 
     const result =
       await paymentService.handlePaymentWebhook(
