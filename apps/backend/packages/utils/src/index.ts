@@ -11,6 +11,7 @@ export function toRole(value: string | undefined | null): AuthRole {
   if (normalized === "owner") return "merchant";
   if (normalized === "admin") return "admin";
   if (normalized === "staff") return "staff";
+  if (normalized === "developer") return "developer";
   return "customer";
 }
 

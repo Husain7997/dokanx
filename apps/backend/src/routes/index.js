@@ -34,6 +34,10 @@ const healthRoute = require('./health.routes');
 const systemRoute = require("../infrastructure/monitoring/health.routes");
 const webhookRoutes = require('../infrastructure/webhook/webhook.routes');
 const themeRoutes = require("./theme.routes");
+const developerRoutes = require("./developer.routes");
+const oauthRoutes = require("./oauth.routes");
+const marketplaceRoutes = require("./marketplace.routes");
+const publicV1Routes = require("./public/v1.routes");
 
 router.use("/financial-test", require("./financial.test.routes"));
 // ---- Routes ----
@@ -51,6 +55,10 @@ router.use("/settlements", settlementRoutes);
 router.use("/report", reportRoutes);
 router.use("/wallet", walletRoutes);
 router.use("/themes", themeRoutes);
+router.use("/developer", developerRoutes);
+router.use("/oauth", oauthRoutes);
+router.use("/marketplace", marketplaceRoutes);
+router.use("/v1", publicV1Routes);
 
 // temporary dev routes
 router.use("/reports", require("../modules/reporting/report.routes"));
