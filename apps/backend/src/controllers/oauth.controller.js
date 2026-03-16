@@ -3,6 +3,7 @@ const OAuthApp = require("../models/oauthApp.model");
 const OAuthAuthCode = require("../models/oauthAuthCode.model");
 const OAuthToken = require("../models/oauthToken.model");
 const { hashSecret, randomToken } = require("../utils/crypto.util");
+const { createAudit } = require("../utils/audit.util");
 
 const DEFAULT_SCOPES = [
   "read_products",
@@ -49,6 +50,14 @@ exports.createApp = async (req, res) => {
     data: app,
     clientSecret,
   });
+
+  await createAudit({
+    action: "CREATE_OAUTH_APP",
+    performedBy: req.user?._id,
+    targetType: "OAuthApp",
+    targetId: app._id,
+    req,
+  });
 };
 
 exports.updateApp = async (req, res) => {
@@ -73,6 +82,14 @@ exports.updateApp = async (req, res) => {
   if (!app) return res.status(404).json({ message: "OAuth app not found" });
 
   res.json({ message: "OAuth app updated", data: app });
+
+  await createAudit({
+    action: "UPDATE_OAUTH_APP",
+    performedBy: req.user?._id,
+    targetType: "OAuthApp",
+    targetId: app._id,
+    req,
+  });
 };
 
 exports.deleteApp = async (req, res) => {
@@ -84,6 +101,14 @@ exports.deleteApp = async (req, res) => {
   if (!app) return res.status(404).json({ message: "OAuth app not found" });
 
   res.json({ message: "OAuth app deleted" });
+
+  await createAudit({
+    action: "DELETE_OAUTH_APP",
+    performedBy: req.user?._id,
+    targetType: "OAuthApp",
+    targetId: app._id,
+    req,
+  });
 };
 
 exports.authorize = async (req, res) => {

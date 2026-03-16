@@ -1,6 +1,7 @@
 const Developer = require("../models/developer.model");
 const WebhookSubscription = require("../models/webhookSubscription.model");
 const { encryptSecret, randomToken } = require("../utils/crypto.util");
+const { createAudit } = require("../utils/audit.util");
 
 exports.listWebhooks = async (req, res) => {
   const developer = await Developer.findOne({ userId: req.user._id });
@@ -34,6 +35,14 @@ exports.createWebhook = async (req, res) => {
     data: hook,
     secret,
   });
+
+  await createAudit({
+    action: "CREATE_WEBHOOK",
+    performedBy: req.user?._id,
+    targetType: "WebhookSubscription",
+    targetId: hook._id,
+    req,
+  });
 };
 
 exports.deleteWebhook = async (req, res) => {
@@ -49,4 +58,12 @@ exports.deleteWebhook = async (req, res) => {
   if (!hook) return res.status(404).json({ message: "Webhook not found" });
 
   res.json({ message: "Webhook deleted" });
+
+  await createAudit({
+    action: "DELETE_WEBHOOK",
+    performedBy: req.user?._id,
+    targetType: "WebhookSubscription",
+    targetId: hook._id,
+    req,
+  });
 };

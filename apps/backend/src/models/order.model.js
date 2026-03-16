@@ -68,6 +68,11 @@ const orderSchema = new mongoose.Schema(
       ],
       default: "PLACED"
     },
+    channel: {
+      type: String,
+      enum: ["WEB", "MOBILE", "POS", "API"],
+      default: "WEB",
+    },
       isSettled: {   // ✅ এই ফিল্ড add করুন
     type: Boolean,
     default: false,

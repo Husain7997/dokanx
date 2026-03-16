@@ -1,6 +1,7 @@
 const Developer = require("../models/developer.model");
 const ApiKey = require("../models/apiKey.model");
 const { hashSecret, randomToken } = require("../utils/crypto.util");
+const { createAudit } = require("../utils/audit.util");
 
 function buildPreview(rawKey) {
   const suffix = rawKey.slice(-6);
@@ -39,6 +40,14 @@ exports.createKey = async (req, res) => {
     data: key,
     secret: rawKey,
   });
+
+  await createAudit({
+    action: "CREATE_API_KEY",
+    performedBy: req.user?._id,
+    targetType: "ApiKey",
+    targetId: key._id,
+    req,
+  });
 };
 
 exports.revokeKey = async (req, res) => {
@@ -55,4 +64,12 @@ exports.revokeKey = async (req, res) => {
   if (!key) return res.status(404).json({ message: "API key not found" });
 
   res.json({ message: "API key revoked", data: key });
+
+  await createAudit({
+    action: "REVOKE_API_KEY",
+    performedBy: req.user?._id,
+    targetType: "ApiKey",
+    targetId: key._id,
+    req,
+  });
 };

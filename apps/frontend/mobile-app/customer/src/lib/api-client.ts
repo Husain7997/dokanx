@@ -48,6 +48,15 @@ export function listPublicShops() {
   );
 }
 
+export function searchProducts(params: { shopId?: string; q?: string }) {
+  const search = new URLSearchParams();
+  if (params.shopId) search.set("shopId", params.shopId);
+  if (params.q) search.set("q", params.q);
+  return request<{ data?: Array<{ _id?: string; id?: string; name?: string; price?: number; shopId?: string }> }>(
+    `/api/search/products${search.toString() ? `?${search.toString()}` : ""}`
+  );
+}
+
 export function placeOrderRequest(
   token: string,
   payload: {

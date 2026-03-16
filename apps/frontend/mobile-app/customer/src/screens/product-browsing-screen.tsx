@@ -1,20 +1,43 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
 import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { searchProducts } from "@/lib/api-client";
 import { useCartStore } from "@/store/cart-store";
 import { useTenantStore } from "@/store/tenant-store";
-
-const products = [
-  { id: "p1", name: "Aurora Headphones", price: 3200, shop: "Aurora Electronics" },
-  { id: "p2", name: "Nook Mixer", price: 2400, shop: "Nook Home" },
-  { id: "p3", name: "City Runner Shoes", price: 1800, shop: "Atelier Wear" },
-];
 
 export function ProductBrowsingScreen() {
   const navigation = useNavigation();
   const addItem = useCartStore((state) => state.addItem);
   const selectedShop = useTenantStore((state) => state.shop);
+  const [products, setProducts] = useState<Array<{ id: string; name: string; price: number }>>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      if (!selectedShop) return;
+      setLoading(true);
+      try {
+        const response = await searchProducts({ shopId: selectedShop.id });
+        if (!active) return;
+        const list =
+          response.data?.map((item) => ({
+            id: String(item._id || item.id || ""),
+            name: String(item.name || ""),
+            price: Number(item.price || 0),
+          })) || [];
+        setProducts(list.filter((item) => item.id));
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      active = false;
+    };
+  }, [selectedShop]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -26,10 +49,11 @@ export function ProductBrowsingScreen() {
             <Text style={styles.noticeSubtitle}>Tap here to choose the storefront for this session.</Text>
           </Pressable>
         ) : null}
+        {loading ? <Text style={styles.cardSubtitle}>Loading products...</Text> : null}
         {products.map((item) => (
           <View key={item.id} style={styles.card}>
             <Text style={styles.cardTitle}>{item.name}</Text>
-            <Text style={styles.cardSubtitle}>{item.shop}</Text>
+            <Text style={styles.cardSubtitle}>{selectedShop?.name || "Shop"}</Text>
             <View style={styles.row}>
               <Text style={styles.price}>{item.price} BDT</Text>
               <Pressable
