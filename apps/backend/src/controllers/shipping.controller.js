@@ -15,6 +15,16 @@ exports.getRates = async (req, res) => {
   });
 };
 
+exports.listCarriers = async (_req, res) => {
+  res.json({
+    data: [
+      { id: "dokanx", name: "DokanX Logistics", supportsTracking: true },
+      { id: "pathao", name: "Pathao", supportsTracking: true },
+      { id: "paperfly", name: "Paperfly", supportsTracking: true },
+    ],
+  });
+};
+
 exports.createShipment = async (req, res) => {
   const { orderId, carrier } = req.body || {};
   if (!orderId || !carrier) {

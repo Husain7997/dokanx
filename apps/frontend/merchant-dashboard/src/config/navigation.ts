@@ -10,6 +10,7 @@ export const navigation: NavigationItem[] = [
   { href: "/finance", label: "Finance" },
   { href: "/wallet", label: "Wallet" },
   { href: "/courier", label: "Courier" },
+  { href: "/pos", label: "POS" },
   { href: "/marketing", label: "Marketing" },
   { href: "/apps", label: "Apps" },
   { href: "/settings", label: "Settings" }

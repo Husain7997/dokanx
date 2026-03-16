@@ -249,3 +249,26 @@ export function listAnalyticsSnapshots(query: {
   if (query.dateTo) search.set("dateTo", query.dateTo);
   return request<{ data?: Array<Record<string, unknown>> }>(`/analytics/warehouse${search.toString() ? `?${search.toString()}` : ""}`);
 }
+
+export function openPosSession(payload: { openingBalance?: number }) {
+  return request<MutationResponse>("/pos/sessions", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function closePosSession(sessionId: string, payload: { closingBalance?: number }) {
+  return request<MutationResponse>(`/pos/sessions/${sessionId}/close`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function createPosOrder(payload: {
+  items: Array<{ product: string; quantity: number }>;
+}) {
+  return request<MutationResponse>("/pos/orders", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
