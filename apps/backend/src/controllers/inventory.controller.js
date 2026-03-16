@@ -1,6 +1,7 @@
 const inventory = require("@/inventory");
 const { withLock } = require("@/core/infrastructure");
   const t = require('@/core/language').t;
+const Inventory = require("../models/Inventory.model");
 exports.adjustStock = async (req, res) => {
 
   const { product, quantity, note } = req.body;
@@ -36,4 +37,18 @@ exports.lockTest = async (req, res) => {
   });
 
   res.json({ message: t('common.updated', req.lang) });
+};
+
+exports.listInventory = async (req, res) => {
+  const shopId = req.shop?._id;
+  if (!shopId) return res.status(400).json({ message: "Shop missing" });
+  const rows = await Inventory.find({ shopId }).lean();
+  res.json({ data: rows });
+};
+
+exports.inventoryAlerts = async (req, res) => {
+  const shopId = req.shop?._id;
+  if (!shopId) return res.status(400).json({ message: "Shop missing" });
+  const rows = await Inventory.find({ shopId, stock: { $lte: 5 } }).lean();
+  res.json({ data: rows });
 };

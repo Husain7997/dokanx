@@ -250,6 +250,17 @@ export function listAnalyticsSnapshots(query: {
   return request<{ data?: Array<Record<string, unknown>> }>(`/analytics/warehouse${search.toString() ? `?${search.toString()}` : ""}`);
 }
 
+export function listCampaigns() {
+  return request<{ data?: Array<Record<string, unknown>> }>("/marketing/campaigns");
+}
+
+export function createCampaign(payload: { name: string; type?: string }) {
+  return request<{ data?: Record<string, unknown> }>("/marketing/campaigns", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function openPosSession(payload: { openingBalance?: number }) {
   return request<MutationResponse>("/pos/sessions", {
     method: "POST",
