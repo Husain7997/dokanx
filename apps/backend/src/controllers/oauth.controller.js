@@ -121,6 +121,35 @@ exports.authorize = async (req, res) => {
   });
 };
 
+exports.consent = async (req, res) => {
+  const { client_id, redirect_uri, scope } = req.query;
+  if (!client_id || !redirect_uri) {
+    return res.status(400).json({ message: "client_id and redirect_uri required" });
+  }
+
+  const app = await OAuthApp.findOne({ clientId: client_id });
+  if (!app) return res.status(404).json({ message: "OAuth app not found" });
+  if (!app.redirectUris.includes(String(redirect_uri))) {
+    return res.status(400).json({ message: "Invalid redirect_uri" });
+  }
+
+  const requestedScopes = String(scope || "")
+    .split(" ")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  res.json({
+    data: {
+      app: {
+        name: app.name,
+        description: app.description,
+        clientId: app.clientId,
+      },
+      scopes: requestedScopes.length ? requestedScopes : app.scopes,
+    },
+  });
+};
+
 exports.token = async (req, res) => {
   const { grant_type } = req.body || {};
   if (grant_type === "authorization_code") {
