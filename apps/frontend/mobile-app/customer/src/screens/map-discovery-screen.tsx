@@ -45,6 +45,8 @@ export function MapDiscoveryScreen() {
   const buttonPos = useRef(new Animated.ValueXY({ x: window.width - 74, y: window.height * 0.4 })).current;
   const watchId = useRef<number | null>(null);
   const mapRef = useRef<MapView | null>(null);
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+  const pulseLoop = useRef<Animated.CompositeAnimation | null>(null);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -198,6 +200,22 @@ export function MapDiscoveryScreen() {
       650
     );
   }, [autoRecenter, userLocation]);
+
+  useEffect(() => {
+    if (!userLocation) return;
+    pulseAnim.setValue(0);
+    pulseLoop.current?.stop();
+    pulseLoop.current = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1600, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ])
+    );
+    pulseLoop.current.start();
+    return () => {
+      pulseLoop.current?.stop();
+    };
+  }, [pulseAnim, userLocation]);
 
   const filteredShops = useMemo(() => {
     const shopIds = new Set(filteredMarkers.map((marker) => marker.id));
@@ -359,12 +377,33 @@ export function MapDiscoveryScreen() {
               provider={PROVIDER_GOOGLE}
               style={StyleSheet.absoluteFill}
               initialRegion={initialRegion}
-              showsUserLocation={Boolean(userLocation)}
+              showsUserLocation={false}
               showsMyLocationButton={true}
               ref={(ref) => {
                 mapRef.current = ref;
               }}
             >
+              {userLocation ? (
+                <Marker coordinate={{ latitude: userLocation.lat, longitude: userLocation.lng }} anchor={{ x: 0.5, y: 0.5 }}>
+                  <View style={styles.userMarker}>
+                    <Animated.View
+                      pointerEvents="none"
+                      style={[
+                        styles.userPulse,
+                        {
+                          opacity: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 0] }),
+                          transform: [
+                            {
+                              scale: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 2.4] }),
+                            },
+                          ],
+                        },
+                      ]}
+                    />
+                    <View style={styles.userDot} />
+                  </View>
+                </Marker>
+              ) : null}
               {filteredMarkers.map((marker) => (
                 <Marker key={marker.id} coordinate={{ latitude: marker.lat, longitude: marker.lng }} title={marker.title} />
               ))}
@@ -551,6 +590,22 @@ const styles = StyleSheet.create({
   refreshButtonDisabled: { opacity: 0.6 },
   refreshText: { color: "#ffffff", fontSize: 11, fontWeight: "600" },
   refreshTextDark: { color: "#111827" },
+  userMarker: { alignItems: "center", justifyContent: "center" },
+  userPulse: {
+    position: "absolute",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(59,130,246,0.3)",
+  },
+  userDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#2563eb",
+    borderWidth: 2,
+    borderColor: "#ffffff",
+  },
 });
 
 function getDistanceKm(

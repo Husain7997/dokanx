@@ -122,6 +122,16 @@ type ProductReviewResponse = {
   }>;
 };
 
+type EtaSettingsResponse = {
+  data?: {
+    basePerKm?: number;
+    minEta?: number;
+    fallbackEta?: number;
+    trafficFactors?: Array<{ maxDistanceKm?: number; minutes?: number }>;
+    distanceBrackets?: Array<{ maxDistanceKm?: number; minutes?: number }>;
+  };
+};
+
 const guestCartStorageKey = "dokanx.guest-cart-token";
 
 function getGuestToken() {
@@ -326,4 +336,8 @@ export function submitProductReview(productId: string, payload: { reviewerName?:
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export function getEtaSettings() {
+  return request<EtaSettingsResponse>("/settings/eta");
 }

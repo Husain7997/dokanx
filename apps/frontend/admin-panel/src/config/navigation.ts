@@ -73,5 +73,10 @@ export const adminNavigation = [
     label: "Reviews",
     href: "/reviews",
     description: "Product review moderation"
+  },
+  {
+    label: "Settings",
+    href: "/settings",
+    description: "Platform ETA thresholds"
   }
 ];

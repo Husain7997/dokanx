@@ -47,6 +47,7 @@ const developerRoutes = require("./developer.routes");
 const oauthRoutes = require("./oauth.routes");
 const marketplaceRoutes = require("./marketplace.routes");
 const publicV1Routes = require("./public/v1.routes");
+const settingsRoutes = require("./settings.routes");
 
 router.use("/financial-test", require("./financial.test.routes"));
 // ---- Routes ----
@@ -76,6 +77,7 @@ router.use("/developer", developerRoutes);
 router.use("/oauth", oauthRoutes);
 router.use("/marketplace", marketplaceRoutes);
 router.use("/v1", publicV1Routes);
+router.use("/settings", settingsRoutes);
 
 // temporary dev routes
 router.use("/reports", require("../modules/reporting/report.routes"));

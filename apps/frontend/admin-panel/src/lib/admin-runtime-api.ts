@@ -131,6 +131,16 @@ type MarketplaceAppsResponse = {
   } & JsonValue>;
 };
 
+type EtaSettingsResponse = {
+  data?: {
+    basePerKm?: number;
+    minEta?: number;
+    fallbackEta?: number;
+    trafficFactors?: Array<{ maxDistanceKm?: number; minutes?: number }>;
+    distanceBrackets?: Array<{ maxDistanceKm?: number; minutes?: number }>;
+  } & JsonValue;
+};
+
 function getHeaders() {
   const store = useAuthStore.getState();
   return {
@@ -212,6 +222,23 @@ export function getSystemHealth() {
 
 export function listMarketplaceApps() {
   return request<MarketplaceAppsResponse>("/marketplace/apps");
+}
+
+export function getEtaSettings() {
+  return request<EtaSettingsResponse>("/settings/eta");
+}
+
+export function updateEtaSettings(payload: {
+  basePerKm: number;
+  minEta: number;
+  fallbackEta: number;
+  trafficFactors: Array<{ maxDistanceKm: number; minutes: number }>;
+  distanceBrackets: Array<{ maxDistanceKm: number; minutes: number }>;
+}) {
+  return request<EtaSettingsResponse>("/admin/settings/eta", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function blockUser(userId: string) {

@@ -26,6 +26,9 @@ export default function Page() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkAction, setBulkAction] = useState<null | "approve" | "reject">(null);
   const [bulkProgress, setBulkProgress] = useState<{ total: number; done: number; failures: number } | null>(null);
+  const [failedIds, setFailedIds] = useState<string[]>([]);
+  const [failedAction, setFailedAction] = useState<null | "approve" | "reject">(null);
+  const [retryProgress, setRetryProgress] = useState<{ total: number; done: number; failures: number } | null>(null);
 
   const filteredReviews = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -115,6 +118,44 @@ export default function Page() {
         >
           Bulk reject
         </Button>
+        <Button
+          variant="secondary"
+          disabled={!failedIds.length || retryProgress !== null}
+          onClick={async () => {
+            if (!failedIds.length || !failedAction) return;
+            const ids = [...failedIds];
+            setRetryProgress({ total: ids.length, done: 0, failures: 0 });
+            const stillFailed: string[] = [];
+            let done = 0;
+            for (const id of ids) {
+              try {
+                if (failedAction === "approve") {
+                  await approveProductReview(id);
+                } else {
+                  await rejectProductReview(id);
+                }
+              } catch {
+                stillFailed.push(id);
+              } finally {
+                done += 1;
+                setRetryProgress({ total: ids.length, done, failures: stillFailed.length });
+              }
+            }
+            const response = await listProductReviews(status);
+            setReviews(Array.isArray(response.data) ? (response.data as ReviewRow[]) : []);
+            setSelectedIds(new Set());
+            setFailedIds(stillFailed);
+            if (stillFailed.length) {
+              setError(`${stillFailed.length} reviews still failed. Please retry again.`);
+            } else {
+              setError(null);
+              setFailedAction(null);
+            }
+            setRetryProgress(null);
+          }}
+        >
+          {retryProgress ? `Retrying ${retryProgress.done}/${retryProgress.total}` : "Retry failed only"}
+        </Button>
       </div>
       <Modal open={bulkAction !== null} onOpenChange={(open) => { if (!open) setBulkAction(null); }}>
         <ModalContent>
@@ -131,8 +172,8 @@ export default function Page() {
             <Button
               onClick={async () => {
                 const ids = Array.from(selectedIds);
+                const failed: string[] = [];
                 setBulkProgress({ total: ids.length, done: 0, failures: 0 });
-                let failures = 0;
                 let done = 0;
                 for (const id of ids) {
                   try {
@@ -142,18 +183,23 @@ export default function Page() {
                       await rejectProductReview(id);
                     }
                   } catch {
-                    failures += 1;
+                    failed.push(id);
                   } finally {
                     done += 1;
-                    setBulkProgress({ total: ids.length, done, failures });
+                    setBulkProgress({ total: ids.length, done, failures: failed.length });
                   }
                 }
                 const response = await listProductReviews(status);
                 setReviews(Array.isArray(response.data) ? (response.data as ReviewRow[]) : []);
                 setSelectedIds(new Set());
                 setBulkAction(null);
-                if (failures) {
-                  setError(`${failures} reviews failed during bulk action. Please retry.`);
+                if (failed.length) {
+                  setError(`${failed.length} reviews failed during bulk action. Please retry.`);
+                  setFailedIds(failed);
+                  setFailedAction(bulkAction);
+                } else {
+                  setFailedIds([]);
+                  setFailedAction(null);
                 }
                 setBulkProgress(null);
               }}

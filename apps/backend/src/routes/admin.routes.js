@@ -6,6 +6,7 @@ const allowRoles = require("../middlewares/allowRoles");
 
 const adminController = require("../controllers/admin.controller");
 const reviewController = require("../controllers/admin/review.controller");
+const settingsController = require("../controllers/settings.controller");
 
 // ❗❗ খুব গুরুত্বপূর্ণ: function হিসেবে পাঠাচ্ছি
 router.get("/users",
@@ -77,6 +78,12 @@ router.post("/reviews/:reviewId/reject",
   protect,
   allowRoles("ADMIN"),
   reviewController.rejectReview
+);
+
+router.put("/settings/eta",
+  protect,
+  allowRoles("ADMIN"),
+  settingsController.updateEtaSettings
 );
 
 module.exports = router;

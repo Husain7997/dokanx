@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Badge, Button, Card, CardDescription, CardTitle, Input } from "@dokanx/ui";
 
-import { listLocations, searchRuntimeProducts, searchShops, searchSuggestions } from "@/lib/runtime-api";
+import { getEtaSettings, listLocations, searchRuntimeProducts, searchShops, searchSuggestions } from "@/lib/runtime-api";
 import { StorefrontProductGrid } from "@/components/storefront-product-grid";
 
 type RuntimeProduct = {
@@ -17,6 +17,32 @@ type RuntimeProduct = {
   shopId?: string;
   image?: string;
   slug?: string;
+};
+
+type EtaSettings = {
+  basePerKm: number;
+  minEta: number;
+  fallbackEta: number;
+  trafficFactors: Array<{ maxDistanceKm: number; minutes: number }>;
+  distanceBrackets: Array<{ maxDistanceKm: number; minutes: number }>;
+};
+
+const defaultEtaSettings: EtaSettings = {
+  basePerKm: 10,
+  minEta: 15,
+  fallbackEta: 45,
+  trafficFactors: [
+    { maxDistanceKm: 2, minutes: 8 },
+    { maxDistanceKm: 5, minutes: 12 },
+    { maxDistanceKm: 10, minutes: 18 },
+    { maxDistanceKm: 999, minutes: 24 },
+  ],
+  distanceBrackets: [
+    { maxDistanceKm: 2, minutes: 5 },
+    { maxDistanceKm: 5, minutes: 8 },
+    { maxDistanceKm: 10, minutes: 12 },
+    { maxDistanceKm: 999, minutes: 18 },
+  ],
 };
 
 export function SearchWorkspace() {
@@ -40,6 +66,7 @@ export function SearchWorkspace() {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [etaSettings, setEtaSettings] = useState<EtaSettings>(defaultEtaSettings);
 
   const categories = useMemo(() => {
     const values = new Set<string>();
@@ -146,6 +173,31 @@ export function SearchWorkspace() {
       }
     }
     void loadLocations();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    async function loadEtaSettings() {
+      try {
+        const response = await getEtaSettings();
+        if (!active) return;
+        const data = response.data || {};
+        setEtaSettings({
+          basePerKm: Number(data.basePerKm ?? defaultEtaSettings.basePerKm),
+          minEta: Number(data.minEta ?? defaultEtaSettings.minEta),
+          fallbackEta: Number(data.fallbackEta ?? defaultEtaSettings.fallbackEta),
+          trafficFactors: normalizeBrackets(data.trafficFactors, defaultEtaSettings.trafficFactors),
+          distanceBrackets: normalizeBrackets(data.distanceBrackets, defaultEtaSettings.distanceBrackets),
+        });
+      } catch {
+        if (!active) return;
+        setEtaSettings(defaultEtaSettings);
+      }
+    }
+    void loadEtaSettings();
     return () => {
       active = false;
     };
@@ -299,7 +351,7 @@ export function SearchWorkspace() {
               </Button>
             </div>
           </Card>
-          {sortShops(shops, userLocation, distance, shopSort, locationMap).map((shop) => (
+          {sortShops(shops, userLocation, distance, shopSort, locationMap, etaSettings).map((shop) => (
             <Card key={String(shop._id || shop.slug || shop.domain)}>
               <CardTitle>{shop.name || "Shop"}</CardTitle>
               <CardDescription className="mt-2">{shop.domain || shop.slug || "Marketplace shop"}</CardDescription>
@@ -350,7 +402,8 @@ function sortShops(
   userLocation: { lat: number; lng: number } | null,
   distance: number,
   sort: "nearest" | "rating",
-  locationMap: Map<string, { lat: number; lng: number }>
+  locationMap: Map<string, { lat: number; lng: number }>,
+  etaSettings: EtaSettings
 ) {
   const enriched = shops.map((shop) => {
     const id = String(shop._id || shop.slug || shop.domain || "");
@@ -364,8 +417,15 @@ function sortShops(
       }
     }
     const etaMinutes = distanceKm !== undefined
-      ? Math.max(15, Math.round(distanceKm * 10 + trafficFactor(distanceKm) + distanceBracket(distanceKm)))
-      : 45;
+      ? Math.max(
+          etaSettings.minEta,
+          Math.round(
+            distanceKm * etaSettings.basePerKm +
+              bracketMinutes(distanceKm, etaSettings.trafficFactors) +
+              bracketMinutes(distanceKm, etaSettings.distanceBrackets)
+          )
+        )
+      : etaSettings.fallbackEta;
     return { ...shop, rating, distanceKm, etaMinutes, isOpen };
   });
 
@@ -405,16 +465,23 @@ function getDistanceKm(
   return 6371 * c;
 }
 
-function trafficFactor(distanceKm: number) {
-  if (distanceKm <= 2) return 8;
-  if (distanceKm <= 5) return 12;
-  if (distanceKm <= 10) return 18;
-  return 24;
+function bracketMinutes(distanceKm: number, brackets: Array<{ maxDistanceKm: number; minutes: number }>) {
+  const sorted = [...brackets].sort((a, b) => a.maxDistanceKm - b.maxDistanceKm);
+  const match = sorted.find((row) => distanceKm <= row.maxDistanceKm);
+  return match ? match.minutes : sorted[sorted.length - 1]?.minutes || 0;
 }
 
-function distanceBracket(distanceKm: number) {
-  if (distanceKm <= 2) return 5;
-  if (distanceKm <= 5) return 8;
-  if (distanceKm <= 10) return 12;
-  return 18;
+function normalizeBrackets(
+  brackets: Array<{ maxDistanceKm?: number; minutes?: number }> | undefined,
+  fallback: Array<{ maxDistanceKm: number; minutes: number }>
+) {
+  if (!Array.isArray(brackets) || !brackets.length) return fallback;
+  const normalized = brackets
+    .map((row) => ({
+      maxDistanceKm: Number(row.maxDistanceKm),
+      minutes: Number(row.minutes),
+    }))
+    .filter((row) => Number.isFinite(row.maxDistanceKm) && Number.isFinite(row.minutes))
+    .sort((a, b) => a.maxDistanceKm - b.maxDistanceKm);
+  return normalized.length ? normalized : fallback;
 }
