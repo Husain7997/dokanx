@@ -234,7 +234,7 @@ export function HomeScreen() {
               <View key={shop.id} style={[styles.mapPin, { left: 20 + index * 24, top: 40 + (index % 3) * 30 }]} />
             ))}
           </View>
-          <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate("ShopSelect" as never)}>
+          <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate("MapDiscovery" as never)}>
             <Text style={styles.secondaryText}>Open map</Text>
           </Pressable>
         </View>

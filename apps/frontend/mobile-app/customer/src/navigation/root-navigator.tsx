@@ -9,6 +9,7 @@ import { SearchResultsScreen } from "../screens/search-results-screen";
 import { LiveChatScreen } from "../screens/live-chat-screen";
 import { ShopSelectScreen } from "../screens/shop-select-screen";
 import { HomeScreen } from "../screens/home-screen";
+import { MapDiscoveryScreen } from "../screens/map-discovery-screen";
 
 const Stack = createNativeStackNavigator();
 
@@ -19,6 +20,7 @@ export function RootNavigator() {
       <Stack.Screen name="Auth" component={AuthScreen} />
       <Stack.Screen name="ShopSelect" component={ShopSelectScreen} />
       <Stack.Screen name="Browse" component={ProductBrowsingScreen} />
+      <Stack.Screen name="MapDiscovery" component={MapDiscoveryScreen} />
       <Stack.Screen name="SearchResults" component={SearchResultsScreen} />
       <Stack.Screen name="LiveChat" component={LiveChatScreen} />
       <Stack.Screen name="Cart" component={CartScreen} />

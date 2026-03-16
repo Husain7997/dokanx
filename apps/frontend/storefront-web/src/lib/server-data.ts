@@ -148,3 +148,14 @@ export async function getShopsDirectory() {
     return [];
   }
 }
+
+export async function getShopBySlug(slug: string) {
+  try {
+    const baseUrl = getApiBaseUrl();
+    const response = await fetch(`${baseUrl}/shops/public`, { cache: "no-store" }).then((res) => res.json());
+    const shops = response.data || [];
+    return shops.find((shop: { slug?: string; domain?: string }) => shop.slug === slug || shop.domain === slug) || null;
+  } catch {
+    return null;
+  }
+}
