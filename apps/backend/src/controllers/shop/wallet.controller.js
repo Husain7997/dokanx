@@ -96,7 +96,21 @@ async (req, res, next) => {
     }
 
     const limit = Math.min(Number(req.query.limit) || 50, 200);
-    const entries = await Ledger.find({ shopId })
+    const filter = { shopId };
+    if (req.query.type) {
+      filter.type = String(req.query.type);
+    }
+    if (req.query.dateFrom || req.query.dateTo) {
+      filter.createdAt = {};
+      if (req.query.dateFrom) {
+        filter.createdAt.$gte = new Date(String(req.query.dateFrom));
+      }
+      if (req.query.dateTo) {
+        filter.createdAt.$lte = new Date(String(req.query.dateTo));
+      }
+    }
+
+    const entries = await Ledger.find(filter)
       .sort({ createdAt: -1 })
       .limit(limit)
       .lean();

@@ -139,16 +139,42 @@ exports.listCustomers = async (req, res) => {
       },
     ]);
 
+    const channelStats = await Order.aggregate([
+      { $match: { shopId, user: { $in: customerIds } } },
+      {
+        $group: {
+          _id: { user: "$user", channel: "$channel" },
+          totalSpend: { $sum: "$totalAmount" },
+          orderCount: { $sum: 1 },
+        },
+      },
+    ]);
+
     const statsMap = new Map(
       orderStats.map((row) => [String(row._id), { orderCount: row.orderCount, totalSpend: row.totalSpend }])
     );
 
+    const channelMap = new Map();
+    for (const row of channelStats) {
+      const userId = String(row._id.user);
+      const channel = String(row._id.channel || "WEB");
+      if (!channelMap.has(userId)) {
+        channelMap.set(userId, {});
+      }
+      channelMap.get(userId)[channel] = {
+        orderCount: row.orderCount,
+        totalSpend: row.totalSpend,
+      };
+    }
+
     const enriched = customers.map((customer) => {
       const stats = statsMap.get(String(customer._id)) || { orderCount: 0, totalSpend: 0 };
+      const spendByChannel = channelMap.get(String(customer._id)) || {};
       return {
         ...customer,
         orderCount: stats.orderCount,
         totalSpend: stats.totalSpend,
+        spendByChannel,
       };
     });
 

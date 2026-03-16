@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button, Card, CardDescription, CardTitle, FinanceLedgerView, Input } from "@dokanx/ui";
 
-import { getWalletSummary, listWalletLedger, topupWallet, transferWallet } from "@/lib/runtime-api";
+import { getWalletSummary, listWalletLedger, listWalletLedgerFiltered, topupWallet, transferWallet } from "@/lib/runtime-api";
 
 type WalletSummary = {
   balance?: number;
@@ -24,6 +24,9 @@ export default function WalletPage() {
   const [topupAmount, setTopupAmount] = useState("0");
   const [transferAmount, setTransferAmount] = useState("0");
   const [targetShopId, setTargetShopId] = useState("");
+  const [filterType, setFilterType] = useState("");
+  const [filterFrom, setFilterFrom] = useState("");
+  const [filterTo, setFilterTo] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -72,7 +75,12 @@ export default function WalletPage() {
                   await topupWallet(Number(topupAmount));
                   const [summary, ledgerResponse] = await Promise.all([
                     getWalletSummary(),
-                    listWalletLedger(50),
+                    listWalletLedgerFiltered({
+                      limit: 50,
+                      type: filterType || undefined,
+                      dateFrom: filterFrom || undefined,
+                      dateTo: filterTo || undefined,
+                    }),
                   ]);
                   setWallet(summary.data || null);
                   setLedger(Array.isArray(ledgerResponse.data) ? ledgerResponse.data : []);
@@ -100,7 +108,12 @@ export default function WalletPage() {
                   await transferWallet({ toShopId: targetShopId, amount: Number(transferAmount) });
                   const [summary, ledgerResponse] = await Promise.all([
                     getWalletSummary(),
-                    listWalletLedger(50),
+                    listWalletLedgerFiltered({
+                      limit: 50,
+                      type: filterType || undefined,
+                      dateFrom: filterFrom || undefined,
+                      dateTo: filterTo || undefined,
+                    }),
                   ]);
                   setWallet(summary.data || null);
                   setLedger(Array.isArray(ledgerResponse.data) ? ledgerResponse.data : []);
@@ -115,6 +128,39 @@ export default function WalletPage() {
               {busy ? "Processing..." : "Transfer"}
             </Button>
           </div>
+        </div>
+      </Card>
+      <Card>
+        <CardTitle>Ledger filters</CardTitle>
+        <CardDescription className="mt-2">
+          Filter ledger entries by type and date range.
+        </CardDescription>
+        <div className="mt-6 grid gap-4 md:grid-cols-4">
+          <Input value={filterType} onChange={(event) => setFilterType(event.target.value)} placeholder="Type (e.g. WALLET_CREDIT)" />
+          <Input type="date" value={filterFrom} onChange={(event) => setFilterFrom(event.target.value)} />
+          <Input type="date" value={filterTo} onChange={(event) => setFilterTo(event.target.value)} />
+          <Button
+            onClick={async () => {
+              setBusy(true);
+              setError(null);
+              try {
+                const ledgerResponse = await listWalletLedgerFiltered({
+                  limit: 50,
+                  type: filterType || undefined,
+                  dateFrom: filterFrom || undefined,
+                  dateTo: filterTo || undefined,
+                });
+                setLedger(Array.isArray(ledgerResponse.data) ? ledgerResponse.data : []);
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Unable to load ledger.");
+              } finally {
+                setBusy(false);
+              }
+            }}
+            disabled={busy}
+          >
+            {busy ? "Loading..." : "Apply"}
+          </Button>
         </div>
       </Card>
       <FinanceLedgerView

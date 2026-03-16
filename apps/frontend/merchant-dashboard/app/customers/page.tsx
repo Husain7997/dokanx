@@ -13,6 +13,7 @@ type CustomerRow = {
   createdAt?: string;
   orderCount?: number;
   totalSpend?: number;
+  spendByChannel?: Record<string, { orderCount?: number; totalSpend?: number }>;
 };
 
 export default function CustomersPage() {
@@ -60,7 +61,10 @@ export default function CustomersPage() {
           customer: customer.name || "Customer",
           email: customer.email || "Unknown",
           orders: String(customer.orderCount ?? 0),
-          value: `${customer.totalSpend ?? 0} BDT`,
+          value: `${customer.totalSpend ?? 0} BDT${customer.spendByChannel ? ` (${["WEB", "MOBILE", "POS"].map((channel) => {
+            const entry = customer.spendByChannel?.[channel];
+            return `${channel}:${entry?.totalSpend ?? 0}`;
+          }).join(" / ")})` : ""}`,
         }))}
       />
     </div>

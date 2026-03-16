@@ -63,5 +63,10 @@ export const adminNavigation = [
     label: "Merchants",
     href: "/merchants",
     description: "Merchant lifecycle"
+  },
+  {
+    label: "Users",
+    href: "/users",
+    description: "Platform users"
   }
 ];

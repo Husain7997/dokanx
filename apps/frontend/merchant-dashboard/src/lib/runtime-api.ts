@@ -388,7 +388,20 @@ export function getWalletSummary() {
 }
 
 export function listWalletLedger(limit = 50) {
-  const search = new URLSearchParams({ limit: String(limit) });
+  return listWalletLedgerFiltered({ limit });
+}
+
+export function listWalletLedgerFiltered(params: {
+  limit?: number;
+  type?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}) {
+  const search = new URLSearchParams();
+  if (params.limit) search.set("limit", String(params.limit));
+  if (params.type) search.set("type", params.type);
+  if (params.dateFrom) search.set("dateFrom", params.dateFrom);
+  if (params.dateTo) search.set("dateTo", params.dateTo);
   return request<WalletLedgerResponse>(`/shop/wallet/ledger?${search.toString()}`);
 }
 
