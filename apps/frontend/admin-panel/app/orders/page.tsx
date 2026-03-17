@@ -35,7 +35,7 @@ export default function Page() {
   const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
   const [reasonDraft, setReasonDraft] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [auditLogs, setAuditLogs] = useState<Array<{ _id?: string; action?: string; targetId?: string; createdAt?: string; meta?: Record<string, unknown> }>>([]);
+  const [auditLogs, setAuditLogs] = useState<Array<{ _id?: string; action?: string; targetId?: string; createdAt?: string; meta?: Record<string, unknown>; performedBy?: { name?: string; email?: string } }>>([]);
 
   useEffect(() => {
     let active = true;
@@ -188,6 +188,7 @@ export default function Page() {
                     .map((log) => (
                       <div key={String(log._id)} className="mt-2 flex flex-wrap justify-between gap-2">
                         <span>{log.createdAt ? new Date(log.createdAt).toLocaleString() : "Update"}</span>
+                        <span>{log.performedBy?.name || log.performedBy?.email || "Admin"}</span>
                         <span>{String((log.meta as Record<string, unknown>)?.disputeStatus || "")}</span>
                         <span>{String((log.meta as Record<string, unknown>)?.disputeReason || "")}</span>
                       </div>
@@ -227,7 +228,32 @@ export default function Page() {
             </span>
           ))}
         </div>
-        <div className="mt-4 flex flex-wrap gap-3">
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <label className="text-xs text-muted-foreground">Export preset</label>
+          <select
+            className="h-9 rounded-full border border-border bg-background px-3 text-xs"
+            onChange={(event) => {
+              const preset = event.target.value;
+              const rows = orders
+                .filter((order) => (order.adminNotes || "").trim() || order.disputeStatus !== "NONE" || order.disputeReason !== "NONE")
+                .map((order) => ({
+                  orderId: order._id || "",
+                  disputeStatus: order.disputeStatus || "NONE",
+                  disputeReason: order.disputeReason || "NONE",
+                  adminNotes: order.adminNotes || "",
+                  createdAt: order.createdAt || "",
+                }))
+                .map((row) => applyDisputeExportPreset(row, preset));
+              const csv = buildCsv(rows);
+              downloadCsv(csv, `disputes-${preset}-${new Date().toISOString().slice(0, 10)}.csv`);
+            }}
+            defaultValue="summary"
+          >
+            <option value="summary">Summary</option>
+            <option value="resolution">Resolution</option>
+            <option value="notes">Notes</option>
+            <option value="full">Full</option>
+          </select>
           <button
             className="rounded-full border border-border/60 px-3 py-2 text-xs"
             onClick={() => {
@@ -241,10 +267,10 @@ export default function Page() {
                   createdAt: order.createdAt || "",
                 }));
               const csv = buildCsv(rows);
-              downloadCsv(csv, `disputes-${new Date().toISOString().slice(0, 10)}.csv`);
+              downloadCsv(csv, `disputes-summary-${new Date().toISOString().slice(0, 10)}.csv`);
             }}
           >
-            Export dispute notes
+            Export summary
           </button>
         </div>
       </Card>
@@ -284,4 +310,30 @@ function downloadCsv(csv: string, filename: string) {
   link.click();
   document.body.removeChild(link);
   window.URL.revokeObjectURL(url);
+}
+
+function applyDisputeExportPreset(row: Record<string, string>, preset: string) {
+  if (preset === "resolution") {
+    return {
+      orderId: row.orderId,
+      disputeStatus: row.disputeStatus,
+      disputeReason: row.disputeReason,
+      createdAt: row.createdAt,
+    };
+  }
+  if (preset === "notes") {
+    return {
+      orderId: row.orderId,
+      adminNotes: row.adminNotes,
+      createdAt: row.createdAt,
+    };
+  }
+  if (preset === "full") {
+    return row;
+  }
+  return {
+    orderId: row.orderId,
+    disputeStatus: row.disputeStatus,
+    disputeReason: row.disputeReason,
+  };
 }

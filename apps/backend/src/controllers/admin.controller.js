@@ -116,6 +116,9 @@ exports.getAllOrders = async (req, res) => {
 };
 
 exports.getAuditLogs = async (req, res) => {
-  const logs = await Audit.find().sort({ createdAt: -1 });
+  const logs = await Audit.find()
+    .sort({ createdAt: -1 })
+    .populate("performedBy", "name email")
+    .lean();
   res.json({ message: t('common.updated', req.lang), data: logs });
 };

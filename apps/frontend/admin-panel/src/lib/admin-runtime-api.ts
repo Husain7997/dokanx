@@ -83,6 +83,8 @@ type AdminAuditResponse = {
     action?: string;
     targetType?: string;
     targetId?: string;
+    performedBy?: { name?: string; email?: string } & JsonValue;
+    meta?: JsonValue;
     createdAt?: string;
   } & JsonValue>;
 };
