@@ -77,6 +77,12 @@ type ShopSettingsResponse = {
     logoUrl?: string;
     brandPrimaryColor?: string;
     brandAccentColor?: string;
+    addressLine1?: string;
+    addressLine2?: string;
+    city?: string;
+    country?: string;
+    vatRate?: number;
+    defaultDiscountRate?: number;
   } & JsonValue;
 };
 
@@ -332,6 +338,12 @@ export function updateShopSettings(payload: {
   logoUrl?: string;
   brandPrimaryColor?: string;
   brandAccentColor?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  country?: string;
+  vatRate?: number;
+  defaultDiscountRate?: number;
 }) {
   return request<ShopSettingsResponse>("/shops/me/settings", {
     method: "PUT",

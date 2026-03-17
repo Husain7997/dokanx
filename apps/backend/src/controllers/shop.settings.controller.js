@@ -37,6 +37,12 @@ exports.getShopSettings = async (req, res) => {
       logoUrl: shop.logoUrl || "",
       brandPrimaryColor: shop.brandPrimaryColor || "",
       brandAccentColor: shop.brandAccentColor || "",
+      addressLine1: shop.addressLine1 || "",
+      addressLine2: shop.addressLine2 || "",
+      city: shop.city || "",
+      country: shop.country || "",
+      vatRate: shop.vatRate ?? 0,
+      defaultDiscountRate: shop.defaultDiscountRate ?? 0,
     },
   });
 };
@@ -53,6 +59,12 @@ exports.updateShopSettings = async (req, res) => {
     logoUrl,
     brandPrimaryColor,
     brandAccentColor,
+    addressLine1,
+    addressLine2,
+    city,
+    country,
+    vatRate,
+    defaultDiscountRate,
   } = req.body || {};
 
   shop.name = name ?? shop.name;
@@ -62,6 +74,12 @@ exports.updateShopSettings = async (req, res) => {
   shop.logoUrl = logoUrl ?? shop.logoUrl;
   shop.brandPrimaryColor = brandPrimaryColor ?? shop.brandPrimaryColor;
   shop.brandAccentColor = brandAccentColor ?? shop.brandAccentColor;
+  shop.addressLine1 = addressLine1 ?? shop.addressLine1;
+  shop.addressLine2 = addressLine2 ?? shop.addressLine2;
+  shop.city = city ?? shop.city;
+  shop.country = country ?? shop.country;
+  if (vatRate !== undefined) shop.vatRate = Number(vatRate) || 0;
+  if (defaultDiscountRate !== undefined) shop.defaultDiscountRate = Number(defaultDiscountRate) || 0;
 
   await shop.save();
 
@@ -75,6 +93,12 @@ exports.updateShopSettings = async (req, res) => {
       logoUrl: shop.logoUrl,
       brandPrimaryColor: shop.brandPrimaryColor,
       brandAccentColor: shop.brandAccentColor,
+      addressLine1: shop.addressLine1,
+      addressLine2: shop.addressLine2,
+      city: shop.city,
+      country: shop.country,
+      vatRate: shop.vatRate ?? 0,
+      defaultDiscountRate: shop.defaultDiscountRate ?? 0,
     },
   });
 };

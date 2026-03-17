@@ -34,6 +34,20 @@ const shopSchema = new mongoose.Schema(
     logoUrl: String,
     brandPrimaryColor: String,
     brandAccentColor: String,
+    addressLine1: String,
+    addressLine2: String,
+    city: String,
+    country: String,
+    vatRate: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    defaultDiscountRate: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     themeId: String,
     themeOverrides: {
       type: Object,

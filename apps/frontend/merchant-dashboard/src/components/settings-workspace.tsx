@@ -46,6 +46,12 @@ export function SettingsWorkspace() {
     logoUrl: "https://placehold.co/180x180",
     brandPrimaryColor: "#0f766e",
     brandAccentColor: "#f97316",
+    addressLine1: "House 12, Road 5",
+    addressLine2: "Banani",
+    city: "Dhaka",
+    country: "Bangladesh",
+    vatRate: "0",
+    defaultDiscountRate: "0",
   });
   const [teamDraft, setTeamDraft] = useState({
     name: "Operations Lead",
@@ -154,6 +160,12 @@ export function SettingsWorkspace() {
         logoUrl: settings.logoUrl,
         brandPrimaryColor: settings.brandPrimaryColor,
         brandAccentColor: settings.brandAccentColor,
+        addressLine1: settings.addressLine1,
+        addressLine2: settings.addressLine2,
+        city: settings.city,
+        country: settings.country,
+        vatRate: Number(settings.vatRate || 0),
+        defaultDiscountRate: Number(settings.defaultDiscountRate || 0),
       });
       setMessage(response.message || "Shop settings saved.");
     } catch (error) {
@@ -259,6 +271,34 @@ export function SettingsWorkspace() {
               <span>Logo URL</span>
               <Input value={settings.logoUrl} onChange={(event) => setSettings((current) => ({ ...current, logoUrl: event.target.value }))} />
             </label>
+            <label className="grid gap-2 text-sm">
+              <span>Address line 1</span>
+              <Input value={settings.addressLine1} onChange={(event) => setSettings((current) => ({ ...current, addressLine1: event.target.value }))} />
+            </label>
+            <label className="grid gap-2 text-sm">
+              <span>Address line 2</span>
+              <Input value={settings.addressLine2} onChange={(event) => setSettings((current) => ({ ...current, addressLine2: event.target.value }))} />
+            </label>
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="grid gap-2 text-sm">
+                <span>City</span>
+                <Input value={settings.city} onChange={(event) => setSettings((current) => ({ ...current, city: event.target.value }))} />
+              </label>
+              <label className="grid gap-2 text-sm">
+                <span>Country</span>
+                <Input value={settings.country} onChange={(event) => setSettings((current) => ({ ...current, country: event.target.value }))} />
+              </label>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="grid gap-2 text-sm">
+                <span>VAT rate (%)</span>
+                <Input value={settings.vatRate} onChange={(event) => setSettings((current) => ({ ...current, vatRate: event.target.value }))} />
+              </label>
+              <label className="grid gap-2 text-sm">
+                <span>Default discount (%)</span>
+                <Input value={settings.defaultDiscountRate} onChange={(event) => setSettings((current) => ({ ...current, defaultDiscountRate: event.target.value }))} />
+              </label>
+            </div>
             <div className="grid gap-4 md:grid-cols-2">
               <label className="grid gap-2 text-sm">
                 <span>Primary color</span>

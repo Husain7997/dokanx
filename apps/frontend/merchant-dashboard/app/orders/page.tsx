@@ -34,7 +34,15 @@ export default function OrdersPage() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState("CONFIRMED");
-  const [shopProfile, setShopProfile] = useState<{ name?: string; logoUrl?: string } | null>(null);
+  const [shopProfile, setShopProfile] = useState<{ name?: string; logoUrl?: string; addressLine1?: string; addressLine2?: string; city?: string; country?: string; vatRate?: number; defaultDiscountRate?: number } | null>(null);
+  const [bulkProgress, setBulkProgress] = useState<{ total: number; done: number; failures: number } | null>(null);
+  const [failedIds, setFailedIds] = useState<string[]>([]);
+  const [csvColumns, setCsvColumns] = useState<Record<string, boolean>>({
+    id: true,
+    status: true,
+    totalAmount: true,
+    createdAt: true,
+  });
 
   async function refresh() {
     const response = await listOrders();
@@ -66,27 +74,49 @@ export default function OrdersPage() {
     if (!ids.length) return;
     setStatusMessage(null);
     setError(null);
+    setFailedIds([]);
+    setBulkProgress({ total: ids.length, done: 0, failures: 0 });
+    let done = 0;
+    const failures: string[] = [];
     for (const id of ids) {
       setBusyId(id);
       try {
         await updateOrderStatus(id, bulkStatus);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Bulk update failed.");
+        failures.push(id);
       }
+      done += 1;
+      setBulkProgress({ total: ids.length, done, failures: failures.length });
     }
     setBusyId(null);
     setSelectedIds(new Set());
     await refresh();
-    setStatusMessage(`Updated ${ids.length} orders to ${bulkStatus}.`);
+    if (failures.length) {
+      setFailedIds(failures);
+      setStatusMessage(`Updated ${ids.length - failures.length}/${ids.length} orders. ${failures.length} failed.`);
+    } else {
+      setStatusMessage(`Updated ${ids.length} orders to ${bulkStatus}.`);
+    }
+    setBulkProgress(null);
   }
 
   function handleExportCsv() {
-    const rows = filteredOrders.map((order) => ({
-      id: order._id || "",
-      status: order.status || "",
-      totalAmount: order.totalAmount ?? 0,
-      createdAt: order.createdAt || "",
-    }));
+    const rows = filteredOrders.map((order) => {
+      const base = {
+        id: order._id || "",
+        status: order.status || "",
+        totalAmount: order.totalAmount ?? 0,
+        createdAt: order.createdAt || "",
+      };
+      const selected: Record<string, string | number> = {};
+      Object.keys(csvColumns).forEach((key) => {
+        if (csvColumns[key]) {
+          selected[key] = base[key as keyof typeof base];
+        }
+      });
+      return selected;
+    });
     const csv = buildCsv(rows);
     downloadCsv(csv, `orders-${new Date().toISOString().slice(0, 10)}.csv`);
   }
@@ -147,6 +177,23 @@ export default function OrdersPage() {
           <Button variant="secondary" onClick={() => setQuery("")}>Clear</Button>
           <Button variant="secondary" onClick={handleExportCsv}>Export CSV</Button>
         </div>
+        <div className="mt-4 grid gap-2 text-xs text-muted-foreground">
+          <p className="font-medium text-foreground">CSV columns</p>
+          <div className="flex flex-wrap gap-4">
+            {Object.keys(csvColumns).map((key) => (
+              <label key={key} className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={csvColumns[key]}
+                  onChange={(event) => {
+                    setCsvColumns((current) => ({ ...current, [key]: event.target.checked }));
+                  }}
+                />
+                {key}
+              </label>
+            ))}
+          </div>
+        </div>
       </Card>
 
       <Card>
@@ -168,6 +215,16 @@ export default function OrdersPage() {
             Update {selectedIds.size} orders
           </Button>
         </div>
+        {bulkProgress ? (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Processing {bulkProgress.done}/{bulkProgress.total} â€¢ Failures {bulkProgress.failures}
+          </p>
+        ) : null}
+        {failedIds.length ? (
+          <p className="mt-2 text-xs text-red-600">
+            Failed order IDs: {failedIds.map((id) => id.slice(-6)).join(", ")}
+          </p>
+        ) : null}
       </Card>
 
       {error ? (
@@ -255,7 +312,7 @@ export default function OrdersPage() {
   );
 }
 
-function buildInvoiceHtml(order: OrderRow, shopProfile: { name?: string; logoUrl?: string } | null) {
+function buildInvoiceHtml(order: OrderRow, shopProfile: { name?: string; logoUrl?: string; addressLine1?: string; addressLine2?: string; city?: string; country?: string; vatRate?: number; defaultDiscountRate?: number } | null) {
   const rows = (order.items || [])
     .map((item) => {
       const name = item.product?.name || "Item";
@@ -265,11 +322,24 @@ function buildInvoiceHtml(order: OrderRow, shopProfile: { name?: string; logoUrl
       return `<tr><td>${name}</td><td>${qty}</td><td>${price}</td><td>${total}</td></tr>`;
     })
     .join("");
+  const subtotal = (order.items || []).reduce((acc, item) => {
+    const qty = Number(item.quantity || 1);
+    const price = Number(item.price || item.product?.price || 0);
+    return acc + price * qty;
+  }, 0);
+  const vatRate = Number(shopProfile?.vatRate || 0);
+  const discountRate = Number(shopProfile?.defaultDiscountRate || 0);
+  const vatAmount = Math.round((subtotal * vatRate) / 100);
+  const discountAmount = Math.round((subtotal * discountRate) / 100);
+  const grandTotal = subtotal + vatAmount - discountAmount;
   const buyerName = order.user?.name || "Guest";
   const buyerEmail = order.user?.email || order.contact?.email || "";
   const buyerPhone = order.user?.phone || order.contact?.phone || "";
   const shopName = shopProfile?.name || "DokanX Shop";
   const shopLogo = shopProfile?.logoUrl || "";
+  const shopAddress = [shopProfile?.addressLine1, shopProfile?.addressLine2, shopProfile?.city, shopProfile?.country]
+    .filter(Boolean)
+    .join(", ");
   return `
     <html>
       <head>
@@ -292,11 +362,15 @@ function buildInvoiceHtml(order: OrderRow, shopProfile: { name?: string; logoUrl
             <p>Order ID: ${order._id || ""}</p>
           </div>
         </div>
+        ${shopAddress ? `<p>Shop address: ${shopAddress}</p>` : ""}
         <p>Buyer: ${buyerName}</p>
         ${buyerEmail ? `<p>Email: ${buyerEmail}</p>` : ""}
         ${buyerPhone ? `<p>Phone: ${buyerPhone}</p>` : ""}
         <p>Status: ${order.status || "PLACED"}</p>
-        <p>Total: ${order.totalAmount ?? 0} BDT</p>
+        <p>Subtotal: ${subtotal} BDT</p>
+        <p>VAT (${vatRate}%): ${vatAmount} BDT</p>
+        <p>Discount (${discountRate}%): -${discountAmount} BDT</p>
+        <p>Total: ${grandTotal} BDT</p>
         <table>
           <thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
           <tbody>${rows || "<tr><td colspan='4'>No items</td></tr>"}</tbody>
