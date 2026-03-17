@@ -195,6 +195,26 @@ type ShipmentResponse = {
   } & JsonValue>;
 };
 
+type OrderListResponse = {
+  data?: Array<{
+    _id?: string;
+    status?: string;
+    totalAmount?: number;
+    createdAt?: string;
+    items?: Array<{ product?: { name?: string } & JsonValue }>;
+  } & JsonValue>;
+};
+
+type InventoryListResponse = {
+  data?: Array<{
+    _id?: string;
+    productId?: string;
+    available?: number;
+    reorderPoint?: number;
+    updatedAt?: string;
+  } & JsonValue>;
+};
+
 function getHeaders() {
   const store = useAuthStore.getState();
   return {
@@ -486,4 +506,12 @@ export function listShopReviews(status = "ALL", limit = 50) {
 export function listShopPayments(status = "ALL", limit = 50) {
   const search = new URLSearchParams({ status, limit: String(limit) });
   return request<PaymentAttemptResponse>(`/shops/me/payments?${search.toString()}`);
+}
+
+export function listOrders() {
+  return request<OrderListResponse>("/orders");
+}
+
+export function listInventory() {
+  return request<InventoryListResponse>("/inventory");
 }
