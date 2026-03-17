@@ -131,6 +131,25 @@ type MarketplaceAppsResponse = {
   } & JsonValue>;
 };
 
+type PaymentGatewayResponse = {
+  data?: Array<{
+    id?: string;
+    name?: string;
+    status?: string;
+    supportsRefunds?: boolean;
+  } & JsonValue>;
+};
+
+type ProductListResponse = {
+  data?: Array<{
+    _id?: string;
+    name?: string;
+    price?: number;
+    stock?: number;
+    shopId?: string;
+  } & JsonValue>;
+};
+
 type EtaSettingsResponse = {
   data?: {
     basePerKm?: number;
@@ -222,6 +241,14 @@ export function getSystemHealth() {
 
 export function listMarketplaceApps() {
   return request<MarketplaceAppsResponse>("/marketplace/apps");
+}
+
+export function listPaymentGateways() {
+  return request<PaymentGatewayResponse>("/payments/gateways");
+}
+
+export function listProducts() {
+  return request<ProductListResponse>("/products");
 }
 
 export function getEtaSettings() {

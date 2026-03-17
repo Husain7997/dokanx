@@ -1,5 +1,10 @@
 export const adminNavigation = [
   {
+    label: "Dashboard",
+    href: "/dashboard",
+    description: "Platform overview"
+  },
+  {
     label: "Tenants",
     href: "/tenants",
     description: "Manage tenant onboarding"
@@ -20,9 +25,19 @@ export const adminNavigation = [
     description: "Payout cycles"
   },
   {
+    label: "Products",
+    href: "/products",
+    description: "Catalog moderation"
+  },
+  {
     label: "Orders",
     href: "/orders",
     description: "Operational orders"
+  },
+  {
+    label: "Payments",
+    href: "/payments",
+    description: "Gateway monitoring"
   },
   {
     label: "Finance",
@@ -35,9 +50,19 @@ export const adminNavigation = [
     description: "Payment and carrier credentials"
   },
   {
+    label: "Marketing",
+    href: "/marketing",
+    description: "Platform campaigns"
+  },
+  {
+    label: "CMS",
+    href: "/cms",
+    description: "Content management"
+  },
+  {
     label: "Risk",
     href: "/risk",
-    description: "Compliance posture"
+    description: "Security & compliance"
   },
   {
     label: "Analytics",
