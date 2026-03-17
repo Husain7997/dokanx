@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Button, Card, CardDescription, CardTitle, DataTable, Input } from "@dokanx/ui";
+import { Badge, Button, Card, CardDescription, CardTitle, DataTable, Input, SelectDropdown } from "@dokanx/ui";
 
 import { blockIp, listAuditLogs, listIpBlocks, unblockIp } from "@/lib/admin-runtime-api";
 
@@ -29,6 +29,7 @@ export default function SecurityPage() {
   const [ip, setIp] = useState("");
   const [reason, setReason] = useState("");
   const [auditQuery, setAuditQuery] = useState("");
+  const [actionFilter, setActionFilter] = useState("ALL");
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -56,13 +57,19 @@ export default function SecurityPage() {
 
   const filteredLogs = useMemo(() => {
     const needle = auditQuery.trim().toLowerCase();
-    if (!needle) return logs;
-    return logs.filter((log) =>
-      [log.action, log.targetType, log.targetId].some((value) =>
+    return logs.filter((log) => {
+      if (actionFilter !== "ALL" && String(log.action || "") !== actionFilter) return false;
+      if (!needle) return true;
+      return [log.action, log.targetType, log.targetId].some((value) =>
         String(value || "").toLowerCase().includes(needle)
-      )
-    );
-  }, [auditQuery, logs]);
+      );
+    });
+  }, [actionFilter, auditQuery, logs]);
+
+  const actionOptions = useMemo(() => {
+    const uniqueActions = Array.from(new Set(logs.map((log) => String(log.action || "UNKNOWN")))).filter(Boolean);
+    return [{ label: "All actions", value: "ALL" }, ...uniqueActions.map((action) => ({ label: action, value: action }))];
+  }, [logs]);
 
   const loginLogs = useMemo(
     () => filteredLogs.filter((log) => String(log.action || "").toUpperCase().includes("LOGIN")),
@@ -159,8 +166,19 @@ export default function SecurityPage() {
         <Card>
           <CardTitle>Login logs</CardTitle>
           <CardDescription className="mt-2">Recent authentication events.</CardDescription>
-          <div className="mt-3">
+          <div className="mt-3 grid gap-3">
             <Input value={auditQuery} onChange={(event) => setAuditQuery(event.target.value)} placeholder="Filter logs by action/target" />
+            <SelectDropdown label="Action filter" options={actionOptions} value={actionFilter} onValueChange={setActionFilter} />
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <Badge variant="neutral">Total {loginLogs.length}</Badge>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => exportAuditCsv(loginLogs, `login-logs-${new Date().toISOString().slice(0, 10)}.csv`)}
+              >
+                Export login logs
+              </Button>
+            </div>
           </div>
           <DataTable
             columns={[
@@ -178,8 +196,19 @@ export default function SecurityPage() {
         <Card>
           <CardTitle>API logs</CardTitle>
           <CardDescription className="mt-2">Recent API access events.</CardDescription>
-          <div className="mt-3">
+          <div className="mt-3 grid gap-3">
             <Input value={auditQuery} onChange={(event) => setAuditQuery(event.target.value)} placeholder="Filter logs by action/target" />
+            <SelectDropdown label="Action filter" options={actionOptions} value={actionFilter} onValueChange={setActionFilter} />
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <Badge variant="neutral">Total {apiLogs.length}</Badge>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => exportAuditCsv(apiLogs, `api-logs-${new Date().toISOString().slice(0, 10)}.csv`)}
+              >
+                Export API logs
+              </Button>
+            </div>
           </div>
           <DataTable
             columns={[
@@ -222,4 +251,15 @@ function downloadCsv(csv: string, filename: string) {
   link.click();
   document.body.removeChild(link);
   window.URL.revokeObjectURL(url);
+}
+
+function exportAuditCsv(rows: AuditRow[], filename: string) {
+  const csvRows = rows.map((log) => ({
+    action: log.action || "",
+    targetType: log.targetType || "",
+    targetId: log.targetId || "",
+    createdAt: log.createdAt || "",
+  }));
+  const csv = buildCsv(csvRows);
+  downloadCsv(csv, filename);
 }
