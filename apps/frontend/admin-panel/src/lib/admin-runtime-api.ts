@@ -67,6 +67,8 @@ type AdminOrderResponse = {
   data?: Array<{
     _id?: string;
     status?: string;
+    disputeStatus?: string;
+    adminNotes?: string;
     totalAmount?: number;
     shop?: { name?: string } & JsonValue;
     user?: { name?: string; email?: string } & JsonValue;
@@ -244,6 +246,13 @@ export function listShops() {
 
 export function listOrders() {
   return request<AdminOrderResponse>("/admin/orders");
+}
+
+export function updateOrderDispute(orderId: string, payload: { disputeStatus?: string; adminNotes?: string }) {
+  return request<{ message?: string; order?: JsonValue }>(`/orders/${orderId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function listAuditLogs() {

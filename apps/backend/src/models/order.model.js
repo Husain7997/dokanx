@@ -68,6 +68,16 @@ const orderSchema = new mongoose.Schema(
       ],
       default: "PLACED"
     },
+    disputeStatus: {
+      type: String,
+      enum: ["NONE", "OPEN", "IN_REVIEW", "RESOLVED", "REJECTED"],
+      default: "NONE",
+      index: true,
+    },
+    adminNotes: {
+      type: String,
+      default: "",
+    },
     channel: {
       type: String,
       enum: ["WEB", "MOBILE", "POS", "API"],

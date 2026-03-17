@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 import { Card, CardDescription, CardTitle, OrdersTable } from "@dokanx/ui";
 
-import { listOrders, listShipments } from "@/lib/admin-runtime-api";
+import { listOrders, listShipments, updateOrderDispute } from "@/lib/admin-runtime-api";
 
 type OrderRow = {
   _id?: string;
   status?: string;
   paymentStatus?: string;
+  disputeStatus?: string;
+  adminNotes?: string;
   totalAmount?: number;
   shop?: { name?: string };
   user?: { name?: string; email?: string };
@@ -29,6 +31,8 @@ export default function Page() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [shipments, setShipments] = useState<ShipmentRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -91,14 +95,69 @@ export default function Page() {
           <CardTitle>Dispute watch</CardTitle>
           <CardDescription className="mt-2">Cancelled or disputed orders.</CardDescription>
           <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
-            {orders.filter((order) => order.status === "CANCELLED").slice(0, 6).map((order) => (
-              <div key={String(order._id)} className="flex flex-wrap justify-between gap-2 rounded-2xl border border-border/60 px-4 py-3">
-                <span>#{String(order._id || "").slice(-6)}</span>
-                <span>{order.status || "DISPUTE"}</span>
-                <span>{order.totalAmount ?? 0} BDT</span>
+            {orders.filter((order) => order.status === "CANCELLED" || order.disputeStatus !== "NONE").slice(0, 6).map((order) => (
+              <div key={String(order._id)} className="grid gap-2 rounded-2xl border border-border/60 px-4 py-3">
+                <div className="flex flex-wrap justify-between gap-2">
+                  <span>#{String(order._id || "").slice(-6)}</span>
+                  <span>{order.disputeStatus || "OPEN"}</span>
+                  <span>{order.totalAmount ?? 0} BDT</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    className="h-9 rounded-full border border-border bg-background px-3 text-xs"
+                    defaultValue={order.disputeStatus || "OPEN"}
+                    onChange={async (event) => {
+                      if (!order._id) return;
+                      setBusyId(order._id);
+                      try {
+                        await updateOrderDispute(order._id, { disputeStatus: event.target.value });
+                        const response = await listOrders();
+                        setOrders(Array.isArray(response.data) ? (response.data as OrderRow[]) : []);
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : "Unable to update dispute.");
+                      } finally {
+                        setBusyId(null);
+                      }
+                    }}
+                    disabled={busyId === order._id}
+                  >
+                    {["NONE", "OPEN", "IN_REVIEW", "RESOLVED", "REJECTED"].map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    className="h-9 flex-1 rounded-full border border-border bg-background px-3 text-xs"
+                    placeholder="Admin notes"
+                    value={notesDraft[order._id || ""] ?? order.adminNotes ?? ""}
+                    onChange={(event) =>
+                      setNotesDraft((current) => ({ ...current, [order._id || ""]: event.target.value }))
+                    }
+                  />
+                  <button
+                    className="rounded-full border border-border/60 px-3 py-1 text-xs"
+                    onClick={async () => {
+                      if (!order._id) return;
+                      setBusyId(order._id);
+                      try {
+                        await updateOrderDispute(order._id, { adminNotes: notesDraft[order._id || ""] ?? "" });
+                        const response = await listOrders();
+                        setOrders(Array.isArray(response.data) ? (response.data as OrderRow[]) : []);
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : "Unable to save notes.");
+                      } finally {
+                        setBusyId(null);
+                      }
+                    }}
+                    disabled={busyId === order._id}
+                  >
+                    Save notes
+                  </button>
+                </div>
               </div>
             ))}
-            {!orders.some((order) => order.status === "CANCELLED") ? <p>No disputes flagged.</p> : null}
+            {!orders.some((order) => order.status === "CANCELLED" || order.disputeStatus !== "NONE") ? <p>No disputes flagged.</p> : null}
           </div>
         </Card>
       </div>

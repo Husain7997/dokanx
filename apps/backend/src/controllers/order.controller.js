@@ -108,11 +108,20 @@ exports.updateOrderStatus = async (req, res) => {
 
   try {
 
-    const order =
-      await transitionOrder({
+    let order = null;
+    if (req.body.status) {
+      order = await transitionOrder({
         orderId: req.params.orderId,
         nextStatus: req.body.status,
       });
+    }
+
+    if (req.body.disputeStatus || req.body.adminNotes !== undefined) {
+      const update = {};
+      if (req.body.disputeStatus) update.disputeStatus = req.body.disputeStatus;
+      if (req.body.adminNotes !== undefined) update.adminNotes = req.body.adminNotes;
+      order = await Order.findByIdAndUpdate(req.params.orderId, update, { new: true });
+    }
 
     res.json({
       message: t('common.updated', req.lang),
