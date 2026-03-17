@@ -42,7 +42,10 @@ export default function OrdersPage() {
     status: true,
     totalAmount: true,
     createdAt: true,
+    customerEmail: false,
+    customerPhone: false,
   });
+  const [csvPreset, setCsvPreset] = useState("summary");
 
   async function refresh() {
     const response = await listOrders();
@@ -101,6 +104,31 @@ export default function OrdersPage() {
     setBulkProgress(null);
   }
 
+  async function handleRetryFailedOnly() {
+    if (!failedIds.length) return;
+    setStatusMessage(null);
+    setError(null);
+    setBulkProgress({ total: failedIds.length, done: 0, failures: 0 });
+    let done = 0;
+    const failures: string[] = [];
+    for (const id of failedIds) {
+      setBusyId(id);
+      try {
+        await updateOrderStatus(id, bulkStatus);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Retry failed.");
+        failures.push(id);
+      }
+      done += 1;
+      setBulkProgress({ total: failedIds.length, done, failures: failures.length });
+    }
+    setBusyId(null);
+    setFailedIds(failures);
+    await refresh();
+    setStatusMessage(failures.length ? `Retry finished with ${failures.length} failures.` : "Retry successful.");
+    setBulkProgress(null);
+  }
+
   function handleExportCsv() {
     const rows = filteredOrders.map((order) => {
       const base = {
@@ -108,6 +136,8 @@ export default function OrdersPage() {
         status: order.status || "",
         totalAmount: order.totalAmount ?? 0,
         createdAt: order.createdAt || "",
+        customerEmail: order.user?.email || order.contact?.email || "",
+        customerPhone: order.user?.phone || order.contact?.phone || "",
       };
       const selected: Record<string, string | number> = {};
       Object.keys(csvColumns).forEach((key) => {
@@ -179,6 +209,23 @@ export default function OrdersPage() {
         </div>
         <div className="mt-4 grid gap-2 text-xs text-muted-foreground">
           <p className="font-medium text-foreground">CSV columns</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="text-xs text-muted-foreground">Preset</label>
+            <select
+              className="h-9 rounded-full border border-border bg-background px-3 text-xs"
+              value={csvPreset}
+              onChange={(event) => {
+                const value = event.target.value;
+                setCsvPreset(value);
+                setCsvColumns(buildPresetColumns(value));
+              }}
+            >
+              <option value="summary">Summary</option>
+              <option value="finance">Finance</option>
+              <option value="customer">Customer</option>
+              <option value="full">Full</option>
+            </select>
+          </div>
           <div className="flex flex-wrap gap-4">
             {Object.keys(csvColumns).map((key) => (
               <label key={key} className="flex items-center gap-2">
@@ -213,6 +260,9 @@ export default function OrdersPage() {
           </select>
           <Button onClick={handleBulkUpdate} disabled={!selectedIds.size}>
             Update {selectedIds.size} orders
+          </Button>
+          <Button variant="secondary" onClick={handleRetryFailedOnly} disabled={!failedIds.length}>
+            Retry failed only
           </Button>
         </div>
         {bulkProgress ? (
@@ -361,6 +411,12 @@ function buildInvoiceHtml(order: OrderRow, shopProfile: { name?: string; logoUrl
             <h1>${shopName} Invoice</h1>
             <p>Order ID: ${order._id || ""}</p>
           </div>
+          <div style="margin-left:auto; text-align:center;">
+            <div style="width:90px;height:90px;border:1px dashed #9ca3af;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#6b7280;">
+              QR
+            </div>
+            <div style="margin-top:6px;font-size:10px;color:#6b7280;">${String(order._id || "").slice(-8)}</div>
+          </div>
         </div>
         ${shopAddress ? `<p>Shop address: ${shopAddress}</p>` : ""}
         <p>Buyer: ${buyerName}</p>
@@ -375,6 +431,15 @@ function buildInvoiceHtml(order: OrderRow, shopProfile: { name?: string; logoUrl
           <thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
           <tbody>${rows || "<tr><td colspan='4'>No items</td></tr>"}</tbody>
         </table>
+        <div style="margin-top:32px;display:flex;justify-content:space-between;align-items:flex-end;">
+          <div>
+            <p style="font-size:12px;color:#6b7280;">Authorized signature</p>
+            <div style="margin-top:24px;width:220px;border-bottom:1px solid #9ca3af;"></div>
+          </div>
+          <div style="text-align:right;font-size:12px;color:#6b7280;">
+            <p>Thank you for your business.</p>
+          </div>
+        </div>
       </body>
     </html>
   `;
@@ -403,4 +468,17 @@ function downloadCsv(csv: string, filename: string) {
   link.click();
   document.body.removeChild(link);
   window.URL.revokeObjectURL(url);
+}
+
+function buildPresetColumns(preset: string) {
+  if (preset === "finance") {
+    return { id: true, status: true, totalAmount: true, createdAt: true, customerEmail: false, customerPhone: false };
+  }
+  if (preset === "customer") {
+    return { id: true, status: true, totalAmount: false, createdAt: true, customerEmail: true, customerPhone: true };
+  }
+  if (preset === "full") {
+    return { id: true, status: true, totalAmount: true, createdAt: true, customerEmail: true, customerPhone: true };
+  }
+  return { id: true, status: true, totalAmount: true, createdAt: true, customerEmail: false, customerPhone: false };
 }
