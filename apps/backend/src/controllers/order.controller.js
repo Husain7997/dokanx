@@ -68,6 +68,7 @@ exports.getOrders = async (req, res) => {
     shopId: req.shop._id,
   })
     .populate("items.product", "name price")
+    .populate("user", "name email phone")
     .sort({ createdAt: -1 });
 
   res.json({

@@ -10,7 +10,7 @@ type OrderRow = {
   status?: string;
   totalAmount?: number;
   createdAt?: string;
-  items?: Array<{ product?: { name?: string } }>;
+  items?: Array<{ product?: { name?: string; price?: number }; quantity?: number; price?: number }>;
 };
 
 type InventoryRow = {
@@ -81,6 +81,9 @@ export function DashboardOverview() {
       (row) => Number(row.available || 0) <= Number(row.reorderPoint || 0)
     ).length;
 
+    const delivered = orders.filter((order) => String(order.status || "") === "DELIVERED").length;
+    const conversion = totalOrders ? Math.round((delivered / totalOrders) * 100) : 0;
+
     return [
       { label: "Today's sales", value: `${todaysSales} BDT`, meta: "Sales today" },
       { label: "Total orders", value: String(totalOrders), meta: "All-time orders" },
@@ -88,6 +91,7 @@ export function DashboardOverview() {
       { label: "Revenue", value: `${summary?.sales?.totalSales ?? revenue} BDT`, meta: "Lifetime revenue" },
       { label: "Wallet balance", value: `${walletBalance} BDT`, meta: "Available payout" },
       { label: "Low stock alerts", value: String(lowStock), meta: "Inventory watchlist" },
+      { label: "Conversion", value: `${conversion}%`, meta: "Delivered / total orders" },
     ];
   }, [inventory, orders, summary, today, walletBalance]);
 
@@ -99,6 +103,8 @@ export function DashboardOverview() {
         .slice(0, 6),
     [inventory]
   );
+
+  const topProducts = useMemo(() => buildTopProducts(orders, 6), [orders]);
 
   const fallbackSeries = useMemo(() => buildDailySeries(orders, 7), [orders]);
   const fallbackRevenueSeries = useMemo(() => buildDailyRevenueSeries(orders, 7), [orders]);
@@ -230,6 +236,24 @@ export function DashboardOverview() {
           </div>
         </Card>
       </div>
+
+      <Card>
+        <CardTitle>Top products</CardTitle>
+        <CardDescription className="mt-2">Best-performing products by order volume.</CardDescription>
+        <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
+          {topProducts.length ? (
+            topProducts.map((row) => (
+              <div key={row.name} className="flex flex-wrap justify-between gap-2 rounded-2xl border border-border/60 px-4 py-3">
+                <span>{row.name}</span>
+                <span>{row.quantity} sold</span>
+                <span>{row.revenue} BDT</span>
+              </div>
+            ))
+          ) : (
+            <p>No product data yet.</p>
+          )}
+        </div>
+      </Card>
     </div>
   );
 }
@@ -274,4 +298,22 @@ function buildDailyRevenueSeries(orders: OrderRow[], days: number) {
     }
   });
   return Array.from(buckets.entries()).map(([label, value]) => ({ label, value }));
+}
+
+function buildTopProducts(orders: OrderRow[], limit: number) {
+  const map = new Map<string, { name: string; quantity: number; revenue: number }>();
+  orders.forEach((order) => {
+    order.items?.forEach((item) => {
+      const name = item.product?.name || "Product";
+      const quantity = Number(item.quantity || 1);
+      const price = Number(item.price || item.product?.price || 0);
+      const current = map.get(name) || { name, quantity: 0, revenue: 0 };
+      current.quantity += quantity;
+      current.revenue += price * quantity;
+      map.set(name, current);
+    });
+  });
+  return Array.from(map.values())
+    .sort((a, b) => b.quantity - a.quantity)
+    .slice(0, limit);
 }

@@ -74,6 +74,9 @@ type ShopSettingsResponse = {
     supportEmail?: string;
     whatsapp?: string;
     payoutSchedule?: string;
+    logoUrl?: string;
+    brandPrimaryColor?: string;
+    brandAccentColor?: string;
   } & JsonValue;
 };
 
@@ -201,7 +204,13 @@ type OrderListResponse = {
     status?: string;
     totalAmount?: number;
     createdAt?: string;
-    items?: Array<{ product?: { name?: string } & JsonValue }>;
+    contact?: { phone?: string; email?: string } & JsonValue;
+    user?: { name?: string; email?: string; phone?: string } & JsonValue;
+    items?: Array<{
+      product?: { name?: string; price?: number } & JsonValue;
+      quantity?: number;
+      price?: number;
+    } & JsonValue>;
   } & JsonValue>;
 };
 
@@ -328,6 +337,10 @@ export function updateShopSettings(payload: {
     method: "PUT",
     body: JSON.stringify(payload),
   });
+}
+
+export function getShopSettings() {
+  return request<ShopSettingsResponse>("/shops/me/settings");
 }
 
 export function listTeamMembers() {

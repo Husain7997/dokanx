@@ -3,14 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button, Card, CardDescription, CardTitle, Input } from "@dokanx/ui";
 
-import { listOrders, refundPayment, updateOrderStatus } from "@/lib/runtime-api";
+import { getShopSettings, listOrders, refundPayment, updateOrderStatus } from "@/lib/runtime-api";
 
 type OrderRow = {
   _id?: string;
   status?: string;
   totalAmount?: number;
   createdAt?: string;
-  items?: Array<{ product?: { name?: string } }>;
+  contact?: { phone?: string; email?: string };
+  user?: { name?: string; email?: string; phone?: string };
+  items?: Array<{ product?: { name?: string; price?: number }; quantity?: number; price?: number }>;
 };
 
 const statusOptions = [
@@ -30,6 +32,9 @@ export default function OrdersPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkStatus, setBulkStatus] = useState("CONFIRMED");
+  const [shopProfile, setShopProfile] = useState<{ name?: string; logoUrl?: string } | null>(null);
 
   async function refresh() {
     const response = await listOrders();
@@ -38,13 +43,53 @@ export default function OrdersPage() {
 
   useEffect(() => {
     void refresh();
+    void loadShopProfile();
   }, []);
+
+  async function loadShopProfile() {
+    try {
+      const response = await getShopSettings();
+      setShopProfile(response.data || null);
+    } catch {
+      setShopProfile(null);
+    }
+  }
 
   const filteredOrders = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return orders;
     return orders.filter((order) => String(order._id || "").toLowerCase().includes(needle));
   }, [orders, query]);
+
+  async function handleBulkUpdate() {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    setStatusMessage(null);
+    setError(null);
+    for (const id of ids) {
+      setBusyId(id);
+      try {
+        await updateOrderStatus(id, bulkStatus);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Bulk update failed.");
+      }
+    }
+    setBusyId(null);
+    setSelectedIds(new Set());
+    await refresh();
+    setStatusMessage(`Updated ${ids.length} orders to ${bulkStatus}.`);
+  }
+
+  function handleExportCsv() {
+    const rows = filteredOrders.map((order) => ({
+      id: order._id || "",
+      status: order.status || "",
+      totalAmount: order.totalAmount ?? 0,
+      createdAt: order.createdAt || "",
+    }));
+    const csv = buildCsv(rows);
+    downloadCsv(csv, `orders-${new Date().toISOString().slice(0, 10)}.csv`);
+  }
 
   async function handleStatusUpdate(orderId: string, status: string) {
     setBusyId(orderId);
@@ -77,7 +122,7 @@ export default function OrdersPage() {
 
   function handlePrintInvoice(order: OrderRow) {
     if (!order._id) return;
-    const html = buildInvoiceHtml(order);
+    const html = buildInvoiceHtml(order, shopProfile);
     const win = window.open("", "_blank", "width=900,height=700");
     if (!win) return;
     win.document.write(html);
@@ -100,6 +145,28 @@ export default function OrdersPage() {
         <div className="mt-4 flex flex-wrap gap-3">
           <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search order ID" />
           <Button variant="secondary" onClick={() => setQuery("")}>Clear</Button>
+          <Button variant="secondary" onClick={handleExportCsv}>Export CSV</Button>
+        </div>
+      </Card>
+
+      <Card>
+        <CardTitle>Bulk status update</CardTitle>
+        <CardDescription className="mt-2">Apply a status to selected orders.</CardDescription>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <select
+            className="h-11 rounded-full border border-border bg-background px-4 text-sm"
+            value={bulkStatus}
+            onChange={(event) => setBulkStatus(event.target.value)}
+          >
+            {statusOptions.map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
+          </select>
+          <Button onClick={handleBulkUpdate} disabled={!selectedIds.size}>
+            Update {selectedIds.size} orders
+          </Button>
         </div>
       </Card>
 
@@ -118,6 +185,25 @@ export default function OrdersPage() {
               {order.items?.[0]?.product?.name || "Multiple items"} â€¢ {order.totalAmount ?? 0} BDT
             </CardDescription>
             <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+              <label className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={order._id ? selectedIds.has(order._id) : false}
+                  onChange={(event) => {
+                    if (!order._id) return;
+                    setSelectedIds((current) => {
+                      const next = new Set(current);
+                      if (event.target.checked) {
+                        next.add(order._id as string);
+                      } else {
+                        next.delete(order._id as string);
+                      }
+                      return next;
+                    });
+                  }}
+                />
+                Select
+              </label>
               <span>Status: {order.status || "PLACED"}</span>
               <span>{order.createdAt ? new Date(order.createdAt).toLocaleString() : "Pending"}</span>
             </div>
@@ -169,10 +255,21 @@ export default function OrdersPage() {
   );
 }
 
-function buildInvoiceHtml(order: OrderRow) {
+function buildInvoiceHtml(order: OrderRow, shopProfile: { name?: string; logoUrl?: string } | null) {
   const rows = (order.items || [])
-    .map((item) => `<tr><td>${item.product?.name || "Item"}</td><td>1</td></tr>`)
+    .map((item) => {
+      const name = item.product?.name || "Item";
+      const qty = Number(item.quantity || 1);
+      const price = Number(item.price || item.product?.price || 0);
+      const total = price * qty;
+      return `<tr><td>${name}</td><td>${qty}</td><td>${price}</td><td>${total}</td></tr>`;
+    })
     .join("");
+  const buyerName = order.user?.name || "Guest";
+  const buyerEmail = order.user?.email || order.contact?.email || "";
+  const buyerPhone = order.user?.phone || order.contact?.phone || "";
+  const shopName = shopProfile?.name || "DokanX Shop";
+  const shopLogo = shopProfile?.logoUrl || "";
   return `
     <html>
       <head>
@@ -183,18 +280,53 @@ function buildInvoiceHtml(order: OrderRow) {
           table { width: 100%; border-collapse: collapse; margin-top: 16px; }
           th, td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; }
           th { background: #f3f4f6; }
+          .header { display: flex; align-items: center; gap: 16px; }
+          .logo { width: 60px; height: 60px; object-fit: cover; border-radius: 12px; border: 1px solid #e5e7eb; }
         </style>
       </head>
       <body>
-        <h1>Invoice</h1>
-        <p>Order ID: ${order._id || ""}</p>
+        <div class="header">
+          ${shopLogo ? `<img src="${shopLogo}" class="logo" />` : ""}
+          <div>
+            <h1>${shopName} Invoice</h1>
+            <p>Order ID: ${order._id || ""}</p>
+          </div>
+        </div>
+        <p>Buyer: ${buyerName}</p>
+        ${buyerEmail ? `<p>Email: ${buyerEmail}</p>` : ""}
+        ${buyerPhone ? `<p>Phone: ${buyerPhone}</p>` : ""}
         <p>Status: ${order.status || "PLACED"}</p>
         <p>Total: ${order.totalAmount ?? 0} BDT</p>
         <table>
-          <thead><tr><th>Item</th><th>Qty</th></tr></thead>
-          <tbody>${rows || "<tr><td colspan='2'>No items</td></tr>"}</tbody>
+          <thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
+          <tbody>${rows || "<tr><td colspan='4'>No items</td></tr>"}</tbody>
         </table>
       </body>
     </html>
   `;
+}
+
+function buildCsv(rows: Array<Record<string, string | number>>) {
+  const headers = rows.length ? Object.keys(rows[0]) : ["id", "status", "totalAmount", "createdAt"];
+  const lines = [
+    headers.join(","),
+    ...rows.map((row) =>
+      headers
+        .map((key) => `"${String(row[key] ?? "").replace(/\"/g, '""')}"`)
+        .join(",")
+    ),
+  ];
+  return lines.join("\n");
+}
+
+function downloadCsv(csv: string, filename: string) {
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
 }
