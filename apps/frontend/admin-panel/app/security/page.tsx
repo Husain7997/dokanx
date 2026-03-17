@@ -31,6 +31,9 @@ export default function SecurityPage() {
   const [auditQuery, setAuditQuery] = useState("");
   const [actionFilter, setActionFilter] = useState("ALL");
   const [selectedBlocks, setSelectedBlocks] = useState<Record<string, boolean>>({});
+  const [highRiskThreshold, setHighRiskThreshold] = useState(80);
+  const [mediumRiskThreshold, setMediumRiskThreshold] = useState(50);
+  const [riskTag, setRiskTag] = useState("Security");
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -239,6 +242,33 @@ export default function SecurityPage() {
         </div>
       </Card>
 
+      <Card>
+        <CardTitle>Risk scoring rules</CardTitle>
+        <CardDescription className="mt-2">Tune thresholds and tags used for audit scoring.</CardDescription>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <Input
+            type="number"
+            value={String(highRiskThreshold)}
+            onChange={(event) => setHighRiskThreshold(Number(event.target.value))}
+            placeholder="High risk threshold"
+          />
+          <Input
+            type="number"
+            value={String(mediumRiskThreshold)}
+            onChange={(event) => setMediumRiskThreshold(Number(event.target.value))}
+            placeholder="Medium risk threshold"
+          />
+          <Input
+            value={riskTag}
+            onChange={(event) => setRiskTag(event.target.value)}
+            placeholder="Risk tag"
+          />
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">
+          High risk ≥ {highRiskThreshold}, Medium risk ≥ {mediumRiskThreshold}. Tag: {riskTag || "Security"}.
+        </p>
+      </Card>
+
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardTitle>Login logs</CardTitle>
@@ -265,7 +295,7 @@ export default function SecurityPage() {
               { key: "risk", header: "Risk" },
             ]}
             rows={loginLogs.map((log) => {
-              const risk = getRiskScore(log.action || "");
+              const risk = getRiskScore(log.action || "", highRiskThreshold, mediumRiskThreshold, riskTag);
               return {
                 action: log.action || "LOGIN",
                 target: `${log.targetType || "User"} ${log.targetId || ""}`.trim(),
@@ -300,7 +330,7 @@ export default function SecurityPage() {
               { key: "risk", header: "Risk" },
             ]}
             rows={apiLogs.map((log) => {
-              const risk = getRiskScore(log.action || "");
+              const risk = getRiskScore(log.action || "", highRiskThreshold, mediumRiskThreshold, riskTag);
               return {
                 action: log.action || "API_CALL",
                 target: `${log.targetType || "Endpoint"} ${log.targetId || ""}`.trim(),
@@ -318,14 +348,14 @@ export default function SecurityPage() {
         <div className="mt-4 flex flex-wrap gap-3">
           <Button
             variant="secondary"
-            onClick={() => exportAuditCsv(filteredLogs, `audit-logs-filtered-${new Date().toISOString().slice(0, 10)}.csv`)}
+            onClick={() => exportAuditCsv(filteredLogs, `audit-logs-filtered-${new Date().toISOString().slice(0, 10)}.csv`, highRiskThreshold, mediumRiskThreshold, riskTag)}
             disabled={!filteredLogs.length}
           >
             Export filtered logs
           </Button>
           <Button
             variant="outline"
-            onClick={() => exportAuditCsv(logs, `audit-logs-all-${new Date().toISOString().slice(0, 10)}.csv`)}
+            onClick={() => exportAuditCsv(logs, `audit-logs-all-${new Date().toISOString().slice(0, 10)}.csv`, highRiskThreshold, mediumRiskThreshold, riskTag)}
             disabled={!logs.length}
           >
             Export all logs
@@ -386,13 +416,13 @@ function downloadCsv(csv: string, filename: string) {
   window.URL.revokeObjectURL(url);
 }
 
-function exportAuditCsv(rows: AuditRow[], filename: string) {
+function exportAuditCsv(rows: AuditRow[], filename: string, highThreshold: number, mediumThreshold: number, tag: string) {
   const csvRows = rows.map((log) => ({
     action: log.action || "",
     targetType: log.targetType || "",
     targetId: log.targetId || "",
-    riskScore: getRiskScore(log.action || "").score,
-    riskLabel: getRiskScore(log.action || "").label,
+    riskScore: getRiskScore(log.action || "", highThreshold, mediumThreshold, tag).score,
+    riskLabel: getRiskScore(log.action || "", highThreshold, mediumThreshold, tag).label,
     createdAt: log.createdAt || "",
   }));
   const csv = buildCsv(csvRows);
@@ -410,19 +440,23 @@ function getSeverity(reason?: string | null) {
   return { label: "Low", variant: "neutral" as const };
 }
 
-function getRiskScore(action: string) {
+function getRiskScore(action: string, highThreshold: number, mediumThreshold: number, tag: string) {
   const value = action.toUpperCase();
+  let score = 30;
   if (value.includes("FAILED") || value.includes("BLOCK") || value.includes("SUSPEND")) {
-    return { score: 90, label: "High", variant: "danger" as const };
+    score = 90;
+  } else if (value.includes("LOGIN") && value.includes("FAILED")) {
+    score = 80;
+  } else if (value.includes("LOGIN") || value.includes("TOKEN") || value.includes("AUTH")) {
+    score = 60;
+  } else if (value.includes("API")) {
+    score = 40;
   }
-  if (value.includes("LOGIN") && value.includes("FAILED")) {
-    return { score: 80, label: "High", variant: "danger" as const };
+  if (score >= highThreshold) {
+    return { score, label: `${tag} High`, variant: "danger" as const };
   }
-  if (value.includes("LOGIN") || value.includes("TOKEN") || value.includes("AUTH")) {
-    return { score: 60, label: "Medium", variant: "warning" as const };
+  if (score >= mediumThreshold) {
+    return { score, label: `${tag} Medium`, variant: "warning" as const };
   }
-  if (value.includes("API")) {
-    return { score: 40, label: "Low", variant: "neutral" as const };
-  }
-  return { score: 30, label: "Low", variant: "neutral" as const };
+  return { score, label: `${tag} Low`, variant: "neutral" as const };
 }

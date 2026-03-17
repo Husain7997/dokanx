@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Badge, Card, CardDescription, CardTitle, DataTable, Grid } from "@dokanx/ui";
+import { Badge, Button, Card, CardDescription, CardTitle, DataTable, Grid, SelectDropdown, TextInput } from "@dokanx/ui";
 
-import { listAuditLogs, listOrders, listShipments } from "@/lib/admin-runtime-api";
+import { listAuditLogs, listOrders, listShipments, updateOrderDispute } from "@/lib/admin-runtime-api";
 
 type OrderRow = {
   _id?: string;
@@ -45,6 +45,11 @@ export default function OrderDetailPage({ params }: { params: { orderId: string 
   const [shipments, setShipments] = useState<ShipmentRow[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [refundStatus, setRefundStatus] = useState("NONE");
+  const [disputeStatus, setDisputeStatus] = useState("NONE");
+  const [disputeReason, setDisputeReason] = useState("NONE");
+  const [adminNotes, setAdminNotes] = useState("");
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -60,6 +65,11 @@ export default function OrderDetailPage({ params }: { params: { orderId: string 
         setOrder(list.find((row) => String(row._id || "") === orderId) || null);
         setShipments(Array.isArray(shipmentResponse.data) ? (shipmentResponse.data as ShipmentRow[]) : []);
         setAuditLogs(Array.isArray(auditResponse.data) ? (auditResponse.data as AuditRow[]) : []);
+        const current = list.find((row) => String(row._id || "") === orderId) || null;
+        setRefundStatus(current?.paymentStatus || "NONE");
+        setDisputeStatus(current?.disputeStatus || "NONE");
+        setDisputeReason(current?.disputeReason || "NONE");
+        setAdminNotes(current?.adminNotes || "");
       } catch (err) {
         if (!active) return;
         setError(err instanceof Error ? err.message : "Unable to load order detail.");
@@ -83,6 +93,48 @@ export default function OrderDetailPage({ params }: { params: { orderId: string 
       ),
     [auditLogs, orderId]
   );
+
+  const disputeStatusOptions = [
+    { label: "None", value: "NONE" },
+    { label: "Open", value: "OPEN" },
+    { label: "In review", value: "IN_REVIEW" },
+    { label: "Resolved", value: "RESOLVED" },
+    { label: "Rejected", value: "REJECTED" },
+  ];
+
+  const disputeReasonOptions = [
+    { label: "None", value: "NONE" },
+    { label: "Customer claim", value: "CUSTOMER_CLAIM" },
+    { label: "Delivery delay", value: "DELIVERY_DELAY" },
+    { label: "Damaged", value: "DAMAGED" },
+    { label: "Payment issue", value: "PAYMENT_ISSUE" },
+    { label: "Fraud", value: "FRAUD" },
+    { label: "Other", value: "OTHER" },
+  ];
+
+  async function handleSaveDispute() {
+    if (!orderId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await updateOrderDispute(orderId, {
+        disputeStatus,
+        disputeReason,
+        adminNotes,
+      });
+      const response = await listOrders();
+      const list = Array.isArray(response.data) ? (response.data as OrderRow[]) : [];
+      setOrder(list.find((row) => String(row._id || "") === orderId) || null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to update dispute.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function handleRefundAction(action: "REQUEST" | "APPROVE" | "DECLINE") {
+    setRefundStatus(action === "REQUEST" ? "REQUESTED" : action === "APPROVE" ? "APPROVED" : "DECLINED");
+  }
 
   return (
     <div className="grid gap-6">
@@ -154,6 +206,29 @@ export default function OrderDetailPage({ params }: { params: { orderId: string 
               <span>Order ID</span>
               <span>{order?._id || "N/A"}</span>
             </div>
+          </div>
+        </Card>
+        <Card>
+          <CardTitle>Refund & dispute actions</CardTitle>
+          <CardDescription className="mt-2">Manual overrides for refunds and dispute states.</CardDescription>
+          <div className="mt-4 grid gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border/60 px-4 py-3 text-sm text-muted-foreground">
+              <span>Refund status</span>
+              <Badge variant={refundStatus === "APPROVED" ? "success" : refundStatus === "DECLINED" ? "danger" : "neutral"}>
+                {refundStatus}
+              </Badge>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="secondary" onClick={() => handleRefundAction("REQUEST")}>Request</Button>
+              <Button size="sm" variant="outline" onClick={() => handleRefundAction("APPROVE")}>Approve</Button>
+              <Button size="sm" variant="ghost" onClick={() => handleRefundAction("DECLINE")}>Decline</Button>
+            </div>
+            <SelectDropdown label="Dispute status" options={disputeStatusOptions} value={disputeStatus} onValueChange={setDisputeStatus} />
+            <SelectDropdown label="Dispute reason" options={disputeReasonOptions} value={disputeReason} onValueChange={setDisputeReason} />
+            <TextInput value={adminNotes} onChange={(event) => setAdminNotes(event.target.value)} placeholder="Admin notes" />
+            <Button onClick={handleSaveDispute} disabled={busy}>
+              {busy ? "Saving..." : "Save dispute"}
+            </Button>
           </div>
         </Card>
       </div>

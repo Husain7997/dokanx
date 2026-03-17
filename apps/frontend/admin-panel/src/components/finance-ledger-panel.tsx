@@ -21,6 +21,7 @@ export function FinanceLedgerPanel() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [rangePreset, setRangePreset] = useState("CUSTOM");
 
   useEffect(() => {
     let active = true;
@@ -118,6 +119,31 @@ export function FinanceLedgerPanel() {
             { label: "All", value: "ALL" },
             { label: "Pending", value: "PENDING" },
             { label: "Paid", value: "PAID" },
+          ]}
+        />
+        <SelectDropdown
+          label="Preset range"
+          value={rangePreset}
+          onValueChange={(value) => {
+            setRangePreset(value);
+            if (value === "LAST_7") {
+              const end = new Date();
+              const start = new Date();
+              start.setDate(end.getDate() - 6);
+              setFromDate(start.toISOString().slice(0, 10));
+              setToDate(end.toISOString().slice(0, 10));
+            } else if (value === "LAST_30") {
+              const end = new Date();
+              const start = new Date();
+              start.setDate(end.getDate() - 29);
+              setFromDate(start.toISOString().slice(0, 10));
+              setToDate(end.toISOString().slice(0, 10));
+            }
+          }}
+          options={[
+            { label: "Custom", value: "CUSTOM" },
+            { label: "Last 7 days", value: "LAST_7" },
+            { label: "Last 30 days", value: "LAST_30" },
           ]}
         />
         <Input
