@@ -150,6 +150,27 @@ type ProductListResponse = {
   } & JsonValue>;
 };
 
+type ShipmentResponse = {
+  data?: Array<{
+    _id?: string;
+    orderId?: string;
+    trackingNumber?: string;
+    carrier?: string;
+    status?: string;
+    createdAt?: string;
+  } & JsonValue>;
+};
+
+type IpBlockResponse = {
+  data?: Array<{
+    _id?: string;
+    ip?: string;
+    reason?: string;
+    status?: string;
+    createdAt?: string;
+  } & JsonValue>;
+};
+
 type EtaSettingsResponse = {
   data?: {
     basePerKm?: number;
@@ -249,6 +270,54 @@ export function listPaymentGateways() {
 
 export function listProducts() {
   return request<ProductListResponse>("/products");
+}
+
+export function listShipments(limit = 100) {
+  const search = new URLSearchParams({ limit: String(limit) });
+  return request<ShipmentResponse>(`/shipping/shipments?${search.toString()}`);
+}
+
+export function adjustWallet(payload: { shopId: string; amount: number; reason?: string }) {
+  return request<{ success?: boolean; balance?: number }>(`/admin/adjustments/adjust`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function refundWallet(payload: { shopId: string; amount: number; reason?: string }) {
+  return request<{ success?: boolean; balance?: number }>(`/admin/adjustments/refund`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function freezeWallet(shopId: string) {
+  return request<{ message?: string }>(`/admin/wallets/${shopId}/freeze`, {
+    method: "POST",
+  });
+}
+
+export function unfreezeWallet(shopId: string) {
+  return request<{ message?: string }>(`/admin/wallets/${shopId}/unfreeze`, {
+    method: "POST",
+  });
+}
+
+export function listIpBlocks() {
+  return request<IpBlockResponse>("/admin/security/ip-blocks");
+}
+
+export function blockIp(payload: { ip: string; reason?: string }) {
+  return request<{ message?: string }>(`/admin/security/ip-blocks`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function unblockIp(id: string) {
+  return request<{ message?: string }>(`/admin/security/ip-blocks/${id}/unblock`, {
+    method: "POST",
+  });
 }
 
 export function getEtaSettings() {

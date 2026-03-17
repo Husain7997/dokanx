@@ -61,30 +61,35 @@ export default function Page() {
             key: "actions",
             header: "Actions",
             render: (row) => (
-              <Button
-                size="sm"
-                variant={row.isBlocked ? "secondary" : "default"}
-                onClick={async () => {
-                  if (!row.id) return;
-                  setBusyId(row.id);
-                  try {
-                    if (row.isBlocked) {
-                      await unblockUser(row.id);
-                    } else {
-                      await blockUser(row.id);
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="secondary" asChild>
+                  <a href={`/merchants/${row.id}`}>View</a>
+                </Button>
+                <Button
+                  size="sm"
+                  variant={row.isBlocked ? "secondary" : "default"}
+                  onClick={async () => {
+                    if (!row.id) return;
+                    setBusyId(row.id);
+                    try {
+                      if (row.isBlocked) {
+                        await unblockUser(row.id);
+                      } else {
+                        await blockUser(row.id);
+                      }
+                      const response = await listMerchants();
+                      setMerchants(Array.isArray(response.data) ? (response.data as MerchantRow[]) : []);
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : "Unable to update merchant.");
+                    } finally {
+                      setBusyId(null);
                     }
-                    const response = await listMerchants();
-                    setMerchants(Array.isArray(response.data) ? (response.data as MerchantRow[]) : []);
-                  } catch (err) {
-                    setError(err instanceof Error ? err.message : "Unable to update merchant.");
-                  } finally {
-                    setBusyId(null);
-                  }
-                }}
-                disabled={busyId === row.id}
-              >
-                {busyId === row.id ? "Updating..." : row.isBlocked ? "Unblock" : "Block"}
-              </Button>
+                  }}
+                  disabled={busyId === row.id}
+                >
+                  {busyId === row.id ? "Updating..." : row.isBlocked ? "Unblock" : "Block"}
+                </Button>
+              </div>
             ),
           },
         ]}

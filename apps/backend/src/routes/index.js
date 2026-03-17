@@ -39,6 +39,8 @@ const taxAdminRoutes = require('./admin/tax.routes');
 const payoutAdminRoutes = require('./admin/payout.routes');
 const approvalAdminRoutes = require('./admin/approval.routes');
 const integrationAdminRoutes = require('./admin/integrations.routes');
+const walletAdminRoutes = require('./admin/wallet.routes');
+const securityAdminRoutes = require('./admin/security.routes');
 const healthRoute = require('./health.routes');
 const systemRoute = require("../infrastructure/monitoring/health.routes");
 const webhookRoutes = require('../infrastructure/webhook/webhook.routes');
@@ -99,6 +101,8 @@ router.use('/admin/taxes', taxAdminRoutes);
 router.use('/admin/payouts', payoutAdminRoutes);
 router.use('/admin/approval', approvalAdminRoutes);
 router.use('/admin/integrations', integrationAdminRoutes);
+router.use('/admin', walletAdminRoutes);
+router.use('/admin/security', securityAdminRoutes);
 router.use('/health', healthRoute);
 router.use(
  "/system", systemRoute);

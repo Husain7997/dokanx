@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { Button } from "@dokanx/ui";
+
 import { getFinanceKpis, getPayoutAlerts, getRevenueVsPayout } from "@/lib/admin-runtime-api";
 
 type FinanceState = {
@@ -129,6 +131,48 @@ export function AdminFinanceOverview() {
           <p className="text-sm text-muted-foreground">No settlement data yet.</p>
         )}
       </div>
+
+      <div className="flex flex-wrap gap-3">
+        <Button
+          variant="secondary"
+          onClick={() => {
+            const rows = state.series.map((row) => ({
+              day: row.day,
+              revenue: row.revenue,
+              payout: row.payout,
+            }));
+            const csv = buildCsv(rows);
+            downloadCsv(csv, `finance-series-${new Date().toISOString().slice(0, 10)}.csv`);
+          }}
+        >
+          Export CSV
+        </Button>
+      </div>
     </div>
   );
+}
+
+function buildCsv(rows: Array<Record<string, string | number>>) {
+  const headers = rows.length ? Object.keys(rows[0]) : ["day", "revenue", "payout"];
+  const lines = [
+    headers.join(","),
+    ...rows.map((row) =>
+      headers
+        .map((key) => `"${String(row[key] ?? "").replace(/\"/g, '""')}"`)
+        .join(",")
+    ),
+  ];
+  return lines.join("\n");
+}
+
+function downloadCsv(csv: string, filename: string) {
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
 }

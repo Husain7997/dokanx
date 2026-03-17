@@ -103,5 +103,10 @@ export const adminNavigation = [
     label: "Settings",
     href: "/settings",
     description: "Platform ETA thresholds"
+  },
+  {
+    label: "Security",
+    href: "/security",
+    description: "Login logs and IP blocks"
   }
 ];
