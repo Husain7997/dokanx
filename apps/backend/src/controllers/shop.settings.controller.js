@@ -44,6 +44,7 @@ exports.getShopSettings = async (req, res) => {
       country: shop.country || "",
       vatRate: shop.vatRate ?? 0,
       defaultDiscountRate: shop.defaultDiscountRate ?? 0,
+      commissionRate: shop.commissionRate ?? 0,
     },
   });
 };
@@ -67,6 +68,7 @@ exports.updateShopSettings = async (req, res) => {
     country,
     vatRate,
     defaultDiscountRate,
+    commissionRate,
   } = req.body || {};
 
   shop.name = name ?? shop.name;
@@ -83,6 +85,7 @@ exports.updateShopSettings = async (req, res) => {
   shop.country = country ?? shop.country;
   if (vatRate !== undefined) shop.vatRate = Number(vatRate) || 0;
   if (defaultDiscountRate !== undefined) shop.defaultDiscountRate = Number(defaultDiscountRate) || 0;
+  if (commissionRate !== undefined) shop.commissionRate = Number(commissionRate) || 0;
 
   await shop.save();
 
@@ -103,6 +106,7 @@ exports.updateShopSettings = async (req, res) => {
       country: shop.country,
       vatRate: shop.vatRate ?? 0,
       defaultDiscountRate: shop.defaultDiscountRate ?? 0,
+      commissionRate: shop.commissionRate ?? 0,
     },
   });
 };

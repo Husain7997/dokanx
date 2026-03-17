@@ -48,6 +48,16 @@ inventoryVersion: {
     type: Boolean,
     default: true,
   },
+  moderationStatus: {
+    type: String,
+    enum: ["PENDING", "APPROVED", "REJECTED", "FLAGGED"],
+    default: "PENDING",
+    index: true,
+  },
+  moderationNote: {
+    type: String,
+    default: "",
+  },
   reconciledAt: Date,
 isReconciling: {
   type: Boolean,

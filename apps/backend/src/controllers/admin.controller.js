@@ -18,10 +18,27 @@ exports.listMerchants = async (_req, res) => {
 
 exports.listShops = async (_req, res) => {
   const shops = await Shop.find()
-    .select("name domain slug isActive owner createdAt")
+    .select("name domain slug isActive owner createdAt commissionRate")
     .populate("owner", "name email")
     .lean();
   res.json({ data: shops });
+};
+
+exports.updateShopCommission = async (req, res) => {
+  const { shopId } = req.params;
+  const { commissionRate } = req.body || {};
+  if (!shopId) return res.status(400).json({ message: "shopId required" });
+  const value = Number(commissionRate);
+  if (!Number.isFinite(value)) return res.status(400).json({ message: "commissionRate required" });
+
+  const shop = await Shop.findByIdAndUpdate(
+    shopId,
+    { commissionRate: value },
+    { new: true }
+  );
+  if (!shop) return res.status(404).json({ message: "Shop not found" });
+
+  res.json({ message: "Commission rate updated", data: shop });
 };
 
 exports.blockUser = async (req, res) => {

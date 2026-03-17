@@ -28,6 +28,7 @@ export default function SecurityPage() {
   const [blocks, setBlocks] = useState<IpBlockRow[]>([]);
   const [ip, setIp] = useState("");
   const [reason, setReason] = useState("");
+  const [auditQuery, setAuditQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -53,13 +54,23 @@ export default function SecurityPage() {
     };
   }, []);
 
+  const filteredLogs = useMemo(() => {
+    const needle = auditQuery.trim().toLowerCase();
+    if (!needle) return logs;
+    return logs.filter((log) =>
+      [log.action, log.targetType, log.targetId].some((value) =>
+        String(value || "").toLowerCase().includes(needle)
+      )
+    );
+  }, [auditQuery, logs]);
+
   const loginLogs = useMemo(
-    () => logs.filter((log) => String(log.action || "").toUpperCase().includes("LOGIN")),
-    [logs]
+    () => filteredLogs.filter((log) => String(log.action || "").toUpperCase().includes("LOGIN")),
+    [filteredLogs]
   );
   const apiLogs = useMemo(
-    () => logs.filter((log) => String(log.action || "").toUpperCase().includes("API")),
-    [logs]
+    () => filteredLogs.filter((log) => String(log.action || "").toUpperCase().includes("API")),
+    [filteredLogs]
   );
 
   async function handleBlockIp() {
@@ -112,6 +123,23 @@ export default function SecurityPage() {
           <Button onClick={handleBlockIp}>Block IP</Button>
         </div>
         {status ? <p className="mt-3 text-xs text-muted-foreground">{status}</p> : null}
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              const rows = blocks.map((block) => ({
+                ip: block.ip || "",
+                reason: block.reason || "",
+                status: block.status || "",
+                createdAt: block.createdAt || "",
+              }));
+              const csv = buildCsv(rows);
+              downloadCsv(csv, `ip-blocks-${new Date().toISOString().slice(0, 10)}.csv`);
+            }}
+          >
+            Export IP blocks CSV
+          </Button>
+        </div>
         <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
           {blocks.map((block) => (
             <div key={String(block._id)} className="flex flex-wrap justify-between gap-2 rounded-2xl border border-border/60 px-4 py-3">
@@ -131,6 +159,9 @@ export default function SecurityPage() {
         <Card>
           <CardTitle>Login logs</CardTitle>
           <CardDescription className="mt-2">Recent authentication events.</CardDescription>
+          <div className="mt-3">
+            <Input value={auditQuery} onChange={(event) => setAuditQuery(event.target.value)} placeholder="Filter logs by action/target" />
+          </div>
           <DataTable
             columns={[
               { key: "action", header: "Action" },
@@ -147,6 +178,9 @@ export default function SecurityPage() {
         <Card>
           <CardTitle>API logs</CardTitle>
           <CardDescription className="mt-2">Recent API access events.</CardDescription>
+          <div className="mt-3">
+            <Input value={auditQuery} onChange={(event) => setAuditQuery(event.target.value)} placeholder="Filter logs by action/target" />
+          </div>
           <DataTable
             columns={[
               { key: "action", header: "Action" },
@@ -163,4 +197,29 @@ export default function SecurityPage() {
       </div>
     </div>
   );
+}
+
+function buildCsv(rows: Array<Record<string, string | number>>) {
+  const headers = rows.length ? Object.keys(rows[0]) : ["ip", "reason", "status", "createdAt"];
+  const lines = [
+    headers.join(","),
+    ...rows.map((row) =>
+      headers
+        .map((key) => `"${String(row[key] ?? "").replace(/\"/g, '""')}"`)
+        .join(",")
+    ),
+  ];
+  return lines.join("\n");
+}
+
+function downloadCsv(csv: string, filename: string) {
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
 }

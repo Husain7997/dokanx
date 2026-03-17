@@ -147,6 +147,8 @@ type ProductListResponse = {
     price?: number;
     stock?: number;
     shopId?: string;
+    moderationStatus?: string;
+    moderationNote?: string;
   } & JsonValue>;
 };
 
@@ -270,6 +272,20 @@ export function listPaymentGateways() {
 
 export function listProducts() {
   return request<ProductListResponse>("/products");
+}
+
+export function moderateProduct(productId: string, payload: { status: string; note?: string }) {
+  return request<{ message?: string }>(`/admin/products/${productId}/moderate`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateShopCommission(shopId: string, commissionRate: number) {
+  return request<{ message?: string }>(`/admin/shops/${shopId}/commission`, {
+    method: "PUT",
+    body: JSON.stringify({ commissionRate }),
+  });
 }
 
 export function listShipments(limit = 100) {

@@ -4,14 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { Card, CardDescription, CardTitle, DataTable } from "@dokanx/ui";
 
-import { listMerchants, listOrders, listProducts } from "@/lib/admin-runtime-api";
+import { listMerchants, listOrders, listProducts, updateShopCommission } from "@/lib/admin-runtime-api";
 
 type MerchantRow = {
   _id?: string;
   name?: string;
   email?: string;
   isBlocked?: boolean;
-  shopId?: { _id?: string; name?: string; domain?: string; slug?: string; isActive?: boolean };
+  shopId?: { _id?: string; name?: string; domain?: string; slug?: string; isActive?: boolean; commissionRate?: number };
 };
 
 type OrderRow = {
@@ -35,6 +35,8 @@ export default function MerchantDetailPage() {
   const [merchant, setMerchant] = useState<MerchantRow | null>(null);
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [products, setProducts] = useState<ProductRow[]>([]);
+  const [commissionRate, setCommissionRate] = useState("");
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -50,6 +52,7 @@ export default function MerchantDetailPage() {
         const list = Array.isArray(merchantsResponse.data) ? (merchantsResponse.data as MerchantRow[]) : [];
         const current = list.find((row) => String(row._id || "") === merchantId) || null;
         setMerchant(current);
+        setCommissionRate(String(current?.shopId?.commissionRate ?? ""));
         const shopId = current?.shopId?._id ? String(current.shopId._id) : "";
         const orderRows = Array.isArray(ordersResponse.data) ? (ordersResponse.data as OrderRow[]) : [];
         setOrders(orderRows.filter((order) => String(order.shop?._id || "") === shopId));
@@ -93,6 +96,29 @@ export default function MerchantDetailPage() {
           <span>Products: {products.length}</span>
           <span>Orders: {orders.length}</span>
           <span>Revenue: {revenue} BDT</span>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <input
+            className="h-11 rounded-full border border-border bg-background px-4 text-sm"
+            placeholder="Commission rate (%)"
+            value={commissionRate}
+            onChange={(event) => setCommissionRate(event.target.value)}
+          />
+          <button
+            className="rounded-full border border-white/60 bg-black px-4 py-2 text-xs font-semibold text-white"
+            onClick={async () => {
+              if (!merchant?.shopId?._id) return;
+              try {
+                await updateShopCommission(String(merchant.shopId._id), Number(commissionRate));
+                setStatusMessage("Commission updated.");
+              } catch (err) {
+                setStatusMessage(err instanceof Error ? err.message : "Commission update failed.");
+              }
+            }}
+          >
+            Update commission
+          </button>
+          {statusMessage ? <span className="text-xs text-muted-foreground">{statusMessage}</span> : null}
         </div>
       </Card>
 

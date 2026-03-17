@@ -38,6 +38,12 @@ router.put("/shops/:id/suspend",
   adminController.suspendShop
 );
 
+router.put("/shops/:shopId/commission",
+  protect,
+  allowRoles("ADMIN"),
+  adminController.updateShopCommission
+);
+
 router.get("/orders",
   protect,
   allowRoles("ADMIN"),

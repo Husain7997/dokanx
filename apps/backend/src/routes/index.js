@@ -41,6 +41,7 @@ const approvalAdminRoutes = require('./admin/approval.routes');
 const integrationAdminRoutes = require('./admin/integrations.routes');
 const walletAdminRoutes = require('./admin/wallet.routes');
 const securityAdminRoutes = require('./admin/security.routes');
+const productModerationRoutes = require('./admin/product.moderation.routes');
 const healthRoute = require('./health.routes');
 const systemRoute = require("../infrastructure/monitoring/health.routes");
 const webhookRoutes = require('../infrastructure/webhook/webhook.routes');
@@ -103,6 +104,7 @@ router.use('/admin/approval', approvalAdminRoutes);
 router.use('/admin/integrations', integrationAdminRoutes);
 router.use('/admin', walletAdminRoutes);
 router.use('/admin/security', securityAdminRoutes);
+router.use('/admin', productModerationRoutes);
 router.use('/health', healthRoute);
 router.use(
  "/system", systemRoute);
