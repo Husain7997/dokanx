@@ -17,6 +17,8 @@ const {
   addTeamMember,
   updateTeamMember,
 } = require("../controllers/shop.settings.controller");
+const { listShopReviews } = require("../controllers/shop/review.controller");
+const { listShopPayments } = require("../controllers/shop/payment.controller");
 
 const { protect,  allowRoles } = require("../middlewares");
 // const allowRoles = require('../middlewares/rbac.middleware');
@@ -54,6 +56,20 @@ router.get(
   protect,
   allowRoles("OWNER", "STAFF", "ADMIN"),
   listCustomers
+);
+
+router.get(
+  "/me/reviews",
+  protect,
+  allowRoles("OWNER", "STAFF", "ADMIN"),
+  listShopReviews
+);
+
+router.get(
+  "/me/payments",
+  protect,
+  allowRoles("OWNER", "STAFF", "ADMIN"),
+  listShopPayments
 );
 
 router.put(

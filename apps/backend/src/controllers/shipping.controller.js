@@ -26,6 +26,21 @@ exports.listCarriers = async (_req, res) => {
   });
 };
 
+exports.listShipments = async (req, res) => {
+  const shopId = req.shop?._id || req.user?.shopId;
+  if (!shopId) {
+    return res.status(400).json({ message: "Shop context missing" });
+  }
+
+  const limit = Math.min(Number(req.query.limit) || 50, 200);
+  const shipments = await Shipment.find({ shopId })
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .lean();
+
+  res.json({ data: shipments });
+};
+
 exports.createShipment = async (req, res) => {
   const { orderId, carrier } = req.body || {};
   if (!orderId || !carrier) {

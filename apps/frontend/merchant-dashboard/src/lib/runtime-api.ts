@@ -160,6 +160,41 @@ type MarketplaceAppsResponse = {
   } & JsonValue>;
 };
 
+type ReviewListResponse = {
+  data?: Array<{
+    _id?: string;
+    productId?: string;
+    reviewerName?: string;
+    rating?: number;
+    message?: string;
+    status?: string;
+    createdAt?: string;
+  } & JsonValue>;
+};
+
+type PaymentAttemptResponse = {
+  data?: Array<{
+    _id?: string;
+    order?: string;
+    gateway?: string;
+    providerPaymentId?: string;
+    amount?: number;
+    status?: string;
+    createdAt?: string;
+  } & JsonValue>;
+};
+
+type ShipmentResponse = {
+  data?: Array<{
+    _id?: string;
+    orderId?: string;
+    trackingNumber?: string;
+    carrier?: string;
+    status?: string;
+    createdAt?: string;
+  } & JsonValue>;
+};
+
 function getHeaders() {
   const store = useAuthStore.getState();
   return {
@@ -423,10 +458,32 @@ export function listCarriers() {
   return request<CarrierResponse>("/shipping/carriers");
 }
 
+export function listShipments(limit = 50) {
+  const search = new URLSearchParams({ limit: String(limit) });
+  return request<ShipmentResponse>(`/shipping/shipments?${search.toString()}`);
+}
+
+export function createShipment(payload: { orderId: string; carrier: string }) {
+  return request<{ data?: JsonValue }>("/shipping/shipments", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function trackShipment(trackingNumber: string) {
   return request<TrackingResponse>(`/shipping/track/${encodeURIComponent(trackingNumber)}`);
 }
 
 export function listMarketplaceApps() {
   return request<MarketplaceAppsResponse>("/marketplace/apps");
+}
+
+export function listShopReviews(status = "ALL", limit = 50) {
+  const search = new URLSearchParams({ status, limit: String(limit) });
+  return request<ReviewListResponse>(`/shops/me/reviews?${search.toString()}`);
+}
+
+export function listShopPayments(status = "ALL", limit = 50) {
+  const search = new URLSearchParams({ status, limit: String(limit) });
+  return request<PaymentAttemptResponse>(`/shops/me/payments?${search.toString()}`);
 }
