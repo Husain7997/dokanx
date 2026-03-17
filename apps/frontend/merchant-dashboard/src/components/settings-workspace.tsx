@@ -46,6 +46,7 @@ export function SettingsWorkspace() {
     logoUrl: "https://placehold.co/180x180",
     brandPrimaryColor: "#0f766e",
     brandAccentColor: "#f97316",
+    storefrontDomain: "https://storefront.dokanx.test",
     addressLine1: "House 12, Road 5",
     addressLine2: "Banani",
     city: "Dhaka",
@@ -160,6 +161,7 @@ export function SettingsWorkspace() {
         logoUrl: settings.logoUrl,
         brandPrimaryColor: settings.brandPrimaryColor,
         brandAccentColor: settings.brandAccentColor,
+        storefrontDomain: settings.storefrontDomain,
         addressLine1: settings.addressLine1,
         addressLine2: settings.addressLine2,
         city: settings.city,
@@ -270,6 +272,10 @@ export function SettingsWorkspace() {
             <label className="grid gap-2 text-sm">
               <span>Logo URL</span>
               <Input value={settings.logoUrl} onChange={(event) => setSettings((current) => ({ ...current, logoUrl: event.target.value }))} />
+            </label>
+            <label className="grid gap-2 text-sm">
+              <span>Storefront domain</span>
+              <Input value={settings.storefrontDomain} onChange={(event) => setSettings((current) => ({ ...current, storefrontDomain: event.target.value }))} />
             </label>
             <label className="grid gap-2 text-sm">
               <span>Address line 1</span>

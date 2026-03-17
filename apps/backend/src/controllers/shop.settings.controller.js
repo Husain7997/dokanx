@@ -37,6 +37,7 @@ exports.getShopSettings = async (req, res) => {
       logoUrl: shop.logoUrl || "",
       brandPrimaryColor: shop.brandPrimaryColor || "",
       brandAccentColor: shop.brandAccentColor || "",
+      storefrontDomain: shop.storefrontDomain || "",
       addressLine1: shop.addressLine1 || "",
       addressLine2: shop.addressLine2 || "",
       city: shop.city || "",
@@ -59,6 +60,7 @@ exports.updateShopSettings = async (req, res) => {
     logoUrl,
     brandPrimaryColor,
     brandAccentColor,
+    storefrontDomain,
     addressLine1,
     addressLine2,
     city,
@@ -74,6 +76,7 @@ exports.updateShopSettings = async (req, res) => {
   shop.logoUrl = logoUrl ?? shop.logoUrl;
   shop.brandPrimaryColor = brandPrimaryColor ?? shop.brandPrimaryColor;
   shop.brandAccentColor = brandAccentColor ?? shop.brandAccentColor;
+  shop.storefrontDomain = storefrontDomain ?? shop.storefrontDomain;
   shop.addressLine1 = addressLine1 ?? shop.addressLine1;
   shop.addressLine2 = addressLine2 ?? shop.addressLine2;
   shop.city = city ?? shop.city;
@@ -93,6 +96,7 @@ exports.updateShopSettings = async (req, res) => {
       logoUrl: shop.logoUrl,
       brandPrimaryColor: shop.brandPrimaryColor,
       brandAccentColor: shop.brandAccentColor,
+      storefrontDomain: shop.storefrontDomain || "",
       addressLine1: shop.addressLine1,
       addressLine2: shop.addressLine2,
       city: shop.city,

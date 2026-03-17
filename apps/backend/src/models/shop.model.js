@@ -34,6 +34,7 @@ const shopSchema = new mongoose.Schema(
     logoUrl: String,
     brandPrimaryColor: String,
     brandAccentColor: String,
+    storefrontDomain: String,
     addressLine1: String,
     addressLine2: String,
     city: String,

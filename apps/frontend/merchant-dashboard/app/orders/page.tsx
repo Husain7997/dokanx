@@ -35,7 +35,8 @@ export default function OrdersPage() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState("CONFIRMED");
-  const [shopProfile, setShopProfile] = useState<{ name?: string; logoUrl?: string; addressLine1?: string; addressLine2?: string; city?: string; country?: string; vatRate?: number; defaultDiscountRate?: number } | null>(null);
+  const [shopProfile, setShopProfile] = useState<{ name?: string; logoUrl?: string; storefrontDomain?: string; addressLine1?: string; addressLine2?: string; city?: string; country?: string; vatRate?: number; defaultDiscountRate?: number } | null>(null);
+  const [qrTarget, setQrTarget] = useState<"invoice" | "payment">("payment");
   const [bulkProgress, setBulkProgress] = useState<{ total: number; done: number; failures: number } | null>(null);
   const [failedIds, setFailedIds] = useState<string[]>([]);
   const [csvColumns, setCsvColumns] = useState<Record<string, boolean>>({
@@ -185,9 +186,11 @@ export default function OrdersPage() {
     if (!order._id) return;
     let qrDataUrl: string | null = null;
     try {
-      const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const paymentUrl = origin ? `${origin}/order-tracking/${order._id}` : String(order._id);
-      qrDataUrl = await QRCode.toDataURL(paymentUrl, { width: 160, margin: 1 });
+      const baseUrl = buildBaseUrl(shopProfile?.storefrontDomain);
+      const invoiceUrl = `${baseUrl}/orders/${order._id}`;
+      const paymentUrl = `${baseUrl}/order-tracking/${order._id}`;
+      const targetUrl = qrTarget === "invoice" ? invoiceUrl : paymentUrl;
+      qrDataUrl = await QRCode.toDataURL(targetUrl, { width: 160, margin: 1 });
     } catch {
       qrDataUrl = null;
     }
@@ -273,6 +276,21 @@ export default function OrdersPage() {
           <Button variant="secondary" onClick={handleRetryFailedOnly} disabled={!failedIds.length}>
             Retry failed only
           </Button>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">QR target</span>
+          {["payment", "invoice"].map((value) => (
+            <label key={value} className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="qr-target"
+                value={value}
+                checked={qrTarget === value}
+                onChange={() => setQrTarget(value as "payment" | "invoice")}
+              />
+              {value === "payment" ? "Payment link" : "Invoice link"}
+            </label>
+          ))}
         </div>
         {bulkProgress ? (
           <p className="mt-3 text-xs text-muted-foreground">
@@ -496,4 +514,13 @@ function buildPresetColumns(preset: string) {
     return { id: true, status: true, totalAmount: true, createdAt: true, customerEmail: true, customerPhone: true };
   }
   return { id: true, status: true, totalAmount: true, createdAt: true, customerEmail: false, customerPhone: false };
+}
+
+function buildBaseUrl(domain?: string | null) {
+  const fallback = typeof window !== "undefined" ? window.location.origin : "";
+  if (!domain) return fallback;
+  const trimmed = domain.trim();
+  if (!trimmed) return fallback;
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed.replace(/\/$/, "");
+  return `https://${trimmed.replace(/\/$/, "")}`;
 }

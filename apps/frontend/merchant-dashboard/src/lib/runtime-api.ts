@@ -77,6 +77,7 @@ type ShopSettingsResponse = {
     logoUrl?: string;
     brandPrimaryColor?: string;
     brandAccentColor?: string;
+    storefrontDomain?: string;
     addressLine1?: string;
     addressLine2?: string;
     city?: string;
@@ -338,6 +339,7 @@ export function updateShopSettings(payload: {
   logoUrl?: string;
   brandPrimaryColor?: string;
   brandAccentColor?: string;
+  storefrontDomain?: string;
   addressLine1?: string;
   addressLine2?: string;
   city?: string;
