@@ -30,6 +30,7 @@ export default function SecurityPage() {
   const [reason, setReason] = useState("");
   const [auditQuery, setAuditQuery] = useState("");
   const [actionFilter, setActionFilter] = useState("ALL");
+  const [selectedBlocks, setSelectedBlocks] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -79,6 +80,33 @@ export default function SecurityPage() {
     () => filteredLogs.filter((log) => String(log.action || "").toUpperCase().includes("API")),
     [filteredLogs]
   );
+  const ipAuditLogs = useMemo(
+    () =>
+      filteredLogs.filter((log) => {
+        const action = String(log.action || "").toUpperCase();
+        return action.includes("IP") || action.includes("BLOCK");
+      }),
+    [filteredLogs]
+  );
+
+  const selectedIds = useMemo(
+    () => blocks.filter((block) => selectedBlocks[String(block._id || "")]).map((block) => String(block._id || "")),
+    [blocks, selectedBlocks]
+  );
+
+  async function handleBulkUnblock() {
+    if (!selectedIds.length) return;
+    setStatus(null);
+    try {
+      await Promise.all(selectedIds.map((id) => unblockIp(id)));
+      const response = await listIpBlocks();
+      setBlocks(Array.isArray(response.data) ? (response.data as IpBlockRow[]) : []);
+      setSelectedBlocks({});
+      setStatus("Selected IPs unblocked.");
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Unable to bulk unblock.");
+    }
+  }
 
   async function handleBlockIp() {
     if (!ip) return;
@@ -131,6 +159,22 @@ export default function SecurityPage() {
         </div>
         {status ? <p className="mt-3 text-xs text-muted-foreground">{status}</p> : null}
         <div className="mt-4 flex flex-wrap gap-3">
+          <Button size="sm" variant="secondary" onClick={handleBulkUnblock} disabled={!selectedIds.length}>
+            Bulk unblock ({selectedIds.length})
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              const next: Record<string, boolean> = {};
+              blocks.forEach((block) => {
+                if (block._id) next[String(block._id)] = true;
+              });
+              setSelectedBlocks(next);
+            }}
+          >
+            Select all
+          </Button>
           <Button
             variant="secondary"
             onClick={() => {
@@ -138,6 +182,7 @@ export default function SecurityPage() {
                 ip: block.ip || "",
                 reason: block.reason || "",
                 status: block.status || "",
+                severity: getSeverity(block.reason).label,
                 createdAt: block.createdAt || "",
               }));
               const csv = buildCsv(rows);
@@ -146,12 +191,44 @@ export default function SecurityPage() {
           >
             Export IP blocks CSV
           </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              const rows = blocks
+                .filter((block) => selectedBlocks[String(block._id || "")])
+                .map((block) => ({
+                  ip: block.ip || "",
+                  reason: block.reason || "",
+                  status: block.status || "",
+                  severity: getSeverity(block.reason).label,
+                  createdAt: block.createdAt || "",
+                }));
+              const csv = buildCsv(rows);
+              downloadCsv(csv, `ip-blocks-selected-${new Date().toISOString().slice(0, 10)}.csv`);
+            }}
+            disabled={!selectedIds.length}
+          >
+            Export selected
+          </Button>
         </div>
         <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
           {blocks.map((block) => (
-            <div key={String(block._id)} className="flex flex-wrap justify-between gap-2 rounded-2xl border border-border/60 px-4 py-3">
-              <span>{block.ip}</span>
+            <div key={String(block._id)} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border/60 px-4 py-3">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={selectedBlocks[String(block._id || "")] || false}
+                  onChange={(event) =>
+                    setSelectedBlocks((current) => ({
+                      ...current,
+                      [String(block._id || "")]: event.target.checked,
+                    }))
+                  }
+                />
+                <span>{block.ip}</span>
+              </label>
               <span>{block.reason || "No reason"}</span>
+              <Badge variant={getSeverity(block.reason).variant}>{getSeverity(block.reason).label}</Badge>
               <span>{block.status || "BLOCKED"}</span>
               <Button size="sm" variant="secondary" onClick={() => block._id && handleUnblockIp(block._id)}>
                 Unblock
@@ -224,6 +301,31 @@ export default function SecurityPage() {
           />
         </Card>
       </div>
+
+      <Card>
+        <CardTitle>IP block audit trail</CardTitle>
+        <CardDescription className="mt-2">Audit log of IP block/unblock events.</CardDescription>
+        <div className="mt-3 grid gap-3">
+          <Input value={auditQuery} onChange={(event) => setAuditQuery(event.target.value)} placeholder="Filter audit trail" />
+          <SelectDropdown label="Action filter" options={actionOptions} value={actionFilter} onValueChange={setActionFilter} />
+        </div>
+        <DataTable
+          columns={[
+            { key: "action", header: "Action" },
+            { key: "target", header: "Target" },
+            { key: "time", header: "Time" },
+          ]}
+          rows={ipAuditLogs.map((log) => ({
+            id: String(log._id || ""),
+            action: log.action || "IP_BLOCK",
+            target: `${log.targetType || "IP"} ${log.targetId || ""}`.trim(),
+            time: log.createdAt ? new Date(log.createdAt).toLocaleString() : "Unknown",
+          }))}
+        />
+        {!ipAuditLogs.length ? (
+          <p className="mt-3 text-sm text-muted-foreground">No IP audit entries found.</p>
+        ) : null}
+      </Card>
     </div>
   );
 }
@@ -262,4 +364,15 @@ function exportAuditCsv(rows: AuditRow[], filename: string) {
   }));
   const csv = buildCsv(csvRows);
   downloadCsv(csv, filename);
+}
+
+function getSeverity(reason?: string | null) {
+  const value = String(reason || "").toLowerCase();
+  if (value.includes("fraud") || value.includes("attack") || value.includes("abuse")) {
+    return { label: "High", variant: "danger" as const };
+  }
+  if (value.includes("suspicious") || value.includes("brute") || value.includes("spam")) {
+    return { label: "Medium", variant: "warning" as const };
+  }
+  return { label: "Low", variant: "neutral" as const };
 }

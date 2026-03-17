@@ -70,6 +70,11 @@ export const adminNavigation = [
     description: "Insights and KPIs"
   },
   {
+    label: "Disputes",
+    href: "/analytics/disputes",
+    description: "Dispute SLA trends"
+  },
+  {
     label: "Search",
     href: "/search",
     description: "Search index controls"
