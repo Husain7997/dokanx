@@ -186,8 +186,8 @@ export default function OrdersPage() {
     let qrDataUrl: string | null = null;
     try {
       const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const invoiceUrl = origin ? `${origin}/orders/${order._id}` : String(order._id);
-      qrDataUrl = await QRCode.toDataURL(invoiceUrl, { width: 160, margin: 1 });
+      const paymentUrl = origin ? `${origin}/order-tracking/${order._id}` : String(order._id);
+      qrDataUrl = await QRCode.toDataURL(paymentUrl, { width: 160, margin: 1 });
     } catch {
       qrDataUrl = null;
     }
