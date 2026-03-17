@@ -515,3 +515,17 @@ export function listOrders() {
 export function listInventory() {
   return request<InventoryListResponse>("/inventory");
 }
+
+export function updateOrderStatus(orderId: string, status: string) {
+  return request<{ message?: string; order?: JsonValue }>(`/orders/${orderId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+}
+
+export function refundPayment(orderId: string, amount: number, reason?: string) {
+  return request<{ message?: string; refundedAmount?: number }>(`/payments/refund`, {
+    method: "POST",
+    body: JSON.stringify({ orderId, amount, reason }),
+  });
+}

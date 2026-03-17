@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AnalyticsCards, Card, CardDescription, CardTitle } from "@dokanx/ui";
+import { AnalyticsCards, Card, CardDescription, CardTitle, SalesChart } from "@dokanx/ui";
 
-import { getShopSummary, getWalletSummary, listInventory, listOrders } from "@/lib/runtime-api";
+import { getShopSummary, getWalletSummary, listAnalyticsSnapshots, listInventory, listOrders } from "@/lib/runtime-api";
 
 type OrderRow = {
   _id?: string;
@@ -27,22 +27,35 @@ export function DashboardOverview() {
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [summary, setSummary] = useState<{ sales?: { totalSales?: number; totalOrders?: number } } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [trendSeries, setTrendSeries] = useState<Array<{ label: string; value: number }>>([]);
+  const [revenueSeries, setRevenueSeries] = useState<Array<{ label: string; value: number }>>([]);
 
   useEffect(() => {
     let active = true;
     async function load() {
       try {
-        const [ordersResponse, inventoryResponse, walletResponse, summaryResponse] = await Promise.all([
+        const [ordersResponse, inventoryResponse, walletResponse, summaryResponse, analyticsResponse] = await Promise.all([
           listOrders(),
           listInventory(),
           getWalletSummary(),
           getShopSummary(),
+          listAnalyticsSnapshots({}),
         ]);
         if (!active) return;
         setOrders(Array.isArray(ordersResponse.data) ? (ordersResponse.data as OrderRow[]) : []);
         setInventory(Array.isArray(inventoryResponse.data) ? (inventoryResponse.data as InventoryRow[]) : []);
         setWalletBalance(Number(walletResponse.data?.balance ?? 0));
         setSummary(summaryResponse.data || null);
+        const snapshots = Array.isArray(analyticsResponse.data) ? analyticsResponse.data : [];
+        const trendSnapshot = snapshots.find((row) => row.metricType === "TREND_ANALYTICS");
+        const payload = trendSnapshot?.payload as { current?: Array<{ label?: string; value?: number }> } | undefined;
+        const series = Array.isArray(payload?.current)
+          ? payload?.current?.map((item, index) => ({
+              label: item.label || `Day ${index + 1}`,
+              value: Number(item.value || 0),
+            })) || []
+          : [];
+        setTrendSeries(series);
       } catch (err) {
         if (!active) return;
         setError(err instanceof Error ? err.message : "Unable to load dashboard overview.");
@@ -86,6 +99,16 @@ export function DashboardOverview() {
         .slice(0, 6),
     [inventory]
   );
+
+  const fallbackSeries = useMemo(() => buildDailySeries(orders, 7), [orders]);
+  const fallbackRevenueSeries = useMemo(() => buildDailyRevenueSeries(orders, 7), [orders]);
+  const chartSales = trendSeries.length ? trendSeries : fallbackSeries;
+  const chartRevenue = revenueSeries.length ? revenueSeries : fallbackRevenueSeries;
+
+  useEffect(() => {
+    if (!orders.length) return;
+    setRevenueSeries(fallbackRevenueSeries);
+  }, [fallbackRevenueSeries, orders.length]);
 
   return (
     <div className="grid gap-6">
@@ -151,6 +174,23 @@ export function DashboardOverview() {
         </Card>
       </div>
 
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardTitle>Sales trend</CardTitle>
+          <CardDescription className="mt-2">Recent sales momentum for your shop.</CardDescription>
+          <div className="mt-6">
+            <SalesChart data={chartSales.length ? chartSales : [{ label: "No data", value: 0 }]} />
+          </div>
+        </Card>
+        <Card>
+          <CardTitle>Revenue trend</CardTitle>
+          <CardDescription className="mt-2">Gross revenue progression over time.</CardDescription>
+          <div className="mt-6">
+            <SalesChart data={chartRevenue.length ? chartRevenue : [{ label: "No data", value: 0 }]} />
+          </div>
+        </Card>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardTitle>Recent orders</CardTitle>
@@ -196,4 +236,42 @@ export function DashboardOverview() {
 
 function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function buildDailySeries(orders: OrderRow[], days: number) {
+  const today = new Date();
+  const buckets = new Map<string, number>();
+  for (let i = days - 1; i >= 0; i -= 1) {
+    const date = new Date(today);
+    date.setDate(today.getDate() - i);
+    const key = date.toLocaleDateString();
+    buckets.set(key, 0);
+  }
+  orders.forEach((order) => {
+    if (!order.createdAt) return;
+    const key = new Date(order.createdAt).toLocaleDateString();
+    if (buckets.has(key)) {
+      buckets.set(key, (buckets.get(key) || 0) + 1);
+    }
+  });
+  return Array.from(buckets.entries()).map(([label, value]) => ({ label, value }));
+}
+
+function buildDailyRevenueSeries(orders: OrderRow[], days: number) {
+  const today = new Date();
+  const buckets = new Map<string, number>();
+  for (let i = days - 1; i >= 0; i -= 1) {
+    const date = new Date(today);
+    date.setDate(today.getDate() - i);
+    const key = date.toLocaleDateString();
+    buckets.set(key, 0);
+  }
+  orders.forEach((order) => {
+    if (!order.createdAt) return;
+    const key = new Date(order.createdAt).toLocaleDateString();
+    if (buckets.has(key)) {
+      buckets.set(key, (buckets.get(key) || 0) + Number(order.totalAmount || 0));
+    }
+  });
+  return Array.from(buckets.entries()).map(([label, value]) => ({ label, value }));
 }
