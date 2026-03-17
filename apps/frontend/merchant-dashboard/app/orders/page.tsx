@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Button, Card, CardDescription, CardTitle, Input } from "@dokanx/ui";
+import QRCode from "qrcode";
 
 import { getShopSettings, listOrders, refundPayment, updateOrderStatus } from "@/lib/runtime-api";
 
@@ -180,9 +181,15 @@ export default function OrdersPage() {
     }
   }
 
-  function handlePrintInvoice(order: OrderRow) {
+  async function handlePrintInvoice(order: OrderRow) {
     if (!order._id) return;
-    const html = buildInvoiceHtml(order, shopProfile);
+    let qrDataUrl: string | null = null;
+    try {
+      qrDataUrl = await QRCode.toDataURL(String(order._id), { width: 160, margin: 1 });
+    } catch {
+      qrDataUrl = null;
+    }
+    const html = buildInvoiceHtml(order, shopProfile, qrDataUrl);
     const win = window.open("", "_blank", "width=900,height=700");
     if (!win) return;
     win.document.write(html);
@@ -362,7 +369,11 @@ export default function OrdersPage() {
   );
 }
 
-function buildInvoiceHtml(order: OrderRow, shopProfile: { name?: string; logoUrl?: string; addressLine1?: string; addressLine2?: string; city?: string; country?: string; vatRate?: number; defaultDiscountRate?: number } | null) {
+function buildInvoiceHtml(
+  order: OrderRow,
+  shopProfile: { name?: string; logoUrl?: string; addressLine1?: string; addressLine2?: string; city?: string; country?: string; vatRate?: number; defaultDiscountRate?: number } | null,
+  qrDataUrl: string | null
+) {
   const rows = (order.items || [])
     .map((item) => {
       const name = item.product?.name || "Item";
@@ -412,9 +423,11 @@ function buildInvoiceHtml(order: OrderRow, shopProfile: { name?: string; logoUrl
             <p>Order ID: ${order._id || ""}</p>
           </div>
           <div style="margin-left:auto; text-align:center;">
-            <div style="width:90px;height:90px;border:1px dashed #9ca3af;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#6b7280;">
-              QR
-            </div>
+            ${
+              qrDataUrl
+                ? `<img src="${qrDataUrl}" style="width:90px;height:90px;border-radius:12px;border:1px solid #e5e7eb;" />`
+                : `<div style="width:90px;height:90px;border:1px dashed #9ca3af;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#6b7280;">QR</div>`
+            }
             <div style="margin-top:6px;font-size:10px;color:#6b7280;">${String(order._id || "").slice(-8)}</div>
           </div>
         </div>
