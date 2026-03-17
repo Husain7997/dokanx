@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import { Card, CardDescription, CardTitle, OrdersTable } from "@dokanx/ui";
 
-import { listOrders, listShipments, updateOrderDispute } from "@/lib/admin-runtime-api";
+import { listAuditLogs, listOrders, listShipments, updateOrderDispute } from "@/lib/admin-runtime-api";
 
 type OrderRow = {
   _id?: string;
   status?: string;
   paymentStatus?: string;
   disputeStatus?: string;
+  disputeReason?: string;
   adminNotes?: string;
   totalAmount?: number;
   shop?: { name?: string };
@@ -32,7 +33,9 @@ export default function Page() {
   const [shipments, setShipments] = useState<ShipmentRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
+  const [reasonDraft, setReasonDraft] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [auditLogs, setAuditLogs] = useState<Array<{ _id?: string; action?: string; targetId?: string; createdAt?: string; meta?: Record<string, unknown> }>>([]);
 
   useEffect(() => {
     let active = true;
@@ -44,6 +47,9 @@ export default function Page() {
         const shipmentResponse = await listShipments(100);
         if (!active) return;
         setShipments(Array.isArray(shipmentResponse.data) ? (shipmentResponse.data as ShipmentRow[]) : []);
+        const auditResponse = await listAuditLogs();
+        if (!active) return;
+        setAuditLogs(Array.isArray(auditResponse.data) ? auditResponse.data : []);
       } catch (err) {
         if (!active) return;
         setError(err instanceof Error ? err.message : "Unable to load orders.");
@@ -110,7 +116,10 @@ export default function Page() {
                       if (!order._id) return;
                       setBusyId(order._id);
                       try {
-                        await updateOrderDispute(order._id, { disputeStatus: event.target.value });
+                        await updateOrderDispute(order._id, {
+                          disputeStatus: event.target.value,
+                          disputeReason: reasonDraft[order._id || ""] || order.disputeReason || "NONE",
+                        });
                         const response = await listOrders();
                         setOrders(Array.isArray(response.data) ? (response.data as OrderRow[]) : []);
                       } catch (err) {
@@ -124,6 +133,19 @@ export default function Page() {
                     {["NONE", "OPEN", "IN_REVIEW", "RESOLVED", "REJECTED"].map((status) => (
                       <option key={status} value={status}>
                         {status}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="h-9 rounded-full border border-border bg-background px-3 text-xs"
+                    value={reasonDraft[order._id || ""] ?? order.disputeReason ?? "NONE"}
+                    onChange={(event) =>
+                      setReasonDraft((current) => ({ ...current, [order._id || ""]: event.target.value }))
+                    }
+                  >
+                    {["NONE", "CUSTOMER_CLAIM", "DELIVERY_DELAY", "DAMAGED", "PAYMENT_ISSUE", "FRAUD", "OTHER"].map((reason) => (
+                      <option key={reason} value={reason}>
+                        {reason}
                       </option>
                     ))}
                   </select>
@@ -141,7 +163,10 @@ export default function Page() {
                       if (!order._id) return;
                       setBusyId(order._id);
                       try {
-                        await updateOrderDispute(order._id, { adminNotes: notesDraft[order._id || ""] ?? "" });
+                        await updateOrderDispute(order._id, {
+                          adminNotes: notesDraft[order._id || ""] ?? "",
+                          disputeReason: reasonDraft[order._id || ""] || order.disputeReason || "NONE",
+                        });
                         const response = await listOrders();
                         setOrders(Array.isArray(response.data) ? (response.data as OrderRow[]) : []);
                       } catch (err) {
@@ -154,6 +179,22 @@ export default function Page() {
                   >
                     Save notes
                   </button>
+                </div>
+                <div className="rounded-xl bg-accent/40 px-3 py-2 text-xs text-muted-foreground">
+                  <p className="font-medium text-foreground">Dispute timeline</p>
+                  {auditLogs
+                    .filter((log) => log.action === "ORDER_DISPUTE_UPDATE" && String(log.targetId || "") === String(order._id || ""))
+                    .slice(0, 3)
+                    .map((log) => (
+                      <div key={String(log._id)} className="mt-2 flex flex-wrap justify-between gap-2">
+                        <span>{log.createdAt ? new Date(log.createdAt).toLocaleString() : "Update"}</span>
+                        <span>{String((log.meta as Record<string, unknown>)?.disputeStatus || "")}</span>
+                        <span>{String((log.meta as Record<string, unknown>)?.disputeReason || "")}</span>
+                      </div>
+                    ))}
+                  {!auditLogs.some((log) => log.action === "ORDER_DISPUTE_UPDATE" && String(log.targetId || "") === String(order._id || "")) ? (
+                    <p className="mt-2">No dispute updates yet.</p>
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -176,6 +217,71 @@ export default function Page() {
           {!shipments.length ? <p>No shipments tracked yet.</p> : null}
         </div>
       </Card>
+      <Card>
+        <CardTitle>Dispute analytics</CardTitle>
+        <CardDescription className="mt-2">Resolution reasons and admin notes export.</CardDescription>
+        <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
+          {buildReasonSummary(orders).map((row) => (
+            <span key={row.label} className="rounded-full border border-border/60 px-3 py-1">
+              {row.label}: {row.count}
+            </span>
+          ))}
+        </div>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <button
+            className="rounded-full border border-border/60 px-3 py-2 text-xs"
+            onClick={() => {
+              const rows = orders
+                .filter((order) => (order.adminNotes || "").trim() || order.disputeStatus !== "NONE" || order.disputeReason !== "NONE")
+                .map((order) => ({
+                  orderId: order._id || "",
+                  disputeStatus: order.disputeStatus || "NONE",
+                  disputeReason: order.disputeReason || "NONE",
+                  adminNotes: order.adminNotes || "",
+                  createdAt: order.createdAt || "",
+                }));
+              const csv = buildCsv(rows);
+              downloadCsv(csv, `disputes-${new Date().toISOString().slice(0, 10)}.csv`);
+            }}
+          >
+            Export dispute notes
+          </button>
+        </div>
+      </Card>
     </div>
   );
+}
+
+function buildReasonSummary(orders: OrderRow[]) {
+  const map = new Map<string, number>();
+  orders.forEach((order) => {
+    const key = order.disputeReason || "NONE";
+    map.set(key, (map.get(key) || 0) + 1);
+  });
+  return Array.from(map.entries()).map(([label, count]) => ({ label, count }));
+}
+
+function buildCsv(rows: Array<Record<string, string | number>>) {
+  const headers = rows.length ? Object.keys(rows[0]) : ["orderId", "disputeStatus", "disputeReason", "adminNotes", "createdAt"];
+  const lines = [
+    headers.join(","),
+    ...rows.map((row) =>
+      headers
+        .map((key) => `"${String(row[key] ?? "").replace(/\"/g, '""')}"`)
+        .join(",")
+    ),
+  ];
+  return lines.join("\n");
+}
+
+function downloadCsv(csv: string, filename: string) {
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
 }

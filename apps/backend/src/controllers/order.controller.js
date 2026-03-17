@@ -12,6 +12,7 @@ const logger = require("../infrastructure/logger/logger");
 const { t } =
   require('@/core/infrastructure');
 const { addJob } = require("@/core/infrastructure");
+const { createAudit } = require("../utils/audit.util");
 exports.placeOrder = async (req, res) => {
 
   const session = await mongoose.startSession();
@@ -116,11 +117,27 @@ exports.updateOrderStatus = async (req, res) => {
       });
     }
 
-    if (req.body.disputeStatus || req.body.adminNotes !== undefined) {
+    if (req.body.disputeStatus || req.body.adminNotes !== undefined || req.body.disputeReason) {
       const update = {};
       if (req.body.disputeStatus) update.disputeStatus = req.body.disputeStatus;
       if (req.body.adminNotes !== undefined) update.adminNotes = req.body.adminNotes;
+      if (req.body.disputeReason) update.disputeReason = req.body.disputeReason;
       order = await Order.findByIdAndUpdate(req.params.orderId, update, { new: true });
+
+      if (order) {
+        await createAudit({
+          action: "ORDER_DISPUTE_UPDATE",
+          performedBy: req.user?._id || null,
+          targetType: "Order",
+          targetId: order._id,
+          req,
+          meta: {
+            disputeStatus: order.disputeStatus,
+            disputeReason: order.disputeReason,
+            adminNotes: order.adminNotes,
+          },
+        });
+      }
     }
 
     res.json({

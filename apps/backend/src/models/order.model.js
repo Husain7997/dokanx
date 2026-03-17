@@ -74,6 +74,12 @@ const orderSchema = new mongoose.Schema(
       default: "NONE",
       index: true,
     },
+    disputeReason: {
+      type: String,
+      enum: ["NONE", "CUSTOMER_CLAIM", "DELIVERY_DELAY", "DAMAGED", "PAYMENT_ISSUE", "FRAUD", "OTHER"],
+      default: "NONE",
+      index: true,
+    },
     adminNotes: {
       type: String,
       default: "",

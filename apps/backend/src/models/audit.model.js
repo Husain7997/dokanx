@@ -9,6 +9,10 @@ const auditSchema = new mongoose.Schema(
     },
     targetId: mongoose.Schema.Types.ObjectId,
     targetType: String,
+    meta: {
+      type: Object,
+      default: null,
+    },
     ip: String,
     userAgent: String
   },

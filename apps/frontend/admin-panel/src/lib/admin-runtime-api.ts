@@ -68,6 +68,7 @@ type AdminOrderResponse = {
     _id?: string;
     status?: string;
     disputeStatus?: string;
+    disputeReason?: string;
     adminNotes?: string;
     totalAmount?: number;
     shop?: { name?: string } & JsonValue;
@@ -248,7 +249,7 @@ export function listOrders() {
   return request<AdminOrderResponse>("/admin/orders");
 }
 
-export function updateOrderDispute(orderId: string, payload: { disputeStatus?: string; adminNotes?: string }) {
+export function updateOrderDispute(orderId: string, payload: { disputeStatus?: string; adminNotes?: string; disputeReason?: string }) {
   return request<{ message?: string; order?: JsonValue }>(`/orders/${orderId}/status`, {
     method: "PATCH",
     body: JSON.stringify(payload),

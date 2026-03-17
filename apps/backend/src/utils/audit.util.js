@@ -5,7 +5,8 @@ exports.createAudit = async ({
   performedBy,
   targetType,
   targetId,
-  req
+  req,
+  meta
 }) => {
   try {
     await AuditLog.create({
@@ -13,7 +14,8 @@ exports.createAudit = async ({
       performedBy,
       targetType,
       targetId,
-     ip: req?.ip || "SYSTEM",
+      meta: meta || null,
+      ip: req?.ip || "SYSTEM",
       userAgent: req.headers["user-agent"]
     });
   } catch (err) {
