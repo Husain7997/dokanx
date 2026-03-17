@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Badge, Button, Card, CardDescription, CardTitle, DataTable, Grid } from "@dokanx/ui";
+import { Badge, Button, Card, CardDescription, CardTitle, DataTable, Grid, Input, SelectDropdown } from "@dokanx/ui";
 
 import { getPayoutAlerts, listSettlements } from "@/lib/admin-runtime-api";
 
@@ -17,6 +17,10 @@ export function FinanceLedgerPanel() {
   const [settlements, setSettlements] = useState<SettlementRow[]>([]);
   const [alerts, setAlerts] = useState<Array<Record<string, unknown>>>([]);
   const [error, setError] = useState<string | null>(null);
+  const [shopFilter, setShopFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -40,16 +44,41 @@ export function FinanceLedgerPanel() {
     };
   }, []);
 
+  const filteredSettlements = useMemo(() => {
+    return settlements.filter((row) => {
+      if (shopFilter && !String(row.shopId || "").toLowerCase().includes(shopFilter.toLowerCase())) {
+        return false;
+      }
+      if (statusFilter !== "ALL" && String(row.status || "PENDING") !== statusFilter) {
+        return false;
+      }
+      if (fromDate) {
+        const created = row.createdAt ? new Date(row.createdAt) : null;
+        const from = new Date(fromDate);
+        if (!created || Number.isNaN(created.getTime()) || created < from) return false;
+      }
+      if (toDate) {
+        const created = row.createdAt ? new Date(row.createdAt) : null;
+        const to = new Date(toDate);
+        if (!created || Number.isNaN(created.getTime())) return false;
+        const end = new Date(to);
+        end.setHours(23, 59, 59, 999);
+        if (created > end) return false;
+      }
+      return true;
+    });
+  }, [fromDate, settlements, shopFilter, statusFilter, toDate]);
+
   const totals = useMemo(() => {
-    const pending = settlements.filter((row) => (row.status || "PENDING") === "PENDING");
-    const paid = settlements.filter((row) => (row.status || "") === "PAID");
+    const pending = filteredSettlements.filter((row) => (row.status || "PENDING") === "PENDING");
+    const paid = filteredSettlements.filter((row) => (row.status || "") === "PAID");
     return {
       pendingCount: pending.length,
       paidCount: paid.length,
       pendingTotal: pending.reduce((sum, row) => sum + (row.totalAmount || 0), 0),
       paidTotal: paid.reduce((sum, row) => sum + (row.totalAmount || 0), 0),
     };
-  }, [settlements]);
+  }, [filteredSettlements]);
 
   return (
     <Card>
@@ -75,11 +104,45 @@ export function FinanceLedgerPanel() {
         </Card>
       </Grid>
 
+      <div className="mt-4 grid gap-3 md:grid-cols-4">
+        <Input
+          value={shopFilter}
+          onChange={(event) => setShopFilter(event.target.value)}
+          placeholder="Filter by shop ID"
+        />
+        <SelectDropdown
+          label="Status"
+          value={statusFilter}
+          onValueChange={setStatusFilter}
+          options={[
+            { label: "All", value: "ALL" },
+            { label: "Pending", value: "PENDING" },
+            { label: "Paid", value: "PAID" },
+          ]}
+        />
+        <Input
+          type="date"
+          value={fromDate}
+          onChange={(event) => setFromDate(event.target.value)}
+          placeholder="From date"
+        />
+        <Input
+          type="date"
+          value={toDate}
+          onChange={(event) => setToDate(event.target.value)}
+          placeholder="To date"
+        />
+      </div>
+
+      <div className="mt-3 text-xs text-muted-foreground">
+        Showing {filteredSettlements.length} of {settlements.length} settlements
+      </div>
+
       <div className="mt-4 flex flex-wrap gap-3">
         <Button
           variant="secondary"
           onClick={() => {
-            const rows = settlements.map((row) => ({
+            const rows = filteredSettlements.map((row) => ({
               settlementId: row._id || "",
               shopId: row.shopId || "",
               totalAmount: row.totalAmount ?? 0,
@@ -105,22 +168,22 @@ export function FinanceLedgerPanel() {
         </Button>
       </div>
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <div>
-          <DataTable
-            columns={[
-              { key: "settlement", header: "Settlement" },
-              { key: "shop", header: "Shop" },
-              { key: "total", header: "Total" },
-              { key: "status", header: "Status" },
-              { key: "created", header: "Created" },
-            ]}
-            rows={settlements.slice(0, 8).map((row) => ({
-              id: String(row._id || ""),
-              settlement: row._id ? String(row._id).slice(-6) : "Settlement",
-              shop: row.shopId || "Shop",
-              total: `${row.totalAmount ?? 0} BDT`,
-              status: row.status || "PENDING",
+        <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+          <div>
+            <DataTable
+              columns={[
+                { key: "settlement", header: "Settlement" },
+                { key: "shop", header: "Shop" },
+                { key: "total", header: "Total" },
+                { key: "status", header: "Status" },
+                { key: "created", header: "Created" },
+              ]}
+              rows={filteredSettlements.slice(0, 8).map((row) => ({
+                id: String(row._id || ""),
+                settlement: row._id ? String(row._id).slice(-6) : "Settlement",
+                shop: row.shopId || "Shop",
+                total: `${row.totalAmount ?? 0} BDT`,
+                status: row.status || "PENDING",
               created: row.createdAt ? new Date(row.createdAt).toLocaleDateString() : "Unknown",
             }))}
           />

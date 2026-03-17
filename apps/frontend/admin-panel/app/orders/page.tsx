@@ -18,7 +18,7 @@ import {
   TextInput
 } from "@dokanx/ui";
 
-import { listAuditLogs, listOrders, listShipments, updateOrderDispute } from "@/lib/admin-runtime-api";
+import { listAuditLogs, listCarriers, listOrders, listShipments, updateOrderDispute } from "@/lib/admin-runtime-api";
 
 type OrderRow = {
   _id?: string;
@@ -40,6 +40,13 @@ type ShipmentRow = {
   carrier?: string;
   status?: string;
   createdAt?: string;
+  events?: Array<{ status?: string; message?: string; timestamp?: string }>;
+};
+
+type CarrierRow = {
+  id?: string;
+  name?: string;
+  supportsTracking?: boolean;
 };
 
 const disputeStatusOptions = ["NONE", "OPEN", "IN_REVIEW", "RESOLVED", "REJECTED"].map((status) => ({
@@ -70,6 +77,7 @@ export const dynamic = "force-dynamic";
 export default function Page() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [shipments, setShipments] = useState<ShipmentRow[]>([]);
+  const [carriers, setCarriers] = useState<CarrierRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
   const [reasonDraft, setReasonDraft] = useState<Record<string, string>>({});
@@ -79,30 +87,120 @@ export default function Page() {
   const [disputeStatusFilter, setDisputeStatusFilter] = useState("ALL");
   const [disputeReasonFilter, setDisputeReasonFilter] = useState("ALL");
 
-  const courierProviders = [
+  const fallbackCouriers = [
     { name: "Pathao Courier", focus: "Fast city coverage", region: "Dhaka core" },
     { name: "Paperfly", focus: "Nationwide B2C delivery", region: "All districts" },
     { name: "Steadfast", focus: "Reliable intercity", region: "Dhaka ↔ Sylhet" },
     { name: "RedX", focus: "High volume routes", region: "Growth corridors" },
   ];
 
-  const selectionSignals = [
-    { label: "Delivery speed", value: "Same-day vs 48-hour SLA" },
-    { label: "Success rate", value: "Return ratio below 3%" },
-    { label: "Shipping cost", value: "Merchant target margin" },
-    { label: "Coverage", value: "Destination fit" },
-    { label: "Merchant preference", value: "Manual override" },
-  ];
+  const courierProviders = useMemo(() => {
+    if (!carriers.length) return fallbackCouriers;
+    return carriers.map((carrier) => ({
+      name: carrier.name || carrier.id || "Courier",
+      focus: carrier.supportsTracking ? "Tracking enabled" : "Manual status sync",
+      region: carrier.supportsTracking ? "Live coverage" : "Configured",
+    }));
+  }, [carriers]);
 
-  const trackingEvents = [
-    "Shipment Created",
-    "Picked Up",
-    "In Transit",
-    "Out for Delivery",
-    "Delivered",
-    "Failed Delivery",
-    "Returned",
-  ];
+  const deliveryStats = useMemo(() => {
+    const total = shipments.length;
+    const delivered = shipments.filter((shipment) => shipment.status === "DELIVERED").length;
+    const failed = shipments.filter((shipment) =>
+      ["FAILED", "RETURNED"].includes(String(shipment.status || "").toUpperCase())
+    ).length;
+    const inTransit = shipments.filter((shipment) =>
+      ["IN_TRANSIT", "OUT_FOR_DELIVERY", "PICKED_UP"].includes(String(shipment.status || "").toUpperCase())
+    ).length;
+    const carrierCount = new Map<string, number>();
+    shipments.forEach((shipment) => {
+      const key = shipment.carrier || "Unknown";
+      carrierCount.set(key, (carrierCount.get(key) || 0) + 1);
+    });
+    const topCourier = Array.from(carrierCount.entries()).sort((a, b) => b[1] - a[1])[0];
+    const deliveryTimes = shipments
+      .map((shipment) => {
+        if (!shipment.createdAt || !shipment.events?.length) return null;
+        const deliveredEvent = shipment.events.find(
+          (event) => String(event.status || "").toUpperCase() === "DELIVERED"
+        );
+        if (!deliveredEvent?.timestamp) return null;
+        const start = new Date(shipment.createdAt).getTime();
+        const end = new Date(deliveredEvent.timestamp).getTime();
+        if (Number.isNaN(start) || Number.isNaN(end) || end < start) return null;
+        return (end - start) / (1000 * 60 * 60 * 24);
+      })
+      .filter((value): value is number => value !== null);
+    const avgDeliveryDays = deliveryTimes.length
+      ? deliveryTimes.reduce((sum, value) => sum + value, 0) / deliveryTimes.length
+      : null;
+    const successRate = total ? (delivered / total) * 100 : 0;
+    const failureRate = total ? (failed / total) * 100 : 0;
+    return {
+      total,
+      delivered,
+      failed,
+      inTransit,
+      topCourier,
+      avgDeliveryDays,
+      successRate,
+      failureRate,
+    };
+  }, [shipments]);
+
+  const selectionSignals = useMemo(
+    () => [
+      {
+        label: "Delivery speed",
+        value: deliveryStats.avgDeliveryDays ? `${deliveryStats.avgDeliveryDays.toFixed(1)} days avg` : "Awaiting data",
+      },
+      {
+        label: "Success rate",
+        value: deliveryStats.total ? `${deliveryStats.successRate.toFixed(1)}% delivered` : "Awaiting data",
+      },
+      {
+        label: "Shipping cost",
+        value: deliveryStats.total ? "Optimized per lane" : "Configured per merchant",
+      },
+      {
+        label: "Coverage",
+        value: carriers.length ? `${carriers.length} couriers active` : "Coverage pending",
+      },
+      {
+        label: "Merchant preference",
+        value: carriers.length ? "Overrides enabled" : "Manual override",
+      },
+    ],
+    [deliveryStats, carriers]
+  );
+
+  const trackingEvents = useMemo(
+    () => [
+      { key: "CREATED", label: "Shipment Created" },
+      { key: "PICKED_UP", label: "Picked Up" },
+      { key: "IN_TRANSIT", label: "In Transit" },
+      { key: "OUT_FOR_DELIVERY", label: "Out for Delivery" },
+      { key: "DELIVERED", label: "Delivered" },
+      { key: "FAILED", label: "Failed Delivery" },
+      { key: "RETURNED", label: "Returned" },
+    ],
+    []
+  );
+
+  const trackingTimeline = useMemo(
+    () =>
+      trackingEvents.map((event) => {
+        const count = shipments.reduce((sum, shipment) => {
+          const statusMatch = String(shipment.status || "").toUpperCase() === event.key;
+          const eventMatch = shipment.events?.some(
+            (item) => String(item.status || "").toUpperCase() === event.key
+          );
+          return sum + (statusMatch || eventMatch ? 1 : 0);
+        }, 0);
+        return { ...event, count };
+      }),
+    [trackingEvents, shipments]
+  );
 
   const statusSyncMethods = [
     { title: "Webhook updates", detail: "Courier pushes real-time updates to DokanX." },
@@ -123,12 +221,31 @@ export default function Page() {
     { reason: "Customer rejected", action: "Trigger return workflow" },
   ];
 
-  const analyticsMetrics = [
-    { label: "Avg delivery time", value: "2.4 days", trend: "+0.2 days" },
-    { label: "Delivery success rate", value: "94.6%", trend: "+1.2%" },
-    { label: "Courier performance", value: "Top: Pathao", trend: "SLA 97%" },
-    { label: "Failure rate", value: "3.1%", trend: "-0.4%" },
-  ];
+  const analyticsMetrics = useMemo(
+    () => [
+      {
+        label: "Avg delivery time",
+        value: deliveryStats.avgDeliveryDays ? `${deliveryStats.avgDeliveryDays.toFixed(1)} days` : "No data yet",
+        trend: deliveryStats.inTransit ? `${deliveryStats.inTransit} in transit` : "Tracking pending",
+      },
+      {
+        label: "Delivery success rate",
+        value: deliveryStats.total ? `${deliveryStats.successRate.toFixed(1)}%` : "No data yet",
+        trend: deliveryStats.delivered ? `${deliveryStats.delivered} delivered` : "Awaiting deliveries",
+      },
+      {
+        label: "Courier performance",
+        value: deliveryStats.topCourier ? `Top: ${deliveryStats.topCourier[0]}` : "No courier data",
+        trend: deliveryStats.topCourier ? `${deliveryStats.topCourier[1]} shipments` : "Awaiting volume",
+      },
+      {
+        label: "Failure rate",
+        value: deliveryStats.total ? `${deliveryStats.failureRate.toFixed(1)}%` : "No data yet",
+        trend: deliveryStats.failed ? `${deliveryStats.failed} failed/returned` : "No failures",
+      },
+    ],
+    [deliveryStats]
+  );
 
   const merchantTools = [
     "Create shipment",
@@ -272,10 +389,12 @@ export default function Page() {
   );
 
   const disputeDaily = useMemo(() => buildDailyDisputeSeries(orders, 7), [orders]);
+  const disputeAverage = useMemo(() => {
+    const values = disputeDaily.map((row) => row.value);
+    return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+  }, [disputeDaily]);
   const chartJsDisputeLine = useMemo(() => {
     const values = disputeDaily.map((row) => row.value);
-    const average =
-      values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
     return {
       labels: disputeDaily.map((row) => row.label),
       datasets: [
@@ -291,14 +410,42 @@ export default function Page() {
         },
         {
           label: "Avg baseline",
-          data: values.map(() => Number(average.toFixed(1))),
+          data: values.map(() => Number(disputeAverage.toFixed(1))),
           borderColor: "hsl(221 83% 53% / 0.6)",
           borderDash: [6, 6],
           pointRadius: 0
         }
       ]
     };
-  }, [disputeDaily]);
+  }, [disputeAverage, disputeDaily]);
+
+  const chartJsLineOptions = useMemo(
+    () => ({
+      ...chartJsOptions,
+      plugins: {
+        ...chartJsOptions.plugins,
+        annotation: {
+          annotations: {
+            averageLine: {
+              type: "line",
+              yMin: disputeAverage,
+              yMax: disputeAverage,
+              borderColor: "hsl(221 83% 53% / 0.5)",
+              borderWidth: 2,
+              borderDash: [6, 6],
+              label: {
+                display: true,
+                content: `Avg ${disputeAverage.toFixed(1)}`,
+                position: "end",
+                color: "hsl(220 9% 46%)"
+              }
+            }
+          }
+        }
+      }
+    }),
+    [chartJsOptions, disputeAverage]
+  );
 
   useEffect(() => {
     let active = true;
@@ -307,9 +454,13 @@ export default function Page() {
         const response = await listOrders();
         if (!active) return;
         setOrders(Array.isArray(response.data) ? (response.data as OrderRow[]) : []);
-        const shipmentResponse = await listShipments(100);
+        const [shipmentResponse, carrierResponse] = await Promise.all([
+          listShipments(100),
+          listCarriers(),
+        ]);
         if (!active) return;
         setShipments(Array.isArray(shipmentResponse.data) ? (shipmentResponse.data as ShipmentRow[]) : []);
+        setCarriers(Array.isArray(carrierResponse.data) ? (carrierResponse.data as CarrierRow[]) : []);
         const auditResponse = await listAuditLogs();
         if (!active) return;
         setAuditLogs(Array.isArray(auditResponse.data) ? auditResponse.data : []);
@@ -410,6 +561,17 @@ export default function Page() {
               status: order.status || "PENDING",
             }))}
           />
+          <div className="mt-4 flex flex-wrap gap-3 text-xs text-muted-foreground">
+            {orders.slice(0, 6).map((order) => (
+              <a
+                key={String(order._id)}
+                href={`/orders/${order._id}`}
+                className="rounded-full border border-border/60 px-3 py-1"
+              >
+                View #{String(order._id || "").slice(-6)}
+              </a>
+            ))}
+          </div>
         </div>
       </Card>
 
@@ -631,10 +793,12 @@ export default function Page() {
             <CardTitle>Tracking timeline</CardTitle>
             <CardDescription className="mt-2">Customer + merchant visibility.</CardDescription>
             <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
-              {trackingEvents.map((event, index) => (
-                <div key={event} className="flex items-center justify-between gap-2 rounded-2xl border border-border/60 px-4 py-2">
-                  <span>{event}</span>
-                  <Badge variant={index === 4 ? "success" : "neutral"}>{index + 1}</Badge>
+              {trackingTimeline.map((event, index) => (
+                <div key={event.key} className="flex items-center justify-between gap-2 rounded-2xl border border-border/60 px-4 py-2">
+                  <span>{event.label}</span>
+                  <Badge variant={event.key === "DELIVERED" ? "success" : "neutral"}>
+                    {event.count ? `${event.count}` : index + 1}
+                  </Badge>
                 </div>
               ))}
             </div>
@@ -775,7 +939,7 @@ export default function Page() {
             </div>
             <div className="rounded-2xl border border-border/60 bg-card/60 p-4">
               {disputeReasonChart.length ? (
-                <ChartJsLineChart data={chartJsDisputeLine} options={chartJsOptions} height={220} />
+                <ChartJsLineChart data={chartJsDisputeLine} options={chartJsLineOptions} height={220} />
               ) : (
                 <p className="text-sm text-muted-foreground">No dispute trend data yet.</p>
               )}
@@ -884,6 +1048,7 @@ export default function Page() {
               { key: "opened", header: "Opened" },
               { key: "age", header: "Age (hrs)" },
               { key: "sla", header: "SLA" },
+              { key: "details", header: "Details" },
             ]}
             rows={disputeQueue.slice(0, 10).map((order) => {
               const createdAt = order.createdAt ? new Date(order.createdAt) : null;
@@ -903,6 +1068,13 @@ export default function Page() {
                 opened: createdAt ? createdAt.toLocaleDateString() : "Unknown",
                 age: resolutionHours ?? ageHours,
                 sla: slaBreached ? "Breached" : "On track",
+                details: order._id ? (
+                  <a className="text-xs text-primary" href={`/orders/${order._id}`}>
+                    View
+                  </a>
+                ) : (
+                  "-"
+                ),
               };
             })}
           />

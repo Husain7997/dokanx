@@ -262,12 +262,17 @@ export default function SecurityPage() {
               { key: "action", header: "Action" },
               { key: "target", header: "Target" },
               { key: "time", header: "Time" },
+              { key: "risk", header: "Risk" },
             ]}
-            rows={loginLogs.map((log) => ({
-              action: log.action || "LOGIN",
-              target: `${log.targetType || "User"} ${log.targetId || ""}`.trim(),
-              time: log.createdAt ? new Date(log.createdAt).toLocaleString() : "Unknown",
-            }))}
+            rows={loginLogs.map((log) => {
+              const risk = getRiskScore(log.action || "");
+              return {
+                action: log.action || "LOGIN",
+                target: `${log.targetType || "User"} ${log.targetId || ""}`.trim(),
+                time: log.createdAt ? new Date(log.createdAt).toLocaleString() : "Unknown",
+                risk: <Badge variant={risk.variant}>{risk.label}</Badge>,
+              };
+            })}
           />
         </Card>
         <Card>
@@ -292,15 +297,41 @@ export default function SecurityPage() {
               { key: "action", header: "Action" },
               { key: "target", header: "Target" },
               { key: "time", header: "Time" },
+              { key: "risk", header: "Risk" },
             ]}
-            rows={apiLogs.map((log) => ({
-              action: log.action || "API_CALL",
-              target: `${log.targetType || "Endpoint"} ${log.targetId || ""}`.trim(),
-              time: log.createdAt ? new Date(log.createdAt).toLocaleString() : "Unknown",
-            }))}
+            rows={apiLogs.map((log) => {
+              const risk = getRiskScore(log.action || "");
+              return {
+                action: log.action || "API_CALL",
+                target: `${log.targetType || "Endpoint"} ${log.targetId || ""}`.trim(),
+                time: log.createdAt ? new Date(log.createdAt).toLocaleString() : "Unknown",
+                risk: <Badge variant={risk.variant}>{risk.label}</Badge>,
+              };
+            })}
           />
         </Card>
       </div>
+
+      <Card>
+        <CardTitle>Audit export</CardTitle>
+        <CardDescription className="mt-2">Bulk export audit logs with risk scoring.</CardDescription>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Button
+            variant="secondary"
+            onClick={() => exportAuditCsv(filteredLogs, `audit-logs-filtered-${new Date().toISOString().slice(0, 10)}.csv`)}
+            disabled={!filteredLogs.length}
+          >
+            Export filtered logs
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => exportAuditCsv(logs, `audit-logs-all-${new Date().toISOString().slice(0, 10)}.csv`)}
+            disabled={!logs.length}
+          >
+            Export all logs
+          </Button>
+        </div>
+      </Card>
 
       <Card>
         <CardTitle>IP block audit trail</CardTitle>
@@ -360,6 +391,8 @@ function exportAuditCsv(rows: AuditRow[], filename: string) {
     action: log.action || "",
     targetType: log.targetType || "",
     targetId: log.targetId || "",
+    riskScore: getRiskScore(log.action || "").score,
+    riskLabel: getRiskScore(log.action || "").label,
     createdAt: log.createdAt || "",
   }));
   const csv = buildCsv(csvRows);
@@ -375,4 +408,21 @@ function getSeverity(reason?: string | null) {
     return { label: "Medium", variant: "warning" as const };
   }
   return { label: "Low", variant: "neutral" as const };
+}
+
+function getRiskScore(action: string) {
+  const value = action.toUpperCase();
+  if (value.includes("FAILED") || value.includes("BLOCK") || value.includes("SUSPEND")) {
+    return { score: 90, label: "High", variant: "danger" as const };
+  }
+  if (value.includes("LOGIN") && value.includes("FAILED")) {
+    return { score: 80, label: "High", variant: "danger" as const };
+  }
+  if (value.includes("LOGIN") || value.includes("TOKEN") || value.includes("AUTH")) {
+    return { score: 60, label: "Medium", variant: "warning" as const };
+  }
+  if (value.includes("API")) {
+    return { score: 40, label: "Low", variant: "neutral" as const };
+  }
+  return { score: 30, label: "Low", variant: "neutral" as const };
 }
