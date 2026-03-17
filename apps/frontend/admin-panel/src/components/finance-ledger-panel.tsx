@@ -70,6 +70,15 @@ export function FinanceLedgerPanel() {
     });
   }, [fromDate, settlements, shopFilter, statusFilter, toDate]);
 
+  useEffect(() => {
+    const preset = inferPreset(fromDate, toDate);
+    if (preset) {
+      setRangePreset(preset);
+    } else if (fromDate || toDate) {
+      setRangePreset("CUSTOM");
+    }
+  }, [fromDate, toDate]);
+
   const totals = useMemo(() => {
     const pending = filteredSettlements.filter((row) => (row.status || "PENDING") === "PENDING");
     const paid = filteredSettlements.filter((row) => (row.status || "") === "PAID");
@@ -138,12 +147,30 @@ export function FinanceLedgerPanel() {
               start.setDate(end.getDate() - 29);
               setFromDate(start.toISOString().slice(0, 10));
               setToDate(end.toISOString().slice(0, 10));
+            } else if (value === "THIS_WEEK") {
+              const now = new Date();
+              const day = now.getDay();
+              const diff = (day === 0 ? -6 : 1) - day;
+              const start = new Date(now);
+              start.setDate(now.getDate() + diff);
+              const end = new Date(start);
+              end.setDate(start.getDate() + 6);
+              setFromDate(start.toISOString().slice(0, 10));
+              setToDate(end.toISOString().slice(0, 10));
+            } else if (value === "THIS_MONTH") {
+              const now = new Date();
+              const start = new Date(now.getFullYear(), now.getMonth(), 1);
+              const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+              setFromDate(start.toISOString().slice(0, 10));
+              setToDate(end.toISOString().slice(0, 10));
             }
           }}
           options={[
             { label: "Custom", value: "CUSTOM" },
             { label: "Last 7 days", value: "LAST_7" },
             { label: "Last 30 days", value: "LAST_30" },
+            { label: "This week", value: "THIS_WEEK" },
+            { label: "This month", value: "THIS_MONTH" },
           ]}
         />
         <Input
@@ -292,4 +319,36 @@ function downloadCsv(csv: string, filename: string) {
   link.click();
   document.body.removeChild(link);
   window.URL.revokeObjectURL(url);
+}
+
+function inferPreset(fromDate: string, toDate: string) {
+  if (!fromDate || !toDate) return null;
+  const start = new Date(fromDate);
+  const end = new Date(toDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+
+  const today = new Date();
+  const iso = (date: Date) => date.toISOString().slice(0, 10);
+
+  const last7Start = new Date(today);
+  last7Start.setDate(today.getDate() - 6);
+  if (iso(start) === iso(last7Start) && iso(end) === iso(today)) return "LAST_7";
+
+  const last30Start = new Date(today);
+  last30Start.setDate(today.getDate() - 29);
+  if (iso(start) === iso(last30Start) && iso(end) === iso(today)) return "LAST_30";
+
+  const day = today.getDay();
+  const diff = (day === 0 ? -6 : 1) - day;
+  const weekStart = new Date(today);
+  weekStart.setDate(today.getDate() + diff);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  if (iso(start) === iso(weekStart) && iso(end) === iso(weekEnd)) return "THIS_WEEK";
+
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  if (iso(start) === iso(monthStart) && iso(end) === iso(monthEnd)) return "THIS_MONTH";
+
+  return null;
 }

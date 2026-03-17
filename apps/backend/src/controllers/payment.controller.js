@@ -18,6 +18,7 @@ const paymentService = require("../services/payment.service");
 const Settlement = require("../models/settlement.model");
 const { ensureIdempotent } = require('../utils/idempotency');
 const paymentGateway = require("../services/payment/paymentGateway.service");
+const { createAudit } = require("../utils/audit.util");
 
 // const features = require('../config/features');
 
@@ -196,6 +197,20 @@ exports.refundPayment = async (req, res) => {
 
   order.status = "REFUNDED";
   await order.save();
+
+  await createAudit({
+    action: "ORDER_REFUND_APPROVED",
+    performedBy: req.user?._id || null,
+    targetType: "Order",
+    targetId: order._id,
+    req,
+    meta: {
+      orderId,
+      amount,
+      reason: reason || "",
+      status: "REFUNDED",
+    },
+  });
 
   res.json({
     success: true,

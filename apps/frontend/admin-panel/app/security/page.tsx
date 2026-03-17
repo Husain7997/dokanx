@@ -35,6 +35,7 @@ export default function SecurityPage() {
   const [mediumRiskThreshold, setMediumRiskThreshold] = useState(50);
   const [riskTag, setRiskTag] = useState("Security");
   const [riskStatus, setRiskStatus] = useState<string | null>(null);
+  const defaultRiskRules = { high: 80, medium: 50, tag: "Security" };
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -162,6 +163,28 @@ export default function SecurityPage() {
       setRiskStatus("Risk rules saved.");
     } catch (err) {
       setRiskStatus(err instanceof Error ? err.message : "Unable to save risk rules.");
+    }
+  }
+
+  async function handleResetRiskRules() {
+    setHighRiskThreshold(defaultRiskRules.high);
+    setMediumRiskThreshold(defaultRiskRules.medium);
+    setRiskTag(defaultRiskRules.tag);
+    setRiskStatus(null);
+    try {
+      const response = await updateRiskSettings({
+        highThreshold: defaultRiskRules.high,
+        mediumThreshold: defaultRiskRules.medium,
+        tag: defaultRiskRules.tag,
+      });
+      if (response?.data) {
+        setHighRiskThreshold(Number(response.data.highThreshold ?? defaultRiskRules.high));
+        setMediumRiskThreshold(Number(response.data.mediumThreshold ?? defaultRiskRules.medium));
+        setRiskTag(String(response.data.tag ?? defaultRiskRules.tag));
+      }
+      setRiskStatus("Risk rules reset to defaults.");
+    } catch (err) {
+      setRiskStatus(err instanceof Error ? err.message : "Unable to reset risk rules.");
     }
   }
 
@@ -297,6 +320,9 @@ export default function SecurityPage() {
         <div className="mt-3 flex flex-wrap gap-3">
           <Button size="sm" variant="secondary" onClick={handleSaveRiskRules}>
             Save rules
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleResetRiskRules}>
+            Reset defaults
           </Button>
           {riskStatus ? <span className="text-xs text-muted-foreground">{riskStatus}</span> : null}
         </div>
