@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Badge, Button, Card, CardDescription, CardTitle, DataTable, Grid, SelectDropdown, TextInput } from "@dokanx/ui";
 
-import { listAuditLogs, listOrders, listShipments, updateOrderDispute } from "@/lib/admin-runtime-api";
+import { listAuditLogs, listOrders, listShipments, refundOrderPayment, updateOrderDispute } from "@/lib/admin-runtime-api";
 
 type OrderRow = {
   _id?: string;
@@ -46,6 +46,8 @@ export default function OrderDetailPage({ params }: { params: { orderId: string 
   const [auditLogs, setAuditLogs] = useState<AuditRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [refundStatus, setRefundStatus] = useState("NONE");
+  const [refundAmount, setRefundAmount] = useState("0");
+  const [refundReason, setRefundReason] = useState("");
   const [disputeStatus, setDisputeStatus] = useState("NONE");
   const [disputeReason, setDisputeReason] = useState("NONE");
   const [adminNotes, setAdminNotes] = useState("");
@@ -67,6 +69,7 @@ export default function OrderDetailPage({ params }: { params: { orderId: string 
         setAuditLogs(Array.isArray(auditResponse.data) ? (auditResponse.data as AuditRow[]) : []);
         const current = list.find((row) => String(row._id || "") === orderId) || null;
         setRefundStatus(current?.paymentStatus || "NONE");
+        setRefundAmount(String(current?.totalAmount ?? 0));
         setDisputeStatus(current?.disputeStatus || "NONE");
         setDisputeReason(current?.disputeReason || "NONE");
         setAdminNotes(current?.adminNotes || "");
@@ -132,8 +135,28 @@ export default function OrderDetailPage({ params }: { params: { orderId: string 
     }
   }
 
-  function handleRefundAction(action: "REQUEST" | "APPROVE" | "DECLINE") {
-    setRefundStatus(action === "REQUEST" ? "REQUESTED" : action === "APPROVE" ? "APPROVED" : "DECLINED");
+  async function handleRefundAction(action: "REQUEST" | "APPROVE" | "DECLINE") {
+    if (action === "APPROVE") {
+      setBusy(true);
+      setError(null);
+      try {
+        await refundOrderPayment({
+          orderId,
+          amount: Number(refundAmount || 0),
+          reason: refundReason || undefined,
+        });
+        const response = await listOrders();
+        const list = Array.isArray(response.data) ? (response.data as OrderRow[]) : [];
+        setOrder(list.find((row) => String(row._id || "") === orderId) || null);
+        setRefundStatus("APPROVED");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Refund failed.");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+    setRefundStatus(action === "REQUEST" ? "REQUESTED" : "DECLINED");
   }
 
   return (
@@ -218,9 +241,19 @@ export default function OrderDetailPage({ params }: { params: { orderId: string 
                 {refundStatus}
               </Badge>
             </div>
+            <TextInput
+              value={refundAmount}
+              onChange={(event) => setRefundAmount(event.target.value)}
+              placeholder="Refund amount"
+            />
+            <TextInput
+              value={refundReason}
+              onChange={(event) => setRefundReason(event.target.value)}
+              placeholder="Refund reason"
+            />
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="secondary" onClick={() => handleRefundAction("REQUEST")}>Request</Button>
-              <Button size="sm" variant="outline" onClick={() => handleRefundAction("APPROVE")}>Approve</Button>
+              <Button size="sm" variant="outline" onClick={() => handleRefundAction("APPROVE")} disabled={busy}>Approve</Button>
               <Button size="sm" variant="ghost" onClick={() => handleRefundAction("DECLINE")}>Decline</Button>
             </div>
             <SelectDropdown label="Dispute status" options={disputeStatusOptions} value={disputeStatus} onValueChange={setDisputeStatus} />

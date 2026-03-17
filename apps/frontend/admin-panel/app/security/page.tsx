@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Badge, Button, Card, CardDescription, CardTitle, DataTable, Input, SelectDropdown } from "@dokanx/ui";
 
-import { blockIp, listAuditLogs, listIpBlocks, unblockIp } from "@/lib/admin-runtime-api";
+import { blockIp, getRiskSettings, listAuditLogs, listIpBlocks, unblockIp, updateRiskSettings } from "@/lib/admin-runtime-api";
 
 type AuditRow = {
   _id?: string;
@@ -34,6 +34,7 @@ export default function SecurityPage() {
   const [highRiskThreshold, setHighRiskThreshold] = useState(80);
   const [mediumRiskThreshold, setMediumRiskThreshold] = useState(50);
   const [riskTag, setRiskTag] = useState("Security");
+  const [riskStatus, setRiskStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -48,6 +49,13 @@ export default function SecurityPage() {
         if (!active) return;
         setLogs(Array.isArray(logsResponse.data) ? (logsResponse.data as AuditRow[]) : []);
         setBlocks(Array.isArray(blockResponse.data) ? (blockResponse.data as IpBlockRow[]) : []);
+        const riskResponse = await getRiskSettings();
+        if (!active) return;
+        if (riskResponse?.data) {
+          setHighRiskThreshold(Number(riskResponse.data.highThreshold ?? 80));
+          setMediumRiskThreshold(Number(riskResponse.data.mediumThreshold ?? 50));
+          setRiskTag(String(riskResponse.data.tag ?? "Security"));
+        }
       } catch (err) {
         if (!active) return;
         setError(err instanceof Error ? err.message : "Unable to load security logs.");
@@ -135,6 +143,25 @@ export default function SecurityPage() {
       setStatus("IP unblocked.");
     } catch (err) {
       setStatus(err instanceof Error ? err.message : "Unable to unblock IP.");
+    }
+  }
+
+  async function handleSaveRiskRules() {
+    setRiskStatus(null);
+    try {
+      const response = await updateRiskSettings({
+        highThreshold: Number(highRiskThreshold),
+        mediumRiskThreshold: Number(mediumRiskThreshold),
+        tag: riskTag || "Security",
+      });
+      if (response?.data) {
+        setHighRiskThreshold(Number(response.data.highThreshold ?? highRiskThreshold));
+        setMediumRiskThreshold(Number(response.data.mediumThreshold ?? mediumRiskThreshold));
+        setRiskTag(String(response.data.tag ?? riskTag));
+      }
+      setRiskStatus("Risk rules saved.");
+    } catch (err) {
+      setRiskStatus(err instanceof Error ? err.message : "Unable to save risk rules.");
     }
   }
 
@@ -267,6 +294,12 @@ export default function SecurityPage() {
         <p className="mt-3 text-xs text-muted-foreground">
           High risk ≥ {highRiskThreshold}, Medium risk ≥ {mediumRiskThreshold}. Tag: {riskTag || "Security"}.
         </p>
+        <div className="mt-3 flex flex-wrap gap-3">
+          <Button size="sm" variant="secondary" onClick={handleSaveRiskRules}>
+            Save rules
+          </Button>
+          {riskStatus ? <span className="text-xs text-muted-foreground">{riskStatus}</span> : null}
+        </div>
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">

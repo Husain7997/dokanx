@@ -258,6 +258,13 @@ export function updateOrderDispute(orderId: string, payload: { disputeStatus?: s
   });
 }
 
+export function refundOrderPayment(payload: { orderId: string; amount: number; reason?: string }) {
+  return request<{ success?: boolean; refundedAmount?: number }>(`/payments/refund`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function listAuditLogs() {
   return request<AdminAuditResponse>("/admin/audit-logs");
 }
@@ -363,6 +370,22 @@ export function updateEtaSettings(payload: {
     method: "PUT",
     body: JSON.stringify(payload),
   });
+}
+
+export function getRiskSettings() {
+  return request<{ data?: { highThreshold?: number; mediumThreshold?: number; tag?: string } & JsonValue }>(
+    "/settings/risk"
+  );
+}
+
+export function updateRiskSettings(payload: { highThreshold: number; mediumThreshold: number; tag?: string }) {
+  return request<{ data?: { highThreshold?: number; mediumThreshold?: number; tag?: string } & JsonValue }>(
+    "/admin/settings/risk",
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }
+  );
 }
 
 export function blockUser(userId: string) {

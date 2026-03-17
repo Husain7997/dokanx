@@ -160,6 +160,41 @@ export function FinanceLedgerPanel() {
         />
       </div>
 
+      <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            const now = new Date();
+            const day = now.getDay();
+            const diff = (day === 0 ? -6 : 1) - day;
+            const start = new Date(now);
+            start.setDate(now.getDate() + diff);
+            const end = new Date(start);
+            end.setDate(start.getDate() + 6);
+            setRangePreset("THIS_WEEK");
+            setFromDate(start.toISOString().slice(0, 10));
+            setToDate(end.toISOString().slice(0, 10));
+          }}
+        >
+          This week
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            const now = new Date();
+            const start = new Date(now.getFullYear(), now.getMonth(), 1);
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            setRangePreset("THIS_MONTH");
+            setFromDate(start.toISOString().slice(0, 10));
+            setToDate(end.toISOString().slice(0, 10));
+          }}
+        >
+          This month
+        </Button>
+      </div>
+
       <div className="mt-3 text-xs text-muted-foreground">
         Showing {filteredSettlements.length} of {settlements.length} settlements
       </div>

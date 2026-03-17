@@ -7,6 +7,7 @@ const allowRoles = require("../middlewares/allowRoles");
 const adminController = require("../controllers/admin.controller");
 const reviewController = require("../controllers/admin/review.controller");
 const settingsController = require("../controllers/settings.controller");
+const analyticsController = require("../controllers/admin/analytics.controller");
 
 // ❗❗ খুব গুরুত্বপূর্ণ: function হিসেবে পাঠাচ্ছি
 router.get("/users",
@@ -90,6 +91,26 @@ router.put("/settings/eta",
   protect,
   allowRoles("ADMIN"),
   settingsController.updateEtaSettings
+);
+
+router.put("/settings/risk",
+  protect,
+  allowRoles("ADMIN"),
+  settingsController.updateRiskSettings
+);
+
+router.get(
+  "/analytics/overview",
+  protect,
+  allowRoles("ADMIN"),
+  analyticsController.getOverview
+);
+
+router.post(
+  "/analytics/build",
+  protect,
+  allowRoles("ADMIN"),
+  analyticsController.buildPlatformWarehouse
 );
 
 module.exports = router;
