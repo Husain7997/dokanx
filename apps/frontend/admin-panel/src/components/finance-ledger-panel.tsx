@@ -163,12 +163,29 @@ export function FinanceLedgerPanel() {
               const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
               setFromDate(start.toISOString().slice(0, 10));
               setToDate(end.toISOString().slice(0, 10));
+            } else if (value === "LAST_QUARTER") {
+              const now = new Date();
+              const currentQuarter = Math.floor(now.getMonth() / 3);
+              const startMonth = (currentQuarter - 1 + 4) % 4 * 3;
+              const startYear = currentQuarter === 0 ? now.getFullYear() - 1 : now.getFullYear();
+              const start = new Date(startYear, startMonth, 1);
+              const end = new Date(startYear, startMonth + 3, 0);
+              setFromDate(start.toISOString().slice(0, 10));
+              setToDate(end.toISOString().slice(0, 10));
+            } else if (value === "LAST_YEAR") {
+              const year = new Date().getFullYear() - 1;
+              const start = new Date(year, 0, 1);
+              const end = new Date(year, 11, 31);
+              setFromDate(start.toISOString().slice(0, 10));
+              setToDate(end.toISOString().slice(0, 10));
             }
           }}
           options={[
             { label: "Custom", value: "CUSTOM" },
             { label: "Last 7 days", value: "LAST_7" },
             { label: "Last 30 days", value: "LAST_30" },
+            { label: "Last quarter", value: "LAST_QUARTER" },
+            { label: "Last year", value: "LAST_YEAR" },
             { label: "This week", value: "THIS_WEEK" },
             { label: "This month", value: "THIS_MONTH" },
           ]}
@@ -219,6 +236,37 @@ export function FinanceLedgerPanel() {
           }}
         >
           This month
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            const now = new Date();
+            const currentQuarter = Math.floor(now.getMonth() / 3);
+            const startMonth = (currentQuarter - 1 + 4) % 4 * 3;
+            const startYear = currentQuarter === 0 ? now.getFullYear() - 1 : now.getFullYear();
+            const start = new Date(startYear, startMonth, 1);
+            const end = new Date(startYear, startMonth + 3, 0);
+            setRangePreset("LAST_QUARTER");
+            setFromDate(start.toISOString().slice(0, 10));
+            setToDate(end.toISOString().slice(0, 10));
+          }}
+        >
+          Last quarter
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            const year = new Date().getFullYear() - 1;
+            const start = new Date(year, 0, 1);
+            const end = new Date(year, 11, 31);
+            setRangePreset("LAST_YEAR");
+            setFromDate(start.toISOString().slice(0, 10));
+            setToDate(end.toISOString().slice(0, 10));
+          }}
+        >
+          Last year
         </Button>
       </div>
 
@@ -349,6 +397,17 @@ function inferPreset(fromDate: string, toDate: string) {
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
   if (iso(start) === iso(monthStart) && iso(end) === iso(monthEnd)) return "THIS_MONTH";
+
+  const currentQuarter = Math.floor(today.getMonth() / 3);
+  const lastQuarterStartMonth = (currentQuarter - 1 + 4) % 4 * 3;
+  const lastQuarterYear = currentQuarter === 0 ? today.getFullYear() - 1 : today.getFullYear();
+  const lastQuarterStart = new Date(lastQuarterYear, lastQuarterStartMonth, 1);
+  const lastQuarterEnd = new Date(lastQuarterYear, lastQuarterStartMonth + 3, 0);
+  if (iso(start) === iso(lastQuarterStart) && iso(end) === iso(lastQuarterEnd)) return "LAST_QUARTER";
+
+  const lastYearStart = new Date(today.getFullYear() - 1, 0, 1);
+  const lastYearEnd = new Date(today.getFullYear() - 1, 11, 31);
+  if (iso(start) === iso(lastYearStart) && iso(end) === iso(lastYearEnd)) return "LAST_YEAR";
 
   return null;
 }

@@ -97,6 +97,14 @@ export default function OrderDetailPage({ params }: { params: { orderId: string 
     [auditLogs, orderId]
   );
 
+  const refundTimeline = useMemo(
+    () =>
+      auditLogs.filter(
+        (log) => log.action === "ORDER_REFUND_APPROVED" && String(log.targetId || "") === orderId
+      ),
+    [auditLogs, orderId]
+  );
+
   const disputeStatusOptions = [
     { label: "None", value: "NONE" },
     { label: "Open", value: "OPEN" },
@@ -300,6 +308,22 @@ export default function OrderDetailPage({ params }: { params: { orderId: string 
             </div>
           ))}
           {!disputeTimeline.length ? <p>No dispute updates yet.</p> : null}
+        </div>
+      </Card>
+
+      <Card>
+        <CardTitle>Refund audit log</CardTitle>
+        <CardDescription className="mt-2">Refund approvals tied to this order</CardDescription>
+        <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
+          {refundTimeline.map((log) => (
+            <div key={String(log._id)} className="flex flex-wrap justify-between gap-2 rounded-2xl border border-border/60 px-4 py-3">
+              <span>{log.createdAt ? new Date(log.createdAt).toLocaleString() : "Update"}</span>
+              <span>{log.performedBy?.name || log.performedBy?.email || "Admin"}</span>
+              <span>{String((log.meta as Record<string, unknown>)?.amount || "")} BDT</span>
+              <span>{String((log.meta as Record<string, unknown>)?.reason || "")}</span>
+            </div>
+          ))}
+          {!refundTimeline.length ? <p>No refund approvals logged yet.</p> : null}
         </div>
       </Card>
     </div>

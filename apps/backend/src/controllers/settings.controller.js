@@ -6,18 +6,60 @@ const {
 } = require("../utils/eta.util");
 
 const RISK_SETTINGS_KEY = "SECURITY_RISK_RULES";
+const ADMIN_THRESHOLD_SETTINGS_KEY = "ADMIN_THRESHOLD_RULES";
 const DEFAULT_RISK_SETTINGS = {
   highThreshold: 80,
   mediumThreshold: 50,
   tag: "Security",
 };
 
+const DEFAULT_THRESHOLD_SETTINGS = {
+  warningStart: 1.2,
+  warningEnd: 1.6,
+  criticalStart: 1.6,
+  criticalEnd: 2.2,
+};
+
 function normalizeRiskSettings(payload = {}) {
-  return {
-    highThreshold: Number(payload.highThreshold ?? DEFAULT_RISK_SETTINGS.highThreshold),
-    mediumThreshold: Number(payload.mediumThreshold ?? DEFAULT_RISK_SETTINGS.mediumThreshold),
-    tag: String(payload.tag ?? DEFAULT_RISK_SETTINGS.tag),
-  };
+  const highThreshold = Number(payload.highThreshold ?? DEFAULT_RISK_SETTINGS.highThreshold);
+  const mediumThreshold = Number(payload.mediumThreshold ?? DEFAULT_RISK_SETTINGS.mediumThreshold);
+  const tag = String(payload.tag ?? DEFAULT_RISK_SETTINGS.tag);
+  return { highThreshold, mediumThreshold, tag };
+}
+
+function validateRiskSettings(payload = {}) {
+  const { highThreshold, mediumThreshold, tag } = payload;
+  const errors = [];
+  if (!Number.isFinite(highThreshold) || highThreshold < 0 || highThreshold > 100) {
+    errors.push("highThreshold must be between 0 and 100");
+  }
+  if (!Number.isFinite(mediumThreshold) || mediumThreshold < 0 || mediumThreshold > 100) {
+    errors.push("mediumThreshold must be between 0 and 100");
+  }
+  if (Number.isFinite(highThreshold) && Number.isFinite(mediumThreshold) && highThreshold < mediumThreshold) {
+    errors.push("highThreshold must be >= mediumThreshold");
+  }
+  if (typeof tag !== "string" || tag.trim().length < 2 || tag.length > 24) {
+    errors.push("tag must be 2-24 characters");
+  }
+  return errors;
+}
+
+function normalizeThresholdSettings(payload = {}) {
+  const warningStart = Number(payload.warningStart ?? DEFAULT_THRESHOLD_SETTINGS.warningStart);
+  const warningEnd = Number(payload.warningEnd ?? DEFAULT_THRESHOLD_SETTINGS.warningEnd);
+  const criticalStart = Number(payload.criticalStart ?? DEFAULT_THRESHOLD_SETTINGS.criticalStart);
+  const criticalEnd = Number(payload.criticalEnd ?? DEFAULT_THRESHOLD_SETTINGS.criticalEnd);
+
+  if (![warningStart, warningEnd, criticalStart, criticalEnd].every((value) => Number.isFinite(value) && value > 0)) {
+    throw new Error("Threshold values must be positive numbers.");
+  }
+
+  if (!(warningStart <= warningEnd && warningEnd <= criticalStart && criticalStart <= criticalEnd)) {
+    throw new Error("Thresholds must be ordered: warningStart ≤ warningEnd ≤ criticalStart ≤ criticalEnd.");
+  }
+
+  return { warningStart, warningEnd, criticalStart, criticalEnd };
 }
 
 exports.getEtaSettings = async (_req, res) => {
@@ -44,10 +86,42 @@ exports.getRiskSettings = async (_req, res) => {
 
 exports.updateRiskSettings = async (req, res) => {
   const payload = normalizeRiskSettings(req.body || {});
+  const errors = validateRiskSettings(payload);
+  if (errors.length) {
+    return res.status(400).json({ message: "Invalid risk settings", errors });
+  }
   const updated = await SystemSetting.findOneAndUpdate(
     { key: RISK_SETTINGS_KEY },
     { value: payload, updatedBy: req.user?._id },
     { new: true, upsert: true }
   ).lean();
   res.json({ message: "Risk settings updated", data: updated?.value || payload });
+};
+
+exports.getThresholdSettings = async (_req, res) => {
+  const setting = await SystemSetting.findOne({ key: ADMIN_THRESHOLD_SETTINGS_KEY }).lean();
+  const value = setting?.value ? normalizeThresholdSettings(setting.value) : DEFAULT_THRESHOLD_SETTINGS;
+  res.json({ data: value });
+};
+
+exports.updateThresholdSettings = async (req, res) => {
+  let payload;
+  try {
+    payload = normalizeThresholdSettings(req.body || {});
+  } catch (error) {
+    return res.status(400).json({ message: error instanceof Error ? error.message : "Invalid threshold payload." });
+  }
+
+  const updated = await SystemSetting.findOneAndUpdate(
+    { key: ADMIN_THRESHOLD_SETTINGS_KEY },
+    { value: payload, updatedBy: req.user?._id },
+    { new: true, upsert: true }
+  ).lean();
+
+  console.info("Admin threshold settings updated", {
+    actor: req.user?._id,
+    payload
+  });
+
+  res.json({ message: "Threshold settings updated", data: updated?.value || payload });
 };
