@@ -35,6 +35,8 @@ const { startAnalyticsWarehouseCron } =
   require("../jobs/analyticsWarehouse.job");
 const { startAnalyticsEventCleanupCron } =
   require("../jobs/analyticsEventCleanup.job");
+const { startAiFeatureSnapshotCron } =
+  require("../jobs/aiFeatureSnapshot.job");
  
 
   const {
@@ -66,6 +68,7 @@ function registerWorkers() {
   startSearchReindexCron();
   startAnalyticsWarehouseCron();
   startAnalyticsEventCleanupCron();
+  startAiFeatureSnapshotCron();
  /* ---------- SYSTEM AGENTS ---------- */
     startRecoveryWorker();
     startAIObserver();

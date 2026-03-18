@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnalyticsCards, Card, CardDescription, CardTitle, SalesChart } from "@dokanx/ui";
 
-import { getAdminKpi, getAdminMetrics, getFinanceKpis, getRevenueVsPayout, getSystemHealth, listAdminUsers, listMerchants, listOrders } from "@/lib/admin-runtime-api";
+import { getAdminAnalyticsOverview, getAdminKpi, getAdminMetrics, getAiMerchantInsights, getAiTrending, getFinanceKpis, getRevenueVsPayout, getSystemHealth, listAdminUsers, listMerchants, listOrders } from "@/lib/admin-runtime-api";
 
 type MetricsState = {
   shops?: number;
@@ -31,6 +31,15 @@ export default function DashboardPage() {
   const [merchantsCount, setMerchantsCount] = useState<number>(0);
   const [orders, setOrders] = useState<Array<{ _id?: string; status?: string; totalAmount?: number; createdAt?: string }>>([]);
   const [trend, setTrend] = useState<Array<{ label: string; value: number }>>([]);
+  const [warehouseTrend, setWarehouseTrend] = useState<Array<{ label: string; value: number }>>([]);
+  const [overview, setOverview] = useState<{
+    wallet?: { net?: number };
+    shipments?: { successRate?: number };
+    inventory?: { lowStockCount?: number };
+    categorySplit?: Array<{ category?: string; revenue?: number }>;
+  } | null>(null);
+  const [aiInsights, setAiInsights] = useState<Array<{ id?: string; title?: string; message?: string; badge?: string }>>([]);
+  const [aiTrending, setAiTrending] = useState<Array<{ name?: string; velocity?: number; changeLabel?: string }>>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -46,6 +55,9 @@ export default function DashboardPage() {
           merchantsResponse,
           ordersResponse,
           revenueResponse,
+          overviewResponse,
+          aiInsightsResponse,
+          aiTrendingResponse,
         ] = await Promise.all([
           getAdminMetrics(),
           getAdminKpi(),
@@ -55,6 +67,9 @@ export default function DashboardPage() {
           listMerchants(),
           listOrders(),
           getRevenueVsPayout(),
+          getAdminAnalyticsOverview(),
+          getAiMerchantInsights(),
+          getAiTrending({ limit: 5 }),
         ]);
         if (!active) return;
         setMetrics(metricsResponse || null);
@@ -71,6 +86,18 @@ export default function DashboardPage() {
             }))
           : [];
         setTrend(revenueSeries);
+        setOverview(overviewResponse.data || null);
+        const daily = Array.isArray(overviewResponse.data?.dailySales)
+          ? overviewResponse.data?.dailySales
+          : [];
+        setWarehouseTrend(
+          daily.map((row) => ({
+            label: row.date || "Day",
+            value: Number(row.gmv || 0),
+          }))
+        );
+        setAiInsights(Array.isArray(aiInsightsResponse.data) ? aiInsightsResponse.data : []);
+        setAiTrending(Array.isArray(aiTrendingResponse.data) ? aiTrendingResponse.data : []);
       } catch (err) {
         if (!active) return;
         setError(err instanceof Error ? err.message : "Unable to load dashboard.");
@@ -83,6 +110,7 @@ export default function DashboardPage() {
   }, []);
 
   const cards = useMemo(() => {
+    const topCategory = overview?.categorySplit?.[0]?.category || "N/A";
     return [
       { label: "Total users", value: String(usersCount), meta: "Platform accounts" },
       { label: "Total merchants", value: String(merchantsCount), meta: "Verified sellers" },
@@ -90,9 +118,25 @@ export default function DashboardPage() {
       { label: "Total revenue", value: `${kpis?.revenue ?? 0} BDT`, meta: "Gross sales" },
       { label: "Wallet txns", value: String(finance?.totalSettlements ?? 0), meta: "Settlement cycles" },
       { label: "Active stores", value: String(metrics?.shops ?? 0), meta: "Active storefronts" },
+      { label: "Wallet net", value: `${overview?.wallet?.net ?? 0} BDT`, meta: "Credits - debits" },
+      { label: "Courier success", value: `${Math.round((overview?.shipments?.successRate ?? 0) * 100)}%`, meta: "Delivered / shipments" },
+      { label: "Low stock", value: String(overview?.inventory?.lowStockCount ?? 0), meta: "Inventory watch" },
+      { label: "Top category", value: topCategory, meta: "By revenue" },
       { label: "System health", value: String(health?.status || "Unknown"), meta: "Runtime status" },
     ];
-  }, [finance?.totalSettlements, health?.status, kpis?.revenue, merchantsCount, metrics?.orders, metrics?.shops, usersCount]);
+  }, [
+    finance?.totalSettlements,
+    health?.status,
+    kpis?.revenue,
+    merchantsCount,
+    metrics?.orders,
+    metrics?.shops,
+    overview?.categorySplit,
+    overview?.inventory?.lowStockCount,
+    overview?.shipments?.successRate,
+    overview?.wallet?.net,
+    usersCount,
+  ]);
 
   return (
     <div className="grid gap-6">
@@ -117,6 +161,13 @@ export default function DashboardPage() {
           </div>
         </Card>
         <Card>
+          <CardTitle>Warehouse GMV</CardTitle>
+          <CardDescription className="mt-2">Daily sales from warehouse snapshots.</CardDescription>
+          <div className="mt-6">
+            <SalesChart data={warehouseTrend.length ? warehouseTrend : [{ label: "No data", value: 0 }]} />
+          </div>
+        </Card>
+        <Card>
           <CardTitle>Recent orders</CardTitle>
           <CardDescription className="mt-2">Latest platform transactions.</CardDescription>
           <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
@@ -129,6 +180,33 @@ export default function DashboardPage() {
               </div>
             ))}
             {!orders.length ? <p>No orders yet.</p> : null}
+          </div>
+        </Card>
+        <Card>
+          <CardTitle>AI signals</CardTitle>
+          <CardDescription className="mt-2">Explainable fraud, demand, and customer risk summaries.</CardDescription>
+          <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
+            {aiInsights.slice(0, 5).map((item) => (
+              <div key={String(item.id)} className="rounded-2xl border border-border/60 px-4 py-3">
+                <p className="font-medium text-foreground">{item.title || "Insight"}</p>
+                <p className="mt-1">{item.message || "No details available."}</p>
+              </div>
+            ))}
+            {!aiInsights.length ? <p>No AI insights available yet.</p> : null}
+          </div>
+        </Card>
+        <Card>
+          <CardTitle>Trending demand</CardTitle>
+          <CardDescription className="mt-2">Products with the highest short-term demand velocity.</CardDescription>
+          <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
+            {aiTrending.slice(0, 5).map((item) => (
+              <div key={String(item.name)} className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 px-4 py-3">
+                <span>{item.name || "Product"}</span>
+                <span>v{Number(item.velocity || 0).toFixed(2)}</span>
+                <span>{item.changeLabel || "steady"}</span>
+              </div>
+            ))}
+            {!aiTrending.length ? <p>No trending demand signals available.</p> : null}
           </div>
         </Card>
       </div>
