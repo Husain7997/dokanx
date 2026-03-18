@@ -1,5 +1,7 @@
 const { processOutbox } =
   require("../jobs/outbox.worker");
+require("../jobs/notification.worker");
+require("../jobs/webhook.worker");
 
 
 
@@ -29,6 +31,10 @@ const { startSearchReindexCron } =
 const { runShippingSync } =
   require("../jobs/shippingSync.job");
 
+const { startAnalyticsWarehouseCron } =
+  require("../jobs/analyticsWarehouse.job");
+const { startAnalyticsEventCleanupCron } =
+  require("../jobs/analyticsEventCleanup.job");
  
 
   const {
@@ -58,6 +64,8 @@ function registerWorkers() {
 
   startSnapshotWorker();
   startSearchReindexCron();
+  startAnalyticsWarehouseCron();
+  startAnalyticsEventCleanupCron();
  /* ---------- SYSTEM AGENTS ---------- */
     startRecoveryWorker();
     startAIObserver();

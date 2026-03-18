@@ -8,6 +8,9 @@ const adminController = require("../controllers/admin.controller");
 const reviewController = require("../controllers/admin/review.controller");
 const settingsController = require("../controllers/settings.controller");
 const analyticsController = require("../controllers/admin/analytics.controller");
+const recommendationController = require("../controllers/admin/recommendation.controller");
+const fraudController = require("../controllers/admin/fraud.controller");
+const apiKeyAdminController = require("../controllers/admin/api-key.admin.controller");
 
 // ❗❗ খুব গুরুত্বপূর্ণ: function হিসেবে পাঠাচ্ছি
 router.get("/users",
@@ -63,10 +66,46 @@ router.get("/merchants",
   adminController.listMerchants
 );
 
+router.get("/fraud/overview",
+  protect,
+  allowRoles("ADMIN"),
+  fraudController.getOverview
+);
+
+router.get("/fraud/alerts",
+  protect,
+  allowRoles("ADMIN"),
+  fraudController.getAlerts
+);
+
+router.get("/fraud/reports",
+  protect,
+  allowRoles("ADMIN"),
+  fraudController.getReports
+);
+
+router.post("/fraud/check-transaction",
+  protect,
+  allowRoles("ADMIN"),
+  fraudController.checkTransaction
+);
+
+router.post("/fraud/review",
+  protect,
+  allowRoles("ADMIN"),
+  fraudController.reviewCase
+);
+
 router.get("/shops",
   protect,
   allowRoles("ADMIN"),
   adminController.listShops
+);
+
+router.post("/keys/migrate",
+  protect,
+  allowRoles("ADMIN"),
+  apiKeyAdminController.migrateLegacyKey
 );
 
 router.get("/reviews",
@@ -99,6 +138,12 @@ router.put("/settings/risk",
   settingsController.updateRiskSettings
 );
 
+router.put("/settings/thresholds",
+  protect,
+  allowRoles("ADMIN"),
+  settingsController.updateThresholdSettings
+);
+
 router.get(
   "/analytics/overview",
   protect,
@@ -111,6 +156,13 @@ router.post(
   protect,
   allowRoles("ADMIN"),
   analyticsController.buildPlatformWarehouse
+);
+
+router.get(
+  "/recommendations/metrics",
+  protect,
+  allowRoles("ADMIN"),
+  recommendationController.getRecommendationMetrics
 );
 
 module.exports = router;

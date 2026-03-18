@@ -21,6 +21,26 @@ const oauthAppSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    webhookSecretHash: {
+      type: String,
+      default: null,
+    },
+    sandboxMode: {
+      type: Boolean,
+      default: false,
+    },
+    ipWhitelist: {
+      type: [String],
+      default: [],
+    },
+    rateLimitPerMinute: {
+      type: Number,
+      default: 60,
+    },
+    rateLimitPerDay: {
+      type: Number,
+      default: 5000,
+    },
     clientId: {
       type: String,
       required: true,
@@ -33,7 +53,7 @@ const oauthAppSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["ACTIVE", "SUSPENDED"],
+      enum: ["ACTIVE", "SUSPENDED", "DRAFT"],
       default: "ACTIVE",
     },
   },

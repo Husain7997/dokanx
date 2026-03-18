@@ -4,14 +4,16 @@ const Inventory = require("../models/Inventory.model");
 const User = require("../models/user.model");
 const Wallet = require("../models/wallet.model");
 const PaymentAttempt = require("../models/paymentAttempt.model");
-const Order = require("../models/order.model");
 const { creditWallet, debitWallet } = require("../services/wallet.service");
 const { randomToken } = require("../utils/crypto.util");
 const mongoose = require("mongoose");
 const { dispatchWebhooks } = require("../services/webhook.service");
+const { resolveShopId } = require("../utils/order-normalization.util");
+const { simulatePaymentAttempt, enqueueSandboxLifecycle } = require("../modules/sandbox-engine/sandbox.service");
+const { recordPlatformAudit } = require("../modules/platform-hardening/platform-audit.service");
 
 exports.listProducts = async (req, res) => {
-  const { shopId } = req.query;
+  const shopId = req.platformContext?.shopId || req.query.shopId;
   const filter = {};
   if (shopId) filter.shopId = shopId;
   const products = await Product.find(filter).lean();
@@ -25,7 +27,8 @@ exports.getProduct = async (req, res) => {
 };
 
 exports.createOrder = async (req, res) => {
-  const { shopId, items, totalAmount, contact } = req.body || {};
+  const { items, totalAmount, contact } = req.body || {};
+  const shopId = req.platformContext?.shopId || req.body?.shopId;
   if (!shopId || !Array.isArray(items) || !items.length) {
     return res.status(400).json({ message: "shopId and items required" });
   }
@@ -49,29 +52,59 @@ exports.createOrder = async (req, res) => {
     totalAmount,
     isGuest: true,
     contact: contact || {},
+    trafficType: req.body?.trafficType || "marketplace",
+    metadata: {
+      ...(req.body?.metadata || {}),
+      publicApi: true,
+      sandboxMode: Boolean(req.platformContext?.sandboxMode),
+      appId: req.platformContext?.appId || null,
+    },
   });
 
   await dispatchWebhooks("order.created", { orderId: order._id, shopId });
+  if (req.platformContext?.sandboxMode) {
+    await enqueueSandboxLifecycle({
+      orderId: order._id,
+      shopId,
+      simulation: String(req.body?.sandboxScenario || "success"),
+    });
+  }
 
   res.status(201).json({ data: order });
 };
 
 exports.listCustomers = async (req, res) => {
-  const { shopId } = req.query;
+  const shopId = req.platformContext?.shopId || req.query.shopId;
   if (!shopId) return res.status(400).json({ message: "shopId required" });
   const users = await User.find({ role: "CUSTOMER", shopId }).select("name email phone").lean();
   res.json({ data: users });
 };
 
+exports.listOrders = async (req, res) => {
+  const shopId = req.platformContext?.shopId || req.query.shopId;
+  if (!shopId) return res.status(400).json({ message: "shopId required" });
+  const orders = await Order.find({ shopId }).sort({ createdAt: -1 }).limit(100).lean();
+  res.json({ data: orders });
+};
+
+exports.listShops = async (req, res) => {
+  const Shop = require("../models/shop.model");
+  const filter = {};
+  const shopId = req.platformContext?.shopId || req.query.shopId;
+  if (shopId) filter._id = shopId;
+  const shops = await Shop.find(filter).select("name slug domain isActive commissionRate").lean();
+  res.json({ data: shops });
+};
+
 exports.listInventory = async (req, res) => {
-  const { shopId } = req.query;
+  const shopId = req.platformContext?.shopId || req.query.shopId;
   if (!shopId) return res.status(400).json({ message: "shopId required" });
   const items = await Inventory.find({ shopId }).lean();
   res.json({ data: items });
 };
 
 exports.getWalletSummary = async (req, res) => {
-  const { shopId } = req.query;
+  const shopId = req.platformContext?.shopId || req.query.shopId;
   if (!shopId) return res.status(400).json({ message: "shopId required" });
 
   const wallet = await Wallet.findOne({ shopId }).lean();
@@ -81,7 +114,8 @@ exports.getWalletSummary = async (req, res) => {
 };
 
 exports.creditWallet = async (req, res) => {
-  const { shopId, amount, referenceId } = req.body || {};
+  const { amount, referenceId } = req.body || {};
+  const shopId = req.platformContext?.shopId || req.body?.shopId;
   if (!shopId || !amount) return res.status(400).json({ message: "shopId and amount required" });
 
   const result = await creditWallet({
@@ -90,17 +124,48 @@ exports.creditWallet = async (req, res) => {
     referenceId: referenceId || `api-credit-${Date.now()}`,
   });
 
+  await recordPlatformAudit({
+    action: "PUBLIC_API_WALLET_CREDIT",
+    category: "financial_action",
+    actorType: req.platformContext?.authType || "api_key",
+    actorId: req.platformContext?.developerId || null,
+    shopId,
+    appId: req.platformContext?.appId || null,
+    apiKeyId: req.platformContext?.apiKeyId || null,
+    method: req.method,
+    path: req.originalUrl,
+    statusCode: 200,
+    ip: req.platformContext?.clientIp || null,
+    metadata: { amount },
+  });
+
   res.json({ message: "Wallet credited", data: result });
 };
 
 exports.debitWallet = async (req, res) => {
-  const { shopId, amount, referenceId } = req.body || {};
+  const { amount, referenceId } = req.body || {};
+  const shopId = req.platformContext?.shopId || req.body?.shopId;
   if (!shopId || !amount) return res.status(400).json({ message: "shopId and amount required" });
 
   await debitWallet({
     shopId,
     amount,
     referenceId: referenceId || `api-debit-${Date.now()}`,
+  });
+
+  await recordPlatformAudit({
+    action: "PUBLIC_API_WALLET_DEBIT",
+    category: "financial_action",
+    actorType: req.platformContext?.authType || "api_key",
+    actorId: req.platformContext?.developerId || null,
+    shopId,
+    appId: req.platformContext?.appId || null,
+    apiKeyId: req.platformContext?.apiKeyId || null,
+    method: req.method,
+    path: req.originalUrl,
+    statusCode: 200,
+    ip: req.platformContext?.clientIp || null,
+    metadata: { amount },
   });
 
   res.json({ message: "Wallet debited" });
@@ -112,6 +177,7 @@ exports.initiatePayment = async (req, res) => {
 
   const order = await Order.findById(orderId);
   if (!order) return res.status(404).json({ message: "Order not found" });
+  const shopId = resolveShopId(order);
 
   const attempt = await PaymentAttempt.findOne({
     order: orderId,
@@ -128,16 +194,24 @@ exports.initiatePayment = async (req, res) => {
   }
 
   const providerPaymentId = `pay_${new mongoose.Types.ObjectId()}`;
+  const provider = req.platformContext?.sandboxMode ? "sandbox" : "public";
   const created = await PaymentAttempt.create({
     order: orderId,
-    shopId: order.shopId,
+    shopId,
     amount: order.totalAmount,
-    provider: "public",
-    gateway: "public",
+    provider,
+    gateway: provider,
     providerPaymentId,
     status: "PENDING",
     processed: false,
   });
+
+  if (req.platformContext?.sandboxMode) {
+    await simulatePaymentAttempt({
+      attemptId: created._id,
+      mode: String(req.body?.sandboxPaymentResult || "success"),
+    });
+  }
 
   res.status(201).json({
     data: {

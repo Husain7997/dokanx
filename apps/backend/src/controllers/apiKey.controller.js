@@ -20,17 +20,26 @@ exports.createKey = async (req, res) => {
   const developer = await Developer.findOne({ userId: req.user._id });
   if (!developer) return res.status(404).json({ message: "Developer profile not found" });
 
-  const { name, permissions, usageLimit, appId } = req.body || {};
+  const { name, permissions, usageLimit, appId, sandboxMode, ipWhitelist, rateLimitPerMinute, rateLimitPerDay, shopId } = req.body || {};
   const rawKey = `dkx_${randomToken(24)}`;
   const keyHash = hashSecret(rawKey);
+  const isLegacy = !appId && !shopId;
 
   const key = await ApiKey.create({
     developerId: developer._id,
     appId: appId || null,
+    legacy: isLegacy,
+    migrationStatus: isLegacy ? "legacy" : "migrated",
+    migratedAt: isLegacy ? null : new Date(),
     name: name || "Default key",
     keyHash,
     keyPreview: buildPreview(rawKey),
     permissions: Array.isArray(permissions) ? permissions : [],
+    shopId: shopId || null,
+    sandboxMode: Boolean(sandboxMode),
+    ipWhitelist: Array.isArray(ipWhitelist) ? ipWhitelist : [],
+    rateLimitPerMinute: Number(rateLimitPerMinute || 60),
+    rateLimitPerDay: Number(rateLimitPerDay || 5000),
     usageLimit: usageLimit ?? null,
     usageRemaining: usageLimit ?? null,
   });

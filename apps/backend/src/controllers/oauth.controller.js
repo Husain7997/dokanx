@@ -2,6 +2,7 @@ const Developer = require("../models/developer.model");
 const OAuthApp = require("../models/oauthApp.model");
 const OAuthAuthCode = require("../models/oauthAuthCode.model");
 const OAuthToken = require("../models/oauthToken.model");
+const ApiKey = require("../models/apiKey.model");
 const { hashSecret, randomToken } = require("../utils/crypto.util");
 const { createAudit } = require("../utils/audit.util");
 
@@ -12,6 +13,11 @@ const DEFAULT_SCOPES = [
   "write_orders",
   "read_customers",
   "write_customers",
+  "read_shops",
+  "manage_payments",
+  "read_shipping",
+  "read_wallet",
+  "write_wallet",
   "read_inventory",
   "write_inventory",
 ];
@@ -28,12 +34,15 @@ exports.createApp = async (req, res) => {
   const developer = await Developer.findOne({ userId: req.user._id });
   if (!developer) return res.status(404).json({ message: "Developer profile not found" });
 
-  const { name, description, redirectUris, scopes } = req.body || {};
+  const { name, description, redirectUris, scopes, sandboxMode, ipWhitelist, rateLimitPerMinute, rateLimitPerDay } = req.body || {};
   if (!name) return res.status(400).json({ message: "App name is required" });
 
   const clientId = `dkx_app_${randomToken(16)}`;
   const clientSecret = `dkx_secret_${randomToken(24)}`;
+  const webhookSecret = `whsec_${randomToken(20)}`;
+  const apiKeySecret = `dkx_${randomToken(24)}`;
   const clientSecretHash = hashSecret(clientSecret);
+  const webhookSecretHash = hashSecret(webhookSecret);
 
   const app = await OAuthApp.create({
     developerId: developer._id,
@@ -41,14 +50,38 @@ exports.createApp = async (req, res) => {
     description: description || "",
     redirectUris: Array.isArray(redirectUris) ? redirectUris : [],
     scopes: Array.isArray(scopes) && scopes.length ? scopes : DEFAULT_SCOPES,
+    webhookSecretHash,
+    sandboxMode: Boolean(sandboxMode),
+    ipWhitelist: Array.isArray(ipWhitelist) ? ipWhitelist : [],
+    rateLimitPerMinute: Number(rateLimitPerMinute || 60),
+    rateLimitPerDay: Number(rateLimitPerDay || 5000),
     clientId,
     clientSecretHash,
+  });
+
+  const key = await ApiKey.create({
+    developerId: developer._id,
+    appId: app._id,
+    name: `${name} default key`,
+    keyHash: hashSecret(apiKeySecret),
+    keyPreview: `dkx_***${apiKeySecret.slice(-6)}`,
+    permissions: app.scopes,
+    legacy: false,
+    migrationStatus: "migrated",
+    migratedAt: new Date(),
+    sandboxMode: Boolean(sandboxMode),
+    ipWhitelist: Array.isArray(ipWhitelist) ? ipWhitelist : [],
+    rateLimitPerMinute: Number(rateLimitPerMinute || 60),
+    rateLimitPerDay: Number(rateLimitPerDay || 5000),
   });
 
   res.status(201).json({
     message: "OAuth app created",
     data: app,
     clientSecret,
+    apiKey: apiKeySecret,
+    webhookSecret,
+    key,
   });
 
   await createAudit({
@@ -65,7 +98,7 @@ exports.updateApp = async (req, res) => {
   if (!developer) return res.status(404).json({ message: "Developer profile not found" });
 
   const { appId } = req.params;
-  const { name, description, redirectUris, scopes, status } = req.body || {};
+  const { name, description, redirectUris, scopes, status, sandboxMode, ipWhitelist, rateLimitPerMinute, rateLimitPerDay } = req.body || {};
 
   const app = await OAuthApp.findOneAndUpdate(
     { _id: appId, developerId: developer._id },
@@ -75,6 +108,10 @@ exports.updateApp = async (req, res) => {
       ...(Array.isArray(redirectUris) ? { redirectUris } : {}),
       ...(Array.isArray(scopes) ? { scopes } : {}),
       ...(status ? { status } : {}),
+      ...(typeof sandboxMode === "boolean" ? { sandboxMode } : {}),
+      ...(Array.isArray(ipWhitelist) ? { ipWhitelist } : {}),
+      ...(typeof rateLimitPerMinute === "number" ? { rateLimitPerMinute } : {}),
+      ...(typeof rateLimitPerDay === "number" ? { rateLimitPerDay } : {}),
     },
     { new: true }
   );
@@ -82,6 +119,19 @@ exports.updateApp = async (req, res) => {
   if (!app) return res.status(404).json({ message: "OAuth app not found" });
 
   res.json({ message: "OAuth app updated", data: app });
+
+  if (Array.isArray(scopes) || typeof sandboxMode === "boolean" || Array.isArray(ipWhitelist) || typeof rateLimitPerMinute === "number" || typeof rateLimitPerDay === "number") {
+    await ApiKey.updateMany(
+      { appId: app._id, revokedAt: null },
+      {
+        ...(Array.isArray(scopes) ? { permissions: scopes } : {}),
+        ...(typeof sandboxMode === "boolean" ? { sandboxMode } : {}),
+        ...(Array.isArray(ipWhitelist) ? { ipWhitelist } : {}),
+        ...(typeof rateLimitPerMinute === "number" ? { rateLimitPerMinute } : {}),
+        ...(typeof rateLimitPerDay === "number" ? { rateLimitPerDay } : {}),
+      }
+    );
+  }
 
   await createAudit({
     action: "UPDATE_OAUTH_APP",

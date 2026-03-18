@@ -13,6 +13,20 @@ const schema = new mongoose.Schema(
       ref: "OAuthApp",
       default: null,
     },
+    legacy: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    migrationStatus: {
+      type: String,
+      enum: ["none", "legacy", "migrated"],
+      default: "none",
+    },
+    migratedAt: {
+      type: Date,
+      default: null,
+    },
     name: {
       type: String,
       default: "Default key",
@@ -35,6 +49,27 @@ const schema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    shopId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Shop",
+      default: null,
+    },
+    sandboxMode: {
+      type: Boolean,
+      default: false,
+    },
+    ipWhitelist: {
+      type: [String],
+      default: [],
+    },
+    rateLimitPerMinute: {
+      type: Number,
+      default: 60,
+    },
+    rateLimitPerDay: {
+      type: Number,
+      default: 5000,
+    },
     usageLimit: {
       type: Number,
       default: null,
@@ -45,6 +80,10 @@ const schema = new mongoose.Schema(
     },
     lastUsedAt: {
       type: Date,
+      default: null,
+    },
+    lastUsedIp: {
+      type: String,
       default: null,
     },
     revokedAt: {

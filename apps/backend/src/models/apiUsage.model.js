@@ -25,6 +25,10 @@ const apiUsageSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    lastStatusCode: {
+      type: Number,
+      default: null,
+    },
   },
   { timestamps: true }
 );

@@ -50,7 +50,18 @@ const developerRoutes = require("./developer.routes");
 const oauthRoutes = require("./oauth.routes");
 const marketplaceRoutes = require("./marketplace.routes");
 const publicV1Routes = require("./public/v1.routes");
+const publicGatewayRoutes = require("../modules/api-gateway/api-gateway.routes");
+const appEngineRoutes = require("../modules/app-engine/app-engine.routes");
+const webhookEngineRoutes = require("../modules/webhook-engine/webhook-engine.routes");
 const settingsRoutes = require("./settings.routes");
+const analyticsRoutes = require("./analytics.routes");
+const recommendationRoutes = require("./recommendation.routes");
+const trafficRoutes = require("../modules/traffic-engine/traffic.routes");
+const commissionRoutes = require("../modules/commission-engine/commission.routes");
+const deliveryRoutes = require("../modules/delivery-engine/delivery.routes");
+const creditRoutes = require("../modules/credit-engine/credit.routes");
+const customerRoutes = require("../modules/customer/customer.routes");
+const warrantyRoutes = require("../modules/warranty-engine/warranty.routes");
 
 router.use("/financial-test", require("./financial.test.routes"));
 // ---- Routes ----
@@ -80,7 +91,18 @@ router.use("/developer", developerRoutes);
 router.use("/oauth", oauthRoutes);
 router.use("/marketplace", marketplaceRoutes);
 router.use("/v1", publicV1Routes);
+router.use("/v1/public", publicGatewayRoutes);
+router.use("/", appEngineRoutes);
+router.use("/", webhookEngineRoutes);
 router.use("/settings", settingsRoutes);
+router.use("/analytics", analyticsRoutes);
+router.use("/recommendations", recommendationRoutes);
+router.use("/traffic", trafficRoutes);
+router.use("/admin/commissions", commissionRoutes);
+router.use("/delivery", deliveryRoutes);
+router.use("/credit", creditRoutes);
+router.use("/customers", customerRoutes);
+router.use("/claims", warrantyRoutes);
 
 // temporary dev routes
 router.use("/reports", require("../modules/reporting/report.routes"));

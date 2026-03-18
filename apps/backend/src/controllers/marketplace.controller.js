@@ -3,6 +3,7 @@ const OAuthApp = require("../models/oauthApp.model");
 const AppListing = require("../models/appListing.model");
 const AppInstallation = require("../models/appInstallation.model");
 const AppReview = require("../models/appReview.model");
+const { installApp, uninstallApp } = require("../modules/app-engine/app-engine.service");
 
 exports.listMarketplaceApps = async (_req, res) => {
   const apps = await AppListing.find({ status: "PUBLISHED" }).sort({ createdAt: -1 });
@@ -34,16 +35,31 @@ exports.publishApp = async (req, res) => {
 };
 
 exports.installApp = async (req, res) => {
-  const { appId, shopId } = req.body || {};
+  const { appId, shopId, sandboxMode } = req.body || {};
   if (!appId || !shopId) return res.status(400).json({ message: "appId and shopId required" });
+  if (req.user?.role !== "ADMIN" && String(req.user?.shopId || "") !== String(shopId)) {
+    return res.status(403).json({ message: "Cannot install app for another shop" });
+  }
 
-  const installation = await AppInstallation.findOneAndUpdate(
-    { appId, shopId },
-    { status: "INSTALLED", installedBy: req.user?._id || null },
-    { new: true, upsert: true }
-  );
+  const installation = await installApp({
+    appId,
+    shopId,
+    installedBy: req.user?._id || null,
+    sandboxMode,
+  });
 
   res.json({ message: "App installed", data: installation });
+};
+
+exports.uninstallApp = async (req, res) => {
+  const { appId, shopId } = req.body || {};
+  if (!appId || !shopId) return res.status(400).json({ message: "appId and shopId required" });
+  if (req.user?.role !== "ADMIN" && String(req.user?.shopId || "") !== String(shopId)) {
+    return res.status(403).json({ message: "Cannot uninstall app for another shop" });
+  }
+
+  const installation = await uninstallApp({ appId, shopId });
+  res.json({ message: "App uninstalled", data: installation });
 };
 
 exports.listReviews = async (req, res) => {

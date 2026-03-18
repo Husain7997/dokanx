@@ -22,6 +22,22 @@ const appInstallationSchema = new mongoose.Schema(
       enum: ["INSTALLED", "UNINSTALLED"],
       default: "INSTALLED",
     },
+    scopes: {
+      type: [String],
+      default: [],
+    },
+    sandboxMode: {
+      type: Boolean,
+      default: false,
+    },
+    installedAt: {
+      type: Date,
+      default: null,
+    },
+    uninstalledAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );
