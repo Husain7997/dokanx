@@ -1,9 +1,30 @@
 const mongoose = require("mongoose");
+const { Schema } = mongoose;
+const ObjectId = Schema.Types.ObjectId;
 
 const schema = new mongoose.Schema(
   {
-    shop: ObjectId,
-    customer: ObjectId,
+    shop: {
+      type: ObjectId,
+      ref: "Shop",
+      default: null,
+    },
+    shopId: {
+      type: ObjectId,
+      ref: "Shop",
+      required: true,
+      index: true,
+    },
+    customer: {
+      type: ObjectId,
+      ref: "CustomerIdentity",
+      default: null,
+    },
+    customerId: {
+      type: String,
+      required: true,
+      index: true,
+    },
 
     type: {
       type: String,
@@ -12,13 +33,30 @@ const schema = new mongoose.Schema(
         "PAYMENT_RECEIVED",
         "ADJUSTMENT",
       ],
+      required: true,
     },
 
-    amount: Number,
+    amount: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
 
-    reference: String,
+    status: {
+      type: String,
+      enum: ["PENDING", "POSTED", "VOID"],
+      default: "POSTED",
+    },
 
-    meta: Object,
+    reference: {
+      type: String,
+      default: null,
+    },
+
+    meta: {
+      type: Object,
+      default: {},
+    },
   },
   { timestamps: true }
 );

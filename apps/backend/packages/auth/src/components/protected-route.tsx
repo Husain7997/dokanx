@@ -14,11 +14,11 @@ export function ProtectedRoute({
   const auth = useAuth();
 
   if (auth.status === "restoring") {
-    return fallback;
+    return null;
   }
 
   if (auth.status !== "authenticated") {
-    return fallback;
+    return null;
   }
 
   return <>{children}</>;

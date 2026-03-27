@@ -1,37 +1,39 @@
 export const colors = {
   light: {
-    background: "hsl(36 33% 97%)",
-    foreground: "hsl(222 30% 12%)",
-    surface: "hsl(0 0% 100%)",
-    surfaceMuted: "hsl(32 25% 94%)",
-    border: "hsl(28 17% 84%)",
-    primary: "hsl(18 79% 53%)",
-    primaryForeground: "hsl(36 33% 97%)",
-    secondary: "hsl(212 50% 18%)",
-    secondaryForeground: "hsl(36 33% 97%)",
-    mutedForeground: "hsl(218 14% 41%)",
-    success: "hsl(145 63% 42%)",
-    warning: "hsl(35 92% 52%)",
-    danger: "hsl(0 79% 63%)"
+    primary: "#2563EB",
+    secondary: "#10B981",
+    accent: "#F59E0B",
+    success: "#22C55E",
+    warning: "#F97316",
+    danger: "#EF4444",
+    background: "#F8FAFC",
+    card: "#FFFFFF",
+    border: "#E2E8F0",
+    text: "#111827",
+    mutedText: "#6B7280"
   },
   dark: {
-    background: "hsl(224 29% 8%)",
-    foreground: "hsl(36 33% 97%)",
-    surface: "hsl(223 24% 11%)",
-    surfaceMuted: "hsl(222 22% 15%)",
-    border: "hsl(223 15% 24%)",
-    primary: "hsl(21 95% 58%)",
-    primaryForeground: "hsl(222 30% 12%)",
-    secondary: "hsl(213 27% 90%)",
-    secondaryForeground: "hsl(222 30% 12%)",
-    mutedForeground: "hsl(219 12% 68%)",
-    success: "hsl(145 58% 50%)",
-    warning: "hsl(39 88% 56%)",
-    danger: "hsl(0 85% 67%)"
+    primary: "#2563EB",
+    secondary: "#10B981",
+    accent: "#F59E0B",
+    success: "#22C55E",
+    warning: "#F97316",
+    danger: "#EF4444",
+    background: "#0B1120",
+    card: "#111827",
+    border: "#1F2937",
+    text: "#F8FAFC",
+    mutedText: "#94A3B8"
   }
 } as const;
 
 export const spacing = {
+  xs: "4px",
+  sm: "8px",
+  md: "16px",
+  lg: "24px",
+  xl: "32px",
+  "2xl": "48px",
   0: "0rem",
   1: "0.25rem",
   2: "0.5rem",
@@ -46,8 +48,16 @@ export const spacing = {
 } as const;
 
 export const typography = {
-  fontSans: '"Inter Variable", "Inter", sans-serif',
-  fontDisplay: '"Cal Sans", "Inter Variable", sans-serif',
+  fontPrimary: '"Inter", "Inter Variable", sans-serif',
+  fontSecondary: '"Poppins", "Inter", sans-serif',
+  scale: {
+    headingXl: "2.25rem",
+    headingLg: "1.875rem",
+    headingMd: "1.5rem",
+    bodyLarge: "1.125rem",
+    bodyRegular: "1rem",
+    caption: "0.875rem"
+  },
   sizes: {
     xs: "0.75rem",
     sm: "0.875rem",
@@ -61,10 +71,14 @@ export const typography = {
 } as const;
 
 export const radius = {
-  sm: "0.5rem",
-  md: "0.75rem",
+  small: "6px",
+  medium: "10px",
+  large: "16px",
+  pill: "999px",
+  sm: "0.375rem",
+  md: "0.625rem",
   lg: "1rem",
-  xl: "1.5rem",
+  xl: "1.25rem",
   full: "999px"
 } as const;
 

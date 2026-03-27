@@ -18,8 +18,12 @@ const gateway =
 
 const requestContext =
   require("./middlewares/requestContext");
+const dbAvailability =
+  require("./middlewares/dbAvailability.middleware");
 const tenantResolver =
   require("./middlewares/tenant.middleware");
+const detectTrafficSource =
+  require("./modules/traffic-engine/detectTrafficSource.middleware");
 
 const languageMiddleware =
   require("./middlewares/language.middleware");
@@ -53,12 +57,17 @@ const app = express();
 */
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({
+  verify: (req, _res, buf) => {
+    req.rawBody = buf ? buf.toString("utf8") : "";
+  },
+}));
 
 app.use(requestContext);
 app.use(languageMiddleware);
 app.use(httpLogger);
 app.use(tenantResolver);
+app.use(detectTrafficSource);
 
 app.use(passport.initialize());
 
@@ -81,6 +90,7 @@ app.use("/", healthRoutes);
 |--------------------------------------------------------------------------
 */
 
+app.use(dbAvailability);
 app.use(rateLimiter);
 app.use(gateway);
 

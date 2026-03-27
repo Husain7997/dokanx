@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@dokanx/auth";
 import { getApiBaseUrl } from "@dokanx/utils";
@@ -16,7 +16,7 @@ type ConsentState = {
   state: string | null;
 };
 
-export default function ConsentPage() {
+function ConsentPageContent() {
   const params = useSearchParams();
   const { status } = useAuth();
   const [state, setState] = useState<ConsentState>({
@@ -146,5 +146,13 @@ export default function ConsentPage() {
         </div>
       ) : null}
     </section>
+  );
+}
+
+export default function ConsentPage() {
+  return (
+    <Suspense fallback={<section className="grid gap-6 rounded-3xl border border-white/40 bg-white/70 p-8"><p className="text-sm text-muted-foreground">Loading consent...</p></section>}>
+      <ConsentPageContent />
+    </Suspense>
   );
 }

@@ -27,12 +27,13 @@ async function createUser(overrides = {}) {
   await ensureConnected();
 
   return await User.create({
+    name: overrides.name || `Test User ${Date.now()}`,
     email:
   overrides.email ||
   `user-${Date.now()}-${Math.random().toString(36).slice(2)}@test.com`,
     password: "123456",
     role: overrides.role || USER_ROLES.OWNER,
-
+    customerWallet: overrides.customerWallet || undefined,
   });
 }
 
@@ -67,6 +68,11 @@ async function createShopWallet({ balance = 0 } = {}) {
     balance: balance,
     available_balance: balance,
     withdrawable_balance: balance,
+    balances: {
+      cash: balance,
+      credit: 0,
+      bank: 0,
+    },
     currency: 'BDT',
     status: 'ACTIVE',
   });

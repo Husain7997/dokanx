@@ -7,21 +7,32 @@ const schema = new mongoose.Schema(
       ref: "Shop",
       index: true,
     },
+    shopId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Shop",
+      index: true,
+    },
 
     customer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "CustomerIdentity",
       index: true,
     },
+    customerId: {
+      type: String,
+      index: true,
+    },
 
     outstandingBalance: {
       type: Number,
       default: 0,
+      min: 0,
     },
 
     creditLimit: {
       type: Number,
       default: 0,
+      min: 0,
     },
 
     status: {
@@ -37,3 +48,5 @@ module.exports = mongoose.model(
   "CreditAccount",
   schema
 );
+
+schema.index({ shopId: 1, customerId: 1 }, { unique: true });

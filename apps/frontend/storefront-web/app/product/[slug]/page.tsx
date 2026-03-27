@@ -5,7 +5,8 @@ import { headers } from "next/headers";
 import { ProductPurchasePanel } from "@/components/product-purchase-panel";
 import { ProductReviewsPanel } from "@/components/product-reviews-panel";
 import { StorefrontProductGrid } from "@/components/storefront-product-grid";
-import { getProductBySlug, getProductsData, getShopBySlug } from "@/lib/server-data";
+import { ProductViewTracker } from "@/components/product-view-tracker";
+import { getProductBySlug, getProductRecommendations, getProductsData, getShopBySlug } from "@/lib/server-data";
 import { getTenantConfig } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
@@ -24,13 +25,19 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   }
 
   const shop = product.shopId ? await getShopBySlug(String(product.shopId)) : null;
-  const similarProducts = await getProductsData(tenant, {
+  const recommendations = await getProductRecommendations(tenant, String(product._id || product.id || ""));
+  const fallbackSimilar = await getProductsData(tenant, {
     limit: "8",
     category: product.category || "",
   });
+  const similarProducts =
+    (recommendations.similar_products as typeof fallbackSimilar) || fallbackSimilar.slice(0, 8);
+  const alsoBought = (recommendations.customers_also_bought as typeof fallbackSimilar) || [];
+  const moreFromShop = (recommendations.more_from_this_shop as typeof fallbackSimilar) || [];
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_360px]">
+      <ProductViewTracker productId={String(product._id || product.id || "")} shopId={String(product.shopId || "")} />
       <div className="grid gap-6">
         <Card className="overflow-hidden p-0">
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -119,11 +126,29 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
         </Card>
       </div>
 
-      <div className="lg:col-span-2">
-        <CardTitle>Similar products</CardTitle>
-        <div className="mt-6">
-          <StorefrontProductGrid products={similarProducts.slice(0, 8)} />
+      <div className="lg:col-span-2 grid gap-8">
+        <div>
+          <CardTitle>Similar products</CardTitle>
+          <div className="mt-6">
+            <StorefrontProductGrid products={similarProducts.slice(0, 8)} trackingContext="product-similar" />
+          </div>
         </div>
+        {alsoBought.length ? (
+          <div>
+            <CardTitle>Customers also bought</CardTitle>
+            <div className="mt-6">
+              <StorefrontProductGrid products={alsoBought.slice(0, 8)} trackingContext="product-also-bought" />
+            </div>
+          </div>
+        ) : null}
+        {moreFromShop.length ? (
+          <div>
+            <CardTitle>More from this shop</CardTitle>
+            <div className="mt-6">
+              <StorefrontProductGrid products={moreFromShop.slice(0, 8)} trackingContext="product-more-from-shop" />
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

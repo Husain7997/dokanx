@@ -4,6 +4,10 @@ const shipmentEventSchema = new mongoose.Schema(
   {
     status: String,
     location: String,
+    geo: {
+      lat: Number,
+      lng: Number,
+    },
     message: String,
     timestamp: Date,
   },
@@ -18,7 +22,7 @@ const shipmentSchema = new mongoose.Schema(
     trackingNumber: { type: String, required: true, index: true },
     status: {
       type: String,
-      enum: ["CREATED", "IN_TRANSIT", "DELIVERED", "FAILED"],
+      enum: ["CREATED", "PICKED_UP", "IN_TRANSIT", "OUT_FOR_DELIVERY", "DELIVERED", "FAILED", "RETURNED"],
       default: "CREATED",
     },
     events: { type: [shipmentEventSchema], default: [] },

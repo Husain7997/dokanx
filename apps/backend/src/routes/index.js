@@ -24,12 +24,12 @@ const adminRoutes = require("./admin.routes");
 const paymentRoutes = require("./payment.routes");
 const settlementRoutes = require("./settlement.routes");
 const shopPayoutRoutes = require('./shop/shop.payout.route');
-// const adminRoutes = require('./admin/payout.routes');
 const inventoryRoutes = require('./inventory.routes');    
 const reportRoutes = require("../modules/reporting/report.routes");
 const settlementAdminRoutes = require('./admin/settlement.routes');
 const walletShopRoutes = require('./shop/wallet.routes');
 const walletRoutes = require("./wallet.routes");
+const financeRoutes = require("./finance.routes");
 const adminMetricsRoutes  = require('./admin.metrics.routes');
 const financeAdminRoutes = require('./admin/finance.routes');
 const adjustmentAdminRoutes = require('./admin/adjustment.routes');
@@ -63,9 +63,9 @@ const deliveryRoutes = require("../modules/delivery-engine/delivery.routes");
 const creditRoutes = require("../modules/credit-engine/credit.routes");
 const customerRoutes = require("../modules/customer/customer.routes");
 const warrantyRoutes = require("../modules/warranty-engine/warranty.routes");
+const agentRoutes = require("../modules/agent/agent.routes");
 
 router.use("/financial-test", require("./financial.test.routes"));
-// ---- Routes ----
 router.use("/", meRoutes);
 router.use('/platform', platformRoutes);
 router.use("/auth", authRoutes);
@@ -87,6 +87,7 @@ router.use("/payments", paymentRoutes);
 router.use("/settlements", settlementRoutes);
 router.use("/report", reportRoutes);
 router.use("/wallet", walletRoutes);
+router.use("/finance", financeRoutes);
 router.use("/themes", themeRoutes);
 router.use("/developer", developerRoutes);
 router.use("/oauth", oauthRoutes);
@@ -105,19 +106,12 @@ router.use("/delivery", deliveryRoutes);
 router.use("/credit", creditRoutes);
 router.use("/customers", customerRoutes);
 router.use("/claims", warrantyRoutes);
-
-// temporary dev routes
+router.use("/agents", agentRoutes);
 router.use("/reports", require("../modules/reporting/report.routes"));
 router.use("/dev", require("./dev.routes"));
-
-
-
-// router.use('/admin', adminRoutes);
-
 router.use('/admin/settlements', settlementAdminRoutes);
 router.use('/shop/wallet', walletShopRoutes);
-router.use(
- "/admin",  adminMetricsRoutes);
+router.use("/admin", adminMetricsRoutes);
 router.use('/admin/finance', financeAdminRoutes);
 router.use('/admin/adjustments', adjustmentAdminRoutes);
 router.use('/admin/compliance', complianceAdminRoutes);
@@ -130,13 +124,8 @@ router.use('/admin', walletAdminRoutes);
 router.use('/admin/security', securityAdminRoutes);
 router.use('/admin', productModerationRoutes);
 router.use('/health', healthRoute);
-router.use(
- "/system", systemRoute);
-
-router.use(
- "/inventory", inventoryRoutes);
-router.use(
- "/webhooks",webhookRoutes);
-
+router.use('/system', systemRoute);
+router.use('/inventory', inventoryRoutes);
+router.use('/webhooks',webhookRoutes);
 
 module.exports = router;

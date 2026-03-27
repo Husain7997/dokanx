@@ -1,8 +1,8 @@
 const Settlement = require("../models/settlement.model");
 const Shop = require("../models/shop.model");
-const ShopWallet = require("../models/ShopWallet");
 const { processShopSettlement } = require("../services/settlement.service");
 const { payoutToShop } = require("../services/wallet.service");
+const walletAdapter = require("../services/wallet/walletAdapter.service");
 
 exports.createSettlement = async (req, res) => {
   try {
@@ -12,7 +12,7 @@ exports.createSettlement = async (req, res) => {
     const shop = await Shop.findById(shopId);
     if (!shop) return res.status(404).json({ message: "Shop not found" });
 
-    const wallet = await ShopWallet.findOne({ shopId: shopId });
+    const wallet = await walletAdapter.findOne({ shopId: shopId });
     if (!wallet) return res.status(404).json({ message: "Shop wallet not found" });
 
     const settlement = await Settlement.create({

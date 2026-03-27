@@ -1,27 +1,28 @@
-const express = require("express");
+﻿const express = require("express");
 const router = express.Router();
 
 const productController = require("../controllers/product.controller");
 const { protect } = require("../middlewares");
 const role = require("../middlewares/role.middleware");
 const checkShopOwnership = require("../middlewares/checkShopOwnership");
-// const { resolveShop } = require("../middlewares/shop.middleware");
-console.log("createProduct TYPE:", typeof productController.createProduct);
-console.log("createProduct VALUE:", productController.createProduct);
 
 router.post(
   "/",
-  protect,        // 🔥 MUST FIRST
-  // resolveShop,
+  protect,
   role("OWNER"),
   checkShopOwnership,
   productController.createProduct
 );
 
-router.get(
-  "/",
-  productController.listProducts
+router.post(
+  "/bulk",
+  protect,
+  role("OWNER"),
+  checkShopOwnership,
+  productController.bulkCreateProducts
 );
+
+router.get("/", productController.listProducts);
 
 router.patch(
   "/:productId",
@@ -39,35 +40,17 @@ router.delete(
   productController.deleteProduct
 );
 
-router.get(
-  "/shop/:shopId",
-  productController.getProductsByShop
-);
-
-router.get(
-  "/barcode/:barcode",
-  productController.getProductByBarcode
-);
+router.get("/shop/:shopId", productController.getProductsByShop);
+router.get("/barcode/:barcode", productController.getProductByBarcode);
 
 router.get(
   "/:productId/inventory",
   protect,
-  // resolveShop,
   productController.getProductInventory
 );
 
-router.get(
-  "/:productId/reviews",
-  productController.listProductReviews
-);
+router.get("/:productId/reviews", productController.listProductReviews);
+router.post("/:productId/reviews", productController.createProductReview);
+router.get("/:productId", productController.getProductDetail);
 
-router.post(
-  "/:productId/reviews",
-  productController.createProductReview
-);
-
-router.get(
-  "/:productId",
-  productController.getProductDetail
-);
 module.exports = router;

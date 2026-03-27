@@ -2,6 +2,7 @@ import type { NavigationItem } from "@dokanx/ui";
 
 export const navigation: NavigationItem[] = [
   { href: "/", label: "Home" },
+  { href: "/map", label: "Map" },
   { href: "/products", label: "Products" },
   { href: "/category/featured", label: "Categories" },
   { href: "/shops", label: "Shops" },

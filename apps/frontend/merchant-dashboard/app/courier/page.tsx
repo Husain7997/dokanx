@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Button, Card, CardDescription, CardTitle, CourierTrackingPanel, Input } from "@dokanx/ui";
+import { Alert, Badge, Button, Card, CardDescription, CardTitle, CourierTrackingPanel, TextInput } from "@dokanx/ui";
 
 import { listCarriers, trackShipment } from "@/lib/runtime-api";
 
@@ -74,12 +74,12 @@ export default function CourierPage() {
           Search a shipment tracking number and review recent carrier updates.
         </CardDescription>
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <Input value={trackingNumber} onChange={(event) => setTrackingNumber(event.target.value)} placeholder="Tracking number" />
+          <TextInput value={trackingNumber} onChange={(event) => setTrackingNumber(event.target.value)} placeholder="Tracking number" />
           <Button onClick={() => void handleTrack()} disabled={!trackingNumber}>
             Track
           </Button>
         </div>
-        {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
+        {error ? <Alert variant="error" className="mt-3">{error}</Alert> : null}
       </Card>
       <CourierTrackingPanel
         courier="Carrier status"
@@ -92,7 +92,9 @@ export default function CourierPage() {
           {carriers.map((carrier) => (
             <div key={String(carrier.id || carrier.name)} className="flex items-center justify-between rounded-2xl border border-border/60 px-4 py-3">
               <span>{carrier.name || "Carrier"}</span>
-              <span>{carrier.supportsTracking ? "Tracking enabled" : "No tracking"}</span>
+              <Badge variant={carrier.supportsTracking ? "success" : "warning"}>
+                {carrier.supportsTracking ? "Tracking enabled" : "No tracking"}
+              </Badge>
             </div>
           ))}
           {!carriers.length ? (

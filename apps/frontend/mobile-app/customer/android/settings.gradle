@@ -1,0 +1,6 @@
+pluginManagement { includeBuild(new File(settingsDir, '../../../../../node_modules/@react-native/gradle-plugin').canonicalPath) }
+plugins { id('com.facebook.react.settings') }
+extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
+rootProject.name = 'DokanXCustomer'
+include ':app'
+includeBuild(new File(settingsDir, '../../../../../node_modules/@react-native/gradle-plugin').canonicalPath)

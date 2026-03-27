@@ -1,53 +1,68 @@
-// src/core/infrastructure/lock.manager.js
-
+const crypto = require("crypto");
 const Redlock = require("redlock").default;
 const redis = require("./redis.client");
 
-// single redis instance
-const redlock = new Redlock(
-  [redis],
-  {
-    retryCount: 3,
-    retryDelay: 200,
-    retryJitter: 200,
-  }
-);
+const LOCK_PREFIX = "lock:";
+const DEFAULT_TTL_MS = 15000;
 
-/**
- * Acquire distributed lock
- */
-async function acquireLock(key, ttl = 5000) {
-  return redlock.acquire([`lock:${key}`], ttl);
+const redlock = new Redlock([redis], {
+  retryCount: 3,
+  retryDelay: 200,
+  retryJitter: 200,
+});
+
+function buildLockKey(key) {
+  return `${LOCK_PREFIX}${key}`;
 }
 
-/**
- * Execute function with lock
- */
+function buildOwnerToken() {
+  return crypto.randomUUID();
+}
 
+async function acquireLock(key, ttl = 5000) {
+  return redlock.acquire([buildLockKey(key)], ttl);
+}
 
-exports.withLock = async (key, fn) => {
+async function releaseOwnedLock(lockKey, ownerToken) {
+  const releaseScript = `
+    if redis.call("get", KEYS[1]) == ARGV[1] then
+      return redis.call("del", KEYS[1])
+    end
+    return 0
+  `;
+  return redis.eval(releaseScript, 1, lockKey, ownerToken);
+}
 
-  const lockKey = `lock:${key}`;
+async function withLock(key, fn, options = {}) {
+  const lockKey = buildLockKey(key);
+  const ownerToken = buildOwnerToken();
+  const ttl = Number(options.ttl || DEFAULT_TTL_MS);
 
-  const ok = await redis.set(
-    lockKey,
-    "1",
-    "NX",
-    "PX",
-    15000
-  );
-
-  if (!ok)
-    throw new Error("Resource busy");
+  const ok = await redis.set(lockKey, ownerToken, "NX", "PX", ttl);
+  if (!ok) {
+    const error = new Error("Resource busy");
+    error.statusCode = 409;
+    throw error;
+  }
 
   try {
     return await fn();
   } finally {
-    await redis.del(lockKey);
+    await releaseOwnedLock(lockKey, ownerToken);
   }
-};
+}
+
+function assertLockManagerHealthy() {
+  if (typeof withLock !== "function") {
+    throw new Error("LOCK_MANAGER_WITHLOCK_INVALID");
+  }
+  if (typeof acquireLock !== "function") {
+    throw new Error("LOCK_MANAGER_ACQUIRE_INVALID");
+  }
+}
 
 module.exports = {
   acquireLock,
-
+  assertLockManagerHealthy,
+  withLock,
 };

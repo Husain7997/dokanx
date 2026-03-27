@@ -13,21 +13,103 @@ const { t } =
   require('@/core/infrastructure');
 const { addJob } = require("@/core/infrastructure");
 const { createAudit } = require("../utils/audit.util");
+const { logSearchEvent } = require("../services/search.service");
+const fraudService = require("../services/fraud.service");
+const commissionService = require("../modules/commission-engine/commission.service");
+const deliveryService = require("../modules/delivery-engine/delivery.service");
+const creditService = require("../modules/credit-engine/credit.service");
+const DeliveryGroup = require("../modules/delivery-engine/deliveryGroup.model");
+const Shop = require("../models/shop.model");
+
+async function serializeCustomerOrder(orderDoc) {
+  if (!orderDoc) return null;
+
+  const order = orderDoc.toObject ? orderDoc.toObject() : orderDoc;
+  const [shop, deliveryGroup] = await Promise.all([
+    order.shopId ? Shop.findById(order.shopId).select("name slug domain").lean() : null,
+    order.deliveryGroupId ? DeliveryGroup.findById(order.deliveryGroupId).lean() : null,
+  ]);
+
+  const items = (order.items || []).map((item) => {
+    const productId = String(item.product?._id || item.product || "");
+    const warrantyEligible = Array.isArray(order.warrantySnapshot)
+      ? order.warrantySnapshot.some((row) => String(row.productId || "") === productId && row.enabled)
+      : false;
+    const guaranteeEligible = Array.isArray(order.guaranteeSnapshot)
+      ? order.guaranteeSnapshot.some((row) => String(row.productId || "") === productId && row.enabled)
+      : false;
+
+    return {
+      ...item,
+      productId,
+      claimEligibility: {
+        warranty: warrantyEligible,
+        guarantee: guaranteeEligible,
+        any: warrantyEligible || guaranteeEligible,
+      },
+    };
+  });
+
+  return {
+    ...order,
+    items,
+    shop: shop || null,
+    deliveryGroup: deliveryGroup || null,
+    claimEligibility: {
+      orderLevel: items.some((item) => item.claimEligibility?.any),
+      items: items.map((item) => ({
+        productId: item.productId,
+        ...item.claimEligibility,
+      })),
+    },
+  };
+}
 exports.placeOrder = async (req, res) => {
+  if (!req.user) {
+    console.warn("ORDER_CREATE_MISSING_USER", {
+      path: req.originalUrl || req.url,
+      bodyKeys: Object.keys(req.body || {}),
+    });
+    return res.status(401).json({
+      success: false,
+      message: "Customer session required",
+    });
+  }
 
   const session = await mongoose.startSession();
 
   try {
+    if (String(req.body?.paymentMode || "").toUpperCase() === "CREDIT") {
+      await creditService.assertCreditEligibility({
+        customerId: req.user?.globalCustomerId || req.user?._id,
+        shopId: req.body.shopId || req.shop?._id || req.shop,
+        amount: req.body.totalAmount,
+      }, req.user);
+    }
 
     let order;
 
     await session.withTransaction(async () => {
 
       order = await CheckoutEngine.checkout({
-        shopId: req.shop,
+        shopId: req.body.shopId || req.shop?._id || req.shop,
         user: req.user,
         items: req.body.items,
+        addressId: req.body.addressId || null,
+        deliveryMode: req.body.deliveryMode || "standard",
         totalAmount: req.body.totalAmount,
+        trafficType: req.traffic?.type || "marketplace",
+        deliveryAddress: req.body.deliveryAddress || null,
+        campaignId: req.body.campaignId || null,
+        paymentMode: req.body.paymentMode || "ONLINE",
+        notes: req.body.notes || "",
+        multiShopGroup: req.body.multiShopGroup || null,
+        metadata: {
+          traffic: req.traffic || null,
+          sourceHeaders: {
+            trafficSource: req.headers["x-traffic-source"] || null,
+          },
+        },
         session
       });
 await addJob("settlement", { orderId: order._id });
@@ -43,12 +125,84 @@ await addJob("settlement", { orderId: order._id });
       orderId: order._id
     });
 
+    const orderDoc = await Order.findById(order._id);
+    if (orderDoc) {
+      await commissionService.applyCommission(orderDoc);
+      await deliveryService.groupOrdersByCustomerAndLocation({ order: orderDoc });
+      if (String(req.body?.paymentMode || "").toUpperCase() === "CREDIT") {
+        await creditService.createCreditSale({
+          orderId: orderDoc._id,
+          customerId: orderDoc.customerId,
+          shopId: orderDoc.shopId,
+          amount: orderDoc.totalAmount,
+        }, req.user);
+      }
+      order = orderDoc.toObject();
+    }
+
+    await createAudit({
+      action: "ORDER_CREATED",
+      performedBy: req.user?._id || null,
+      targetType: "Order",
+      targetId: order._id,
+      req,
+      meta: {
+        totalAmount: Number(order.totalAmount || 0),
+        channel: req.body?.channel || "WEB",
+        deviceFingerprint: req.headers["x-device-fingerprint"] || null,
+        couponCode: req.body?.couponCode || null,
+      },
+    });
+
+    try {
+      await fraudService.evaluateTransaction({
+        orderId: order._id,
+        source: "order_created",
+        context: {
+          ip: req.ip,
+          userAgent: req.headers["user-agent"] || "",
+          deviceFingerprint: req.headers["x-device-fingerprint"] || "",
+          couponCode: req.body?.couponCode || "",
+        },
+      });
+    } catch (fraudError) {
+      logger.warn("Fraud evaluation failed", {
+        orderId: order._id,
+        error: fraudError?.message || String(fraudError),
+      });
+    }
+
     res.status(201).json({
       message: t("order.created", req.lang),
       data: order
     });
 
+    const searchId = req.headers["x-search-id"] ? String(req.headers["x-search-id"]) : null;
+    const searchQuery = req.headers["x-search-query"] ? String(req.headers["x-search-query"]) : "";
+    if (searchId) {
+      await logSearchEvent({
+        searchId,
+        query: searchQuery,
+        eventType: "CHECKOUT",
+        userId: req.user?._id || null,
+        shopId: req.shop?._id || null,
+        metadata: {
+          items: Array.isArray(req.body.items) ? req.body.items.length : 0,
+          totalAmount: Number(req.body.totalAmount || 0),
+        },
+      });
+    }
+
   } catch (err) {
+    logger.error("Order create failed", {
+      requestId: req.requestId || req.headers["x-request-id"] || null,
+      orderId: req.body?.orderId || null,
+      shopId: req.body?.shopId || req.shop?._id || null,
+      customerId: req.user?._id || null,
+      paymentMode: req.body?.paymentMode || null,
+      error: err?.message || String(err),
+      stack: err?.stack || null,
+    });
 
     res.status(400).json({
       success: false,
@@ -64,17 +218,68 @@ await addJob("settlement", { orderId: order._id });
  * SHOP ORDERS
  */
 exports.getOrders = async (req, res) => {
+  const rawLimit = Number(req.query.limit);
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0
+    ? Math.min(rawLimit, 100)
+    : null;
 
-  const orders = await Order.find({
-    shopId: req.shop._id,
+  let query = Order.find({
+    shopId: req.shop?._id || req.user?.shopId,
   })
     .populate("items.product", "name price")
     .populate("user", "name email phone")
     .sort({ createdAt: -1 });
 
+  if (limit) {
+    query = query.limit(limit);
+  }
+
+  const orders = await query;
+
   res.json({
     message: t('common.updated', req.lang),
     data: orders,
+  });
+};
+
+exports.getMyOrders = async (req, res) => {
+  const orders = await Order.find({
+    customerId: req.user?._id,
+  })
+    .populate("items.product", "name price slug shopId")
+    .sort({ createdAt: -1 });
+
+  const data = await Promise.all(orders.map((order) => serializeCustomerOrder(order)));
+
+  res.json({
+    message: t("common.updated", req.lang),
+    data,
+  });
+};
+
+exports.getOrderById = async (req, res) => {
+  const order = await Order.findById(req.params.orderId)
+    .populate("items.product", "name price slug shopId");
+
+  if (!order) {
+    return res.status(404).json({ message: "Order not found" });
+  }
+
+  const role = String(req.user?.role || "").toUpperCase();
+  const isCustomerOwner = String(order.customerId || "") === String(req.user?._id || "");
+  const isMerchantScoped = String(order.shopId || "") === String(req.user?.shopId || "");
+
+  if (
+    role !== "ADMIN" &&
+    !(role === "CUSTOMER" && isCustomerOwner) &&
+    !((role === "OWNER" || role === "STAFF") && isMerchantScoped)
+  ) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  res.json({
+    message: t("common.updated", req.lang),
+    data: await serializeCustomerOrder(order),
   });
 };
 
@@ -153,3 +358,4 @@ exports.updateOrderStatus = async (req, res) => {
 
   }
 };
+

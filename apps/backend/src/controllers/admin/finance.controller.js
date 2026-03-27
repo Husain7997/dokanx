@@ -1,5 +1,3 @@
-
-const ShopWallet = require('../../models/ShopWallet');
 const mongoose = require('mongoose');
 
 const Settlement = require('../../models/settlement.model');

@@ -1,4 +1,5 @@
 const SystemSetting = require("../models/systemSetting.model");
+const { createAudit } = require("../utils/audit.util");
 const {
   ETA_SETTINGS_KEY,
   DEFAULT_ETA_SETTINGS,
@@ -112,15 +113,32 @@ exports.updateThresholdSettings = async (req, res) => {
     return res.status(400).json({ message: error instanceof Error ? error.message : "Invalid threshold payload." });
   }
 
+  const existing = await SystemSetting.findOne({ key: ADMIN_THRESHOLD_SETTINGS_KEY }).lean();
+  let previous = DEFAULT_THRESHOLD_SETTINGS;
+  try {
+    if (existing?.value) {
+      previous = normalizeThresholdSettings(existing.value);
+    }
+  } catch {
+    previous = DEFAULT_THRESHOLD_SETTINGS;
+  }
+
   const updated = await SystemSetting.findOneAndUpdate(
     { key: ADMIN_THRESHOLD_SETTINGS_KEY },
     { value: payload, updatedBy: req.user?._id },
     { new: true, upsert: true }
   ).lean();
 
-  console.info("Admin threshold settings updated", {
-    actor: req.user?._id,
-    payload
+  await createAudit({
+    action: "ADMIN_THRESHOLD_UPDATED",
+    performedBy: req.user?._id,
+    targetType: "SystemSetting",
+    targetId: updated?._id,
+    req,
+    meta: {
+      previous,
+      next: payload
+    }
   });
 
   res.json({ message: "Threshold settings updated", data: updated?.value || payload });

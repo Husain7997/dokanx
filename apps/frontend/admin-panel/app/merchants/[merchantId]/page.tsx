@@ -148,6 +148,9 @@ export default function MerchantDetailPage({ params }: { params: { merchantId: s
           <Button asChild variant="secondary" size="sm">
             <a href="/merchants">Back to merchants</a>
           </Button>
+          <Button asChild size="sm">
+            <a href={`/merchants/${merchantId}/scorecard`}>Open scorecard</a>
+          </Button>
         </div>
       </div>
 

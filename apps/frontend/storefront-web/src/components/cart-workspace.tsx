@@ -5,6 +5,7 @@ import { Button, Card, CardDescription, CardTitle, Input } from "@dokanx/ui";
 import type { Cart, Product } from "@dokanx/types";
 
 import { clearCart, getRuntimeCart, saveCart, searchRuntimeProducts } from "@/lib/runtime-api";
+import { useCartStore } from "@/stores/cart-store";
 
 type CartWorkspaceProps = {
   initialCart: Cart;
@@ -41,6 +42,12 @@ function normalizeRuntimeProducts(products: Product[]): CartProduct[] {
 }
 
 export function CartWorkspace({ initialCart, initialProducts }: CartWorkspaceProps) {
+  const storedCart = useCartStore((state) => state.cart);
+  const hydrateShop = useCartStore((state) => state.hydrateShop);
+  const addItem = useCartStore((state) => state.addItem);
+  const updateQuantity = useCartStore((state) => state.updateQuantity);
+  const removeItem = useCartStore((state) => state.removeItem);
+  const clearShop = useCartStore((state) => state.clearShop);
   const [cart, setCart] = useState<Cart>(initialCart);
   const [products, setProducts] = useState<CartProduct[]>(normalizeRuntimeProducts(initialProducts));
   const [selectedProductId, setSelectedProductId] = useState(
@@ -55,11 +62,41 @@ export function CartWorkspace({ initialCart, initialProducts }: CartWorkspacePro
     return String(firstCartItem?.shopId || products[0]?.shopId || "");
   }, [cart.items, products]);
 
+  const groupedByShop = useMemo(() => {
+    const groups = new Map<string, RuntimeCartItem[]>();
+    (cart.items as RuntimeCartItem[]).forEach((item) => {
+      const key = String(item.shopId || "unscoped");
+      const current = groups.get(key) || [];
+      current.push(item);
+      groups.set(key, current);
+    });
+    return Array.from(groups.entries()).map(([shopId, items]) => ({
+      shopId,
+      items,
+      subtotal: items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    }));
+  }, [cart.items]);
+
   useEffect(() => {
     async function hydrateCart() {
       if (!activeShopId) return;
 
       try {
+        const storedItems = storedCart[activeShopId]?.items || [];
+        if (storedItems.length) {
+          setCart(
+            buildCart(
+              storedItems.map((item) => ({
+                id: `stored-${item.productId}`,
+                productId: item.productId,
+                name: item.name,
+                quantity: item.quantity,
+                price: item.price,
+                shopId: activeShopId,
+              }))
+            )
+          );
+        }
         const response = await getRuntimeCart(activeShopId);
         const runtimeCart = response.data;
 
@@ -72,6 +109,15 @@ export function CartWorkspace({ initialCart, initialProducts }: CartWorkspacePro
             price: item.price,
             shopId: activeShopId,
           }));
+          hydrateShop(
+            activeShopId,
+            normalizedItems.map((item) => ({
+              productId: item.productId,
+              name: item.name,
+              price: item.price,
+              quantity: item.quantity,
+            }))
+          );
           setCart(buildCart(normalizedItems));
         }
       } catch {
@@ -80,7 +126,7 @@ export function CartWorkspace({ initialCart, initialProducts }: CartWorkspacePro
     }
 
     void hydrateCart();
-  }, [activeShopId]);
+  }, [activeShopId, hydrateShop, storedCart]);
 
   useEffect(() => {
     async function refreshProducts() {
@@ -135,8 +181,26 @@ export function CartWorkspace({ initialCart, initialProducts }: CartWorkspacePro
           price: item.price,
           shopId: nextShopId,
         }));
+        hydrateShop(
+          nextShopId,
+          normalizedItems.map((item) => ({
+            productId: item.productId,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+          }))
+        );
         setCart(buildCart(normalizedItems));
       } else {
+        hydrateShop(
+          nextShopId,
+          nextItems.map((item) => ({
+            productId: item.productId,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+          }))
+        );
         setCart(buildCart(nextItems));
       }
 
@@ -162,6 +226,7 @@ export function CartWorkspace({ initialCart, initialProducts }: CartWorkspacePro
 
     if (existing) {
       existing.quantity += quantity;
+      updateQuantity(String(selected.shopId || activeShopId || "unscoped"), existing.productId, existing.quantity);
     } else {
       nextItems.push({
         id: `line-${Date.now()}`,
@@ -170,6 +235,12 @@ export function CartWorkspace({ initialCart, initialProducts }: CartWorkspacePro
         quantity,
         price: Number(selected.price || 0),
         shopId: selected.shopId,
+      });
+      addItem(String(selected.shopId || activeShopId || "unscoped"), {
+        productId: String(selected._id || selected.id),
+        name: selected.name,
+        price: Number(selected.price || 0),
+        quantity,
       });
     }
 
@@ -180,6 +251,7 @@ export function CartWorkspace({ initialCart, initialProducts }: CartWorkspacePro
     const nextItems = (cart.items as RuntimeCartItem[])
       .map((item) => {
         if (item.productId !== productId) return item;
+        updateQuantity(String(item.shopId || activeShopId || "unscoped"), item.productId, item.quantity + delta);
         return {
           ...item,
           quantity: item.quantity + delta,
@@ -191,6 +263,10 @@ export function CartWorkspace({ initialCart, initialProducts }: CartWorkspacePro
   }
 
   async function handleRemove(productId: string) {
+    const target = (cart.items as RuntimeCartItem[]).find((item) => item.productId === productId);
+    if (target) {
+      removeItem(String(target.shopId || activeShopId || "unscoped"), target.productId);
+    }
     const nextItems = (cart.items as RuntimeCartItem[]).filter((item) => item.productId !== productId);
 
     if (!nextItems.length && activeShopId) {
@@ -199,6 +275,7 @@ export function CartWorkspace({ initialCart, initialProducts }: CartWorkspacePro
       try {
         await clearCart(activeShopId);
         setCart(buildCart([]));
+        clearShop(activeShopId);
         setMessage("Cart cleared.");
       } catch (error) {
         setMessage(error instanceof Error ? error.message : "Unable to remove item.");
@@ -223,6 +300,7 @@ export function CartWorkspace({ initialCart, initialProducts }: CartWorkspacePro
     try {
       await clearCart(activeShopId);
       setCart(buildCart([]));
+      clearShop(activeShopId);
       setMessage("Cart cleared.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to clear cart.");
@@ -265,6 +343,14 @@ export function CartWorkspace({ initialCart, initialProducts }: CartWorkspacePro
         </div>
 
         <div className="mt-6 grid gap-4">
+          {groupedByShop.length > 1 ? (
+            <div className="rounded-3xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm">
+              <p className="font-semibold">Grouped delivery view</p>
+              <p className="mt-1 text-muted-foreground">
+                {groupedByShop.length} shops → 1 delivery flow once the backend groups eligible routes.
+              </p>
+            </div>
+          ) : null}
           {(cart.items as RuntimeCartItem[]).length ? (
             (cart.items as RuntimeCartItem[]).map((item) => (
               <div key={item.productId} className="rounded-3xl border border-border/60 bg-card/60 p-4">
@@ -311,6 +397,18 @@ export function CartWorkspace({ initialCart, initialProducts }: CartWorkspacePro
             <span>Subtotal</span>
             <span>{cart.totals?.subtotal || 0} BDT</span>
           </div>
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">Shops</span>
+            <span>{groupedByShop.length}</span>
+          </div>
+        </div>
+        <div className="mt-6 grid gap-3">
+          {groupedByShop.map((group) => (
+            <div key={group.shopId} className="rounded-2xl border border-border/60 p-3 text-sm">
+              <p className="font-medium">Shop {group.shopId === "unscoped" ? "Unknown" : group.shopId.slice(-6)}</p>
+              <p className="text-xs text-muted-foreground">{group.items.length} lines • {group.subtotal} BDT</p>
+            </div>
+          ))}
         </div>
         <div className="mt-6 grid gap-3">
           <Button asChild>
@@ -325,6 +423,11 @@ export function CartWorkspace({ initialCart, initialProducts }: CartWorkspacePro
             {message}
           </div>
         ) : null}
+        <div className="sticky bottom-4 mt-6">
+          <Button asChild className="w-full">
+            <a href="/checkout">Checkout {cart.totals?.subtotal || 0} BDT</a>
+          </Button>
+        </div>
       </Card>
     </div>
   );

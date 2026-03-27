@@ -21,6 +21,14 @@ const defaultDistance = [
   { maxDistanceKm: 999, minutes: 18 },
 ];
 
+const defaultEtaSettings = {
+  basePerKm: 10,
+  minEta: 15,
+  fallbackEta: 45,
+  trafficFactors: defaultTraffic,
+  distanceBrackets: defaultDistance,
+};
+
 const BASE_PER_KM_RANGE = { min: 1, max: 30 };
 const MIN_ETA_RANGE = { min: 5, max: 120 };
 const FALLBACK_ETA_RANGE = { min: 10, max: 240 };

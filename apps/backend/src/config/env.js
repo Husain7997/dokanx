@@ -9,13 +9,14 @@ function requireEnv(key) {
 }
 
 module.exports = {
-  NODE_ENV: process.env.NODE_ENV || 'development',
+  NODE_ENV: process.env.NODE_ENV || "development",
   PORT: process.env.PORT || 3000,
 
-  MONGO_URI: requireEnv('MONGO_URI'),
+  MONGO_URI: requireEnv("MONGO_URI"),
+  MONGO_URI_FALLBACK: process.env.MONGO_URI_FALLBACK || null,
 
-  JWT_SECRET: requireEnv('JWT_SECRET'),
-  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
+  JWT_SECRET: requireEnv("JWT_SECRET"),
+  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || "7d",
 
   PLATFORM_FEE_PERCENT: Number(process.env.PLATFORM_FEE_PERCENT || 5),
 };

@@ -19,6 +19,7 @@ const schema = new mongoose.Schema({
 });
 
 schema.index({ aggregateId: 1, createdAt: 1 });
+schema.index({ "metadata.user": 1, createdAt: -1 });
 
 
 

@@ -1,7 +1,7 @@
  "use client";
 
 import { useEffect, useState } from "react";
-import { AnalyticsCards, Card, CardDescription, CardTitle } from "@dokanx/ui";
+import { Alert, AnalyticsCards, Badge, Button, Card, CardDescription, CardTitle, TextInput } from "@dokanx/ui";
 
 import { createCampaign, listCampaigns } from "@/lib/runtime-api";
 
@@ -44,29 +44,24 @@ export default function MarketingPage() {
         </CardDescription>
         <div className="mt-6 grid gap-3 text-sm text-muted-foreground">
           <div className="grid gap-2 md:grid-cols-[1fr_auto]">
-            <input
-              className="rounded-xl border border-white/60 bg-white px-3 py-2 text-sm"
+            <TextInput
               placeholder="New campaign name"
               value={name}
               onChange={(event) => setName(event.target.value)}
             />
-            <button
-              className="rounded-full border border-white/60 bg-black px-4 py-2 text-xs font-semibold text-white"
-              onClick={handleCreate}
-            >
-              Create
-            </button>
+            <Button onClick={handleCreate}>Create</Button>
           </div>
           {campaigns.length ? (
             campaigns.map((campaign) => (
-              <div key={campaign._id} className="rounded-xl bg-accent p-3">
-                {campaign.name} â€¢ {campaign.status || "DRAFT"}
+              <div key={campaign._id} className="flex items-center justify-between rounded-xl bg-accent p-3">
+                <span>{campaign.name}</span>
+                <Badge variant="neutral">{campaign.status || "DRAFT"}</Badge>
               </div>
             ))
           ) : (
             <div className="rounded-xl bg-accent p-3">No campaigns yet.</div>
           )}
-          {status ? <div className="text-xs text-emerald-700">{status}</div> : null}
+          {status ? <Alert variant="success">{status}</Alert> : null}
         </div>
       </Card>
     </div>

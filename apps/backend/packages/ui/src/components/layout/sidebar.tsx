@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 
 import { cn } from "../../lib/utils";
 
@@ -28,7 +29,7 @@ export function Sidebar({
       </div>
       <nav className="mt-6 grid gap-1">
         {items.map((item) => (
-          <a
+          <Link
             key={item.href}
             href={item.href}
             className={cn(
@@ -40,7 +41,7 @@ export function Sidebar({
           >
             {item.icon}
             <span>{item.label}</span>
-          </a>
+          </Link>
         ))}
       </nav>
       {footer ? <div className="mt-auto pt-4">{footer}</div> : null}

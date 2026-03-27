@@ -2,7 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@dokanx/auth";
-import { Button, Input, InventoryTable, OrdersTable } from "@dokanx/ui";
+import {
+  Alert,
+  Button,
+  InventoryTable,
+  OrdersTable,
+  SelectDropdown,
+  TextInput
+} from "@dokanx/ui";
 
 import { adjustInventory, createProduct, deleteProduct, listShopProducts, updateProduct } from "@/lib/runtime-api";
 
@@ -84,6 +91,17 @@ export function ProductWorkspace() {
         stock: String(item.stock || 0),
         state: Number(item.stock || 0) <= 5 ? "Low" : "Healthy",
       })),
+    [products],
+  );
+
+  const productOptions = useMemo(
+    () => [
+      { label: "Create a new product", value: "" },
+      ...products.map((product) => ({
+        label: product.name || String(product._id || "Product"),
+        value: String(product._id || ""),
+      })),
+    ],
     [products],
   );
 
@@ -187,46 +205,41 @@ export function ProductWorkspace() {
           description="Create, update, archive, and adjust stock from one owner-authenticated workspace."
         >
           <div className="grid gap-4">
-            <label className="grid gap-2 text-sm">
-              <span>Existing products</span>
-              <select
-                className="h-11 rounded-full border border-border bg-background px-4 text-sm"
-                value={selectedProductId}
-                onChange={(event) => setSelectedProductId(event.target.value)}
-                disabled={loadingProducts || !products.length}
-              >
-                <option value="">Create a new product</option>
-                {products.map((product) => (
-                  <option key={String(product._id || "")} value={String(product._id || "")}>
-                    {product.name || product._id}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <SelectDropdown
+              label="Existing products"
+              value={selectedProductId}
+              onValueChange={setSelectedProductId}
+              options={productOptions}
+              disabled={loadingProducts || !products.length}
+            />
 
             <div className="grid gap-4 md:grid-cols-2">
-              <label className="grid gap-2 text-sm">
-                <span>Name</span>
-                <Input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} />
-              </label>
-              <label className="grid gap-2 text-sm">
-                <span>Category</span>
-                <Input value={draft.category} onChange={(event) => setDraft((current) => ({ ...current, category: event.target.value }))} />
-              </label>
-              <label className="grid gap-2 text-sm">
-                <span>Price</span>
-                <Input value={draft.price} onChange={(event) => setDraft((current) => ({ ...current, price: event.target.value }))} />
-              </label>
-              <label className="grid gap-2 text-sm">
-                <span>Stock</span>
-                <Input value={draft.stock} onChange={(event) => setDraft((current) => ({ ...current, stock: event.target.value }))} />
-              </label>
+              <TextInput
+                label="Name"
+                value={draft.name}
+                onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+              />
+              <TextInput
+                label="Category"
+                value={draft.category}
+                onChange={(event) => setDraft((current) => ({ ...current, category: event.target.value }))}
+              />
+              <TextInput
+                label="Price"
+                value={draft.price}
+                onChange={(event) => setDraft((current) => ({ ...current, price: event.target.value }))}
+              />
+              <TextInput
+                label="Stock"
+                value={draft.stock}
+                onChange={(event) => setDraft((current) => ({ ...current, stock: event.target.value }))}
+              />
             </div>
           </div>
 
           <div className="mt-6 flex flex-wrap gap-3">
-            <Button onClick={handleCreateProduct} disabled={submitting}>
-              {submitting ? "Working..." : "Create Product"}
+            <Button onClick={handleCreateProduct} loading={submitting} loadingText="Saving product">
+              Create Product
             </Button>
             <Button variant="secondary" onClick={handleUpdateProduct} disabled={submitting || !selectedProductId}>
               Update Product
@@ -237,14 +250,16 @@ export function ProductWorkspace() {
           </div>
 
           <div className="mt-8 grid gap-4 rounded-3xl border border-border/60 bg-muted/20 p-4 md:grid-cols-[140px_minmax(0,1fr)_auto]">
-            <label className="grid gap-2 text-sm">
-              <span>Stock delta</span>
-              <Input value={inventoryDelta} onChange={(event) => setInventoryDelta(event.target.value)} />
-            </label>
-            <label className="grid gap-2 text-sm">
-              <span>Adjustment note</span>
-              <Input value={inventoryNote} onChange={(event) => setInventoryNote(event.target.value)} />
-            </label>
+            <TextInput
+              label="Stock delta"
+              value={inventoryDelta}
+              onChange={(event) => setInventoryDelta(event.target.value)}
+            />
+            <TextInput
+              label="Adjustment note"
+              value={inventoryNote}
+              onChange={(event) => setInventoryNote(event.target.value)}
+            />
             <div className="flex items-end">
               <Button className="w-full" onClick={handleAdjustInventory} disabled={submitting || !selectedProductId}>
                 Adjust Inventory
@@ -252,7 +267,7 @@ export function ProductWorkspace() {
             </div>
           </div>
 
-          <p className="mt-4 text-sm text-muted-foreground">{message}</p>
+          {message ? <Alert variant="info" className="mt-4">{message}</Alert> : null}
         </WorkspaceCard>
 
         <WorkspaceCard

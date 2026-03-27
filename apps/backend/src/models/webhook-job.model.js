@@ -33,9 +33,20 @@ const webhookJobSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    deliveryId: {
+      type: String,
+      required: true,
+      index: true,
+    },
+    dedupeKey: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true,
+    },
     status: {
       type: String,
-      enum: ["pending", "success", "failed"],
+      enum: ["pending", "success", "failed", "dead_letter"],
       default: "pending",
       index: true,
     },
@@ -67,6 +78,8 @@ const webhookJobSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+webhookJobSchema.index({ subscriptionId: 1, event: 1, createdAt: -1 });
 
 module.exports =
   mongoose.models.WebhookJob ||

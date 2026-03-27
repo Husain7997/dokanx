@@ -53,3 +53,38 @@ export function triggerDeltaReindex() {
     method: "POST",
   });
 }
+
+export function getSearchTrending(params?: { days?: number; limit?: number }) {
+  const query = new URLSearchParams();
+  if (params?.days) query.set("days", String(params.days));
+  if (params?.limit) query.set("limit", String(params.limit));
+  const suffix = query.toString();
+  return request<{ data?: Array<{ query?: string; count?: number }>; count?: number }>(
+    `/search/trending${suffix ? `?${suffix}` : ""}`
+  );
+}
+
+export function getSearchNoResults(params?: { days?: number; limit?: number }) {
+  const query = new URLSearchParams();
+  if (params?.days) query.set("days", String(params.days));
+  if (params?.limit) query.set("limit", String(params.limit));
+  const suffix = query.toString();
+  return request<{ data?: Array<{ query?: string; count?: number }>; count?: number }>(
+    `/search/no-results${suffix ? `?${suffix}` : ""}`
+  );
+}
+
+export function getSearchConversion(params?: { days?: number }) {
+  const query = new URLSearchParams();
+  if (params?.days) query.set("days", String(params.days));
+  const suffix = query.toString();
+  return request<{
+    data?: {
+      totalSearches?: number;
+      addToCart?: number;
+      checkout?: number;
+      addToCartRate?: number;
+      checkoutRate?: number;
+    };
+  }>(`/search/conversion${suffix ? `?${suffix}` : ""}`);
+}

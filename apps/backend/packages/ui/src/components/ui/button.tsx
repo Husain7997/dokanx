@@ -1,8 +1,9 @@
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
-import type { ButtonHTMLAttributes } from "react";
+import { Children, type ButtonHTMLAttributes } from "react";
 
 import { cn } from "../../lib/utils";
+import { Spinner } from "./spinner";
 
 const buttonVariants = cva(
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-md)] text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))] disabled:pointer-events-none disabled:opacity-50",
@@ -11,7 +12,11 @@ const buttonVariants = cva(
       variant: {
         primary:
           "bg-primary text-primary-foreground shadow-[var(--shadow-sm)] hover:brightness-95",
+        default:
+          "bg-primary text-primary-foreground shadow-[var(--shadow-sm)] hover:brightness-95",
         secondary: "bg-secondary text-secondary-foreground hover:opacity-90",
+        danger:
+          "bg-[hsl(var(--destructive))] text-white shadow-[var(--shadow-sm)] hover:brightness-95",
         outline:
           "border border-border bg-card text-card-foreground hover:bg-accent hover:text-accent-foreground",
         ghost: "text-foreground hover:bg-accent hover:text-accent-foreground"
@@ -29,9 +34,11 @@ const buttonVariants = cva(
   }
 );
 
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> &
+export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean;
+    loading?: boolean;
+    loadingText?: string;
   };
 
 export function Button({
@@ -39,11 +46,27 @@ export function Button({
   variant,
   size,
   asChild = false,
+  loading = false,
+  loadingText = "Loading",
   ...props
 }: ButtonProps) {
-  const Comp = asChild ? Slot : "button";
+  const childCount = Children.count(props.children);
+  const useSlot = asChild && childCount === 1 && !loading;
+  const Comp = useSlot ? Slot : "button";
+  const spinnerClass =
+    variant === "primary" || variant === "default" || variant === "secondary" || variant === "danger"
+      ? "h-4 w-4 border-white/40 border-t-white"
+      : "h-4 w-4 border-primary/30 border-t-primary";
 
   return (
-    <Comp className={cn(buttonVariants({ variant, size }), className)} {...props} />
+    <Comp
+      className={cn(buttonVariants({ variant, size }), className)}
+      aria-busy={loading || undefined}
+      disabled={loading || props.disabled}
+      {...props}
+    >
+      {loading ? <Spinner className={spinnerClass} label={loadingText} /> : null}
+      {props.children}
+    </Comp>
   );
 }

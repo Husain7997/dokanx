@@ -1,9 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AnalyticsCards, Card, CardDescription, CardTitle, SalesChart } from "@dokanx/ui";
+import {
+  Alert,
+  AnalyticsCards,
+  Badge,
+  Card,
+  CardDescription,
+  CardTitle,
+  Grid,
+  ProgressBar,
+  SalesChart
+} from "@dokanx/ui";
 
-import { getShopSummary, getWalletSummary, listAnalyticsSnapshots, listInventory, listOrders } from "@/lib/runtime-api";
+import { getShopSummary, getWalletReport, getWalletSummary, listAnalyticsSnapshots, listCustomers, listInventory, listOrders } from "@/lib/runtime-api";
 
 type OrderRow = {
   _id?: string;
@@ -21,33 +31,76 @@ type InventoryRow = {
   updatedAt?: string;
 };
 
+type DailySalesRow = {
+  date?: string;
+  gmv?: number;
+  orders?: number;
+  aov?: number;
+};
+
+type WalletSummary = {
+  credits?: number;
+  debits?: number;
+  net?: number;
+  transactionCount?: number;
+};
+
+type ShipmentSummary = {
+  total?: number;
+  delivered?: number;
+  failed?: number;
+  successRate?: number;
+};
+
+type InventorySnapshot = {
+  totalSkus?: number;
+  totalStock?: number;
+  totalReserved?: number;
+  lowStockCount?: number;
+  outOfStockCount?: number;
+};
+
 export function DashboardOverview() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [customers, setCustomers] = useState<Array<{ totalDue?: number; phone?: string }>>([]);
   const [inventory, setInventory] = useState<InventoryRow[]>([]);
   const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [walletReport, setWalletReport] = useState<{ totalIncome?: number; totalExpense?: number; profitLoss?: number; totalDue?: number } | null>(null);
   const [summary, setSummary] = useState<{ sales?: { totalSales?: number; totalOrders?: number } } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [trendSeries, setTrendSeries] = useState<Array<{ label: string; value: number }>>([]);
   const [revenueSeries, setRevenueSeries] = useState<Array<{ label: string; value: number }>>([]);
+  const [dailySalesSnapshot, setDailySalesSnapshot] = useState<DailySalesRow[]>([]);
+  const [walletSnapshot, setWalletSnapshot] = useState<WalletSummary | null>(null);
+  const [shipmentSnapshot, setShipmentSnapshot] = useState<ShipmentSummary | null>(null);
+  const [inventorySnapshot, setInventorySnapshot] = useState<InventorySnapshot | null>(null);
 
   useEffect(() => {
     let active = true;
     async function load() {
       try {
-        const [ordersResponse, inventoryResponse, walletResponse, summaryResponse, analyticsResponse] = await Promise.all([
-          listOrders(),
-          listInventory(),
+        const [ordersResponse, inventoryResponse, walletResponse, summaryResponse, analyticsResponse, customerResponse, walletReportResponse] = await Promise.all([
+          listOrders(25),
+          listInventory(60),
           getWalletSummary(),
           getShopSummary(),
           listAnalyticsSnapshots({}),
+          listCustomers(),
+          getWalletReport(),
         ]);
         if (!active) return;
         setOrders(Array.isArray(ordersResponse.data) ? (ordersResponse.data as OrderRow[]) : []);
+        setCustomers(Array.isArray(customerResponse.data) ? customerResponse.data as Array<{ totalDue?: number; phone?: string }> : []);
         setInventory(Array.isArray(inventoryResponse.data) ? (inventoryResponse.data as InventoryRow[]) : []);
         setWalletBalance(Number(walletResponse.data?.balance ?? 0));
+        setWalletReport(walletReportResponse.data || null);
         setSummary(summaryResponse.data || null);
         const snapshots = Array.isArray(analyticsResponse.data) ? analyticsResponse.data : [];
         const trendSnapshot = snapshots.find((row) => row.metricType === "TREND_ANALYTICS");
+        const dailySales = snapshots.find((row) => row.metricType === "DAILY_SALES");
+        const walletSummary = snapshots.find((row) => row.metricType === "WALLET_SUMMARY");
+        const shipmentSummary = snapshots.find((row) => row.metricType === "SHIPMENT_STATUS");
+        const inventorySummary = snapshots.find((row) => row.metricType === "INVENTORY_SNAPSHOT");
         const payload = trendSnapshot?.payload as { current?: Array<{ label?: string; value?: number }> } | undefined;
         const series = Array.isArray(payload?.current)
           ? payload?.current?.map((item, index) => ({
@@ -56,6 +109,11 @@ export function DashboardOverview() {
             })) || []
           : [];
         setTrendSeries(series);
+        const dailyRows = Array.isArray(dailySales?.payload) ? (dailySales?.payload as DailySalesRow[]) : [];
+        setDailySalesSnapshot(dailyRows);
+        setWalletSnapshot((walletSummary?.payload as WalletSummary) || null);
+        setShipmentSnapshot((shipmentSummary?.payload as ShipmentSummary) || null);
+        setInventorySnapshot((inventorySummary?.payload as InventorySnapshot) || null);
       } catch (err) {
         if (!active) return;
         setError(err instanceof Error ? err.message : "Unable to load dashboard overview.");
@@ -74,7 +132,9 @@ export function DashboardOverview() {
       ["PLACED", "PAYMENT_PENDING", "PAYMENT_FAILED", "CONFIRMED"].includes(String(order.status || ""))
     ).length;
     const revenue = orders.reduce((acc, order) => acc + Number(order.totalAmount || 0), 0);
-    const todaysSales = orders
+    const todayKey = toDateKey(today);
+    const todaysSalesFromSnapshot = dailySalesSnapshot.find((row) => row.date === todayKey)?.gmv || 0;
+    const todaysSales = todaysSalesFromSnapshot || orders
       .filter((order) => order.createdAt && isSameDay(new Date(order.createdAt), today))
       .reduce((acc, order) => acc + Number(order.totalAmount || 0), 0);
     const lowStock = inventory.filter(
@@ -82,7 +142,14 @@ export function DashboardOverview() {
     ).length;
 
     const delivered = orders.filter((order) => String(order.status || "") === "DELIVERED").length;
-    const conversion = totalOrders ? Math.round((delivered / totalOrders) * 100) : 0;
+    const conversion = shipmentSnapshot?.successRate
+      ? Math.round(shipmentSnapshot.successRate * 100)
+      : totalOrders
+        ? Math.round((delivered / totalOrders) * 100)
+        : 0;
+    const lowStockCount = inventorySnapshot?.lowStockCount ?? lowStock;
+    const totalDue = customers.reduce((sum, customer) => sum + Number(customer.totalDue || 0), 0);
+    const searchableCustomers = customers.filter((customer) => Boolean(customer.phone)).length;
 
     return [
       { label: "Today's sales", value: `${todaysSales} BDT`, meta: "Sales today" },
@@ -90,10 +157,26 @@ export function DashboardOverview() {
       { label: "Pending orders", value: String(pendingOrders), meta: "Needs action" },
       { label: "Revenue", value: `${summary?.sales?.totalSales ?? revenue} BDT`, meta: "Lifetime revenue" },
       { label: "Wallet balance", value: `${walletBalance} BDT`, meta: "Available payout" },
-      { label: "Low stock alerts", value: String(lowStock), meta: "Inventory watchlist" },
-      { label: "Conversion", value: `${conversion}%`, meta: "Delivered / total orders" },
+      { label: "Profit", value: `${walletReport?.profitLoss ?? 0} BDT`, meta: "Income - expense" },
+      { label: "Customer due", value: `${totalDue} BDT`, meta: "Outstanding credit" },
+      { label: "CRM ready", value: String(searchableCustomers), meta: "Customers with mobile index" },
+      { label: "Wallet inflow", value: `${walletSnapshot?.credits ?? 0} BDT`, meta: "Credits (30 days)" },
+      { label: "Low stock alerts", value: String(lowStockCount), meta: "Inventory watchlist" },
+      { label: "Courier success", value: `${conversion}%`, meta: "Delivered / total shipments" },
     ];
-  }, [inventory, orders, summary, today, walletBalance]);
+  }, [
+    dailySalesSnapshot,
+    inventory,
+    inventorySnapshot?.lowStockCount,
+    orders,
+    shipmentSnapshot?.successRate,
+    summary,
+    today,
+    customers,
+    walletBalance,
+    walletReport?.profitLoss,
+    walletSnapshot?.credits,
+  ]);
 
   const recentOrders = useMemo(() => orders.slice(0, 6), [orders]);
   const lowStockItems = useMemo(
@@ -108,8 +191,20 @@ export function DashboardOverview() {
 
   const fallbackSeries = useMemo(() => buildDailySeries(orders, 7), [orders]);
   const fallbackRevenueSeries = useMemo(() => buildDailyRevenueSeries(orders, 7), [orders]);
+  const snapshotRevenueSeries = useMemo(
+    () =>
+      dailySalesSnapshot.slice(-14).map((row) => ({
+        label: row.date || "Day",
+        value: Number(row.gmv || 0),
+      })),
+    [dailySalesSnapshot]
+  );
   const chartSales = trendSeries.length ? trendSeries : fallbackSeries;
-  const chartRevenue = revenueSeries.length ? revenueSeries : fallbackRevenueSeries;
+  const chartRevenue = snapshotRevenueSeries.length
+    ? snapshotRevenueSeries
+    : revenueSeries.length
+      ? revenueSeries
+      : fallbackRevenueSeries;
 
   useEffect(() => {
     if (!orders.length) return;
@@ -122,20 +217,15 @@ export function DashboardOverview() {
         <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Merchant</p>
         <h1 className="dx-display text-3xl">Dashboard</h1>
         <p className="text-sm text-muted-foreground">
-          Your shop health at a glanceâ€”sales, inventory, and customer activity.
+          Your shop health at a glance: sales, inventory, and customer activity.
         </p>
       </div>
 
-      {error ? (
-        <Card>
-          <CardTitle>Dashboard overview</CardTitle>
-          <CardDescription className="mt-2">{error}</CardDescription>
-        </Card>
-      ) : null}
+      {error ? <Alert variant="error">{error}</Alert> : null}
 
       <AnalyticsCards items={quickStats} />
 
-      <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
+      <Grid minColumnWidth="320px" className="gap-4">
         <Card>
           <CardTitle>Activity feed</CardTitle>
           <CardDescription className="mt-2">Recent orders and fulfillment updates.</CardDescription>
@@ -147,7 +237,7 @@ export function DashboardOverview() {
                   className="flex flex-wrap justify-between gap-2 rounded-2xl border border-border/60 px-4 py-3"
                 >
                   <span>Order {order._id?.slice(-6)}</span>
-                  <span>{order.status || "PLACED"}</span>
+                  <Badge variant={resolveStatusVariant(order.status)}>{order.status || "PLACED"}</Badge>
                   <span>{order.totalAmount ?? 0} BDT</span>
                   <span>{order.createdAt ? new Date(order.createdAt).toLocaleString() : "Pending"}</span>
                 </div>
@@ -170,7 +260,7 @@ export function DashboardOverview() {
                 >
                   <span>{row.productId || "Product"}</span>
                   <span>{row.available ?? 0} left</span>
-                  <span>Reorder at {row.reorderPoint ?? 0}</span>
+                  <Badge variant="warning">Reorder at {row.reorderPoint ?? 0}</Badge>
                 </div>
               ))
             ) : (
@@ -178,9 +268,9 @@ export function DashboardOverview() {
             )}
           </div>
         </Card>
-      </div>
+      </Grid>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <Grid minColumnWidth="320px" className="gap-4">
         <Card>
           <CardTitle>Sales trend</CardTitle>
           <CardDescription className="mt-2">Recent sales momentum for your shop.</CardDescription>
@@ -195,9 +285,9 @@ export function DashboardOverview() {
             <SalesChart data={chartRevenue.length ? chartRevenue : [{ label: "No data", value: 0 }]} />
           </div>
         </Card>
-      </div>
+      </Grid>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <Grid minColumnWidth="320px" className="gap-4">
         <Card>
           <CardTitle>Recent orders</CardTitle>
           <CardDescription className="mt-2">Track last confirmed purchases.</CardDescription>
@@ -207,7 +297,7 @@ export function DashboardOverview() {
                 <div key={String(order._id)} className="flex flex-wrap justify-between gap-2 rounded-2xl border border-border/60 px-4 py-3">
                   <span>{order.items?.[0]?.product?.name || "Order items"}</span>
                   <span>{order.totalAmount ?? 0} BDT</span>
-                  <span>{order.status || "PLACED"}</span>
+                  <Badge variant={resolveStatusVariant(order.status)}>{order.status || "PLACED"}</Badge>
                 </div>
               ))
             ) : (
@@ -227,15 +317,24 @@ export function DashboardOverview() {
             </div>
             <div className="flex flex-wrap justify-between gap-2 rounded-2xl border border-border/60 px-4 py-3">
               <span>Total SKUs</span>
-              <span>{inventory.length}</span>
+              <span>{inventorySnapshot?.totalSkus ?? inventory.length}</span>
             </div>
             <div className="flex flex-wrap justify-between gap-2 rounded-2xl border border-border/60 px-4 py-3">
               <span>Low stock items</span>
               <span>{lowStockItems.length}</span>
             </div>
+            <div className="rounded-2xl border border-border/60 px-4 py-3">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>Low stock ratio</span>
+                <span>{inventory.length ? Math.round((lowStockItems.length / inventory.length) * 100) : 0}%</span>
+              </div>
+              <div className="mt-2">
+                <ProgressBar value={inventory.length ? (lowStockItems.length / inventory.length) * 100 : 0} />
+              </div>
+            </div>
           </div>
         </Card>
-      </div>
+      </Grid>
 
       <Card>
         <CardTitle>Top products</CardTitle>
@@ -260,6 +359,18 @@ export function DashboardOverview() {
 
 function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function toDateKey(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function resolveStatusVariant(status?: string) {
+  const value = String(status || "").toUpperCase();
+  if (["DELIVERED", "PAID", "COMPLETED"].includes(value)) return "success";
+  if (["CANCELLED", "FAILED", "REFUNDED"].includes(value)) return "danger";
+  if (["PAYMENT_PENDING", "PENDING", "IN_REVIEW"].includes(value)) return "warning";
+  return "neutral";
 }
 
 function buildDailySeries(orders: OrderRow[], days: number) {

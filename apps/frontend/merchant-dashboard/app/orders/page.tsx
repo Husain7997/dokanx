@@ -1,10 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Button, Card, CardDescription, CardTitle, Input } from "@dokanx/ui";
+import { useAuth } from "@dokanx/auth";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardDescription,
+  CardTitle,
+  Checkbox,
+  ProgressBar,
+  SearchInput,
+  SelectDropdown
+} from "@dokanx/ui";
 import QRCode from "qrcode";
 
-import { getShopSettings, listOrders, refundPayment, updateOrderStatus } from "@/lib/runtime-api";
+import { getShopSettings, listOrders, listShopClaims, refundPayment, updateClaimStatus, updateOrderStatus } from "@/lib/runtime-api";
 
 type OrderRow = {
   _id?: string;
@@ -27,7 +39,20 @@ const statusOptions = [
   "REFUNDED",
 ];
 
+const statusSelectOptions = statusOptions.map((status) => ({
+  label: status.replace(/_/g, " "),
+  value: status
+}));
+
+const csvPresetOptions = [
+  { label: "Summary", value: "summary" },
+  { label: "Finance", value: "finance" },
+  { label: "Customer", value: "customer" },
+  { label: "Full", value: "full" }
+];
+
 export default function OrdersPage() {
+  const auth = useAuth();
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [query, setQuery] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -48,6 +73,7 @@ export default function OrdersPage() {
     customerPhone: false,
   });
   const [csvPreset, setCsvPreset] = useState("summary");
+  const [claims, setClaims] = useState<Array<Record<string, unknown>>>([]);
 
   async function refresh() {
     const response = await listOrders();
@@ -58,6 +84,16 @@ export default function OrdersPage() {
     void refresh();
     void loadShopProfile();
   }, []);
+
+  useEffect(() => {
+    const shopId = auth.user?.shopId;
+    if (!shopId) return;
+    listShopClaims(String(shopId))
+      .then((response) => {
+        setClaims(Array.isArray(response.data) ? response.data : []);
+      })
+      .catch(() => undefined);
+  }, [auth.user?.shopId]);
 
   async function loadShopProfile() {
     try {
@@ -215,37 +251,30 @@ export default function OrdersPage() {
         <CardTitle>Order filters</CardTitle>
         <CardDescription className="mt-2">Search by order ID to jump to a record.</CardDescription>
         <div className="mt-4 flex flex-wrap gap-3">
-          <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search order ID" />
+          <SearchInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search order ID" />
           <Button variant="secondary" onClick={() => setQuery("")}>Clear</Button>
           <Button variant="secondary" onClick={handleExportCsv}>Export CSV</Button>
         </div>
         <div className="mt-4 grid gap-2 text-xs text-muted-foreground">
           <p className="font-medium text-foreground">CSV columns</p>
           <div className="flex flex-wrap items-center gap-3">
-            <label className="text-xs text-muted-foreground">Preset</label>
-            <select
-              className="h-9 rounded-full border border-border bg-background px-3 text-xs"
+            <SelectDropdown
+              label="Preset"
               value={csvPreset}
-              onChange={(event) => {
-                const value = event.target.value;
+              onValueChange={(value) => {
                 setCsvPreset(value);
                 setCsvColumns(buildPresetColumns(value));
               }}
-            >
-              <option value="summary">Summary</option>
-              <option value="finance">Finance</option>
-              <option value="customer">Customer</option>
-              <option value="full">Full</option>
-            </select>
+              options={csvPresetOptions}
+            />
           </div>
           <div className="flex flex-wrap gap-4">
             {Object.keys(csvColumns).map((key) => (
               <label key={key} className="flex items-center gap-2">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={csvColumns[key]}
-                  onChange={(event) => {
-                    setCsvColumns((current) => ({ ...current, [key]: event.target.checked }));
+                  onCheckedChange={(checked) => {
+                    setCsvColumns((current) => ({ ...current, [key]: Boolean(checked) }));
                   }}
                 />
                 {key}
@@ -259,17 +288,12 @@ export default function OrdersPage() {
         <CardTitle>Bulk status update</CardTitle>
         <CardDescription className="mt-2">Apply a status to selected orders.</CardDescription>
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <select
-            className="h-11 rounded-full border border-border bg-background px-4 text-sm"
+          <SelectDropdown
+            label="Bulk status"
             value={bulkStatus}
-            onChange={(event) => setBulkStatus(event.target.value)}
-          >
-            {statusOptions.map((status) => (
-              <option key={status} value={status}>
-                {status}
-              </option>
-            ))}
-          </select>
+            onValueChange={setBulkStatus}
+            options={statusSelectOptions}
+          />
           <Button onClick={handleBulkUpdate} disabled={!selectedIds.size}>
             Update {selectedIds.size} orders
           </Button>
@@ -281,53 +305,107 @@ export default function OrdersPage() {
           <span className="font-medium text-foreground">QR target</span>
           {["payment", "invoice"].map((value) => (
             <label key={value} className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="qr-target"
-                value={value}
+              <Checkbox
                 checked={qrTarget === value}
-                onChange={() => setQrTarget(value as "payment" | "invoice")}
+                onCheckedChange={() => setQrTarget(value as "payment" | "invoice")}
               />
               {value === "payment" ? "Payment link" : "Invoice link"}
             </label>
           ))}
         </div>
         {bulkProgress ? (
-          <p className="mt-3 text-xs text-muted-foreground">
-            Processing {bulkProgress.done}/{bulkProgress.total} â€¢ Failures {bulkProgress.failures}
-          </p>
+          <div className="mt-3 grid gap-2 text-xs text-muted-foreground">
+            <div className="flex items-center justify-between">
+              <span>Processing {bulkProgress.done}/{bulkProgress.total}</span>
+              <span>Failures {bulkProgress.failures}</span>
+            </div>
+            <ProgressBar value={(bulkProgress.done / bulkProgress.total) * 100} />
+          </div>
         ) : null}
         {failedIds.length ? (
-          <p className="mt-2 text-xs text-red-600">
+          <Alert variant="error" className="mt-2">
             Failed order IDs: {failedIds.map((id) => id.slice(-6)).join(", ")}
-          </p>
+          </Alert>
         ) : null}
       </Card>
 
-      {error ? (
-        <Card>
-          <CardTitle>Orders</CardTitle>
-          <CardDescription className="mt-2">{error}</CardDescription>
-        </Card>
-      ) : null}
+      <Card>
+        <CardTitle>Warranty and guarantee claims</CardTitle>
+        <CardDescription className="mt-2">Approve, reject, or resolve customer claims from the merchant panel.</CardDescription>
+        <div className="mt-4 grid gap-3">
+          {claims.slice(0, 8).map((claim, index) => (
+            <div key={`${String(claim._id || index)}`} className="rounded-2xl border border-border/60 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold">
+                    {String(claim.type || "claim").toUpperCase()} {String(claim.status || "pending").toUpperCase()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Order {String(claim.orderId || "")} | Product {String(claim.productId || "")}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="secondary" onClick={async () => {
+                    if (!claim._id) return;
+                    await updateClaimStatus(String(claim._id), { status: "approved" });
+                    if (auth.user?.shopId) {
+                      const response = await listShopClaims(String(auth.user.shopId));
+                      setClaims(Array.isArray(response.data) ? response.data : []);
+                    }
+                  }}>
+                    Approve
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={async () => {
+                    if (!claim._id) return;
+                    await updateClaimStatus(String(claim._id), { status: "rejected", decisionNote: "Rejected by merchant" });
+                    if (auth.user?.shopId) {
+                      const response = await listShopClaims(String(auth.user.shopId));
+                      setClaims(Array.isArray(response.data) ? response.data : []);
+                    }
+                  }}>
+                    Reject
+                  </Button>
+                  <Button size="sm" onClick={async () => {
+                    if (!claim._id) return;
+                    await updateClaimStatus(String(claim._id), { status: "resolved", resolutionType: "refund" });
+                    if (auth.user?.shopId) {
+                      const response = await listShopClaims(String(auth.user.shopId));
+                      setClaims(Array.isArray(response.data) ? response.data : []);
+                    }
+                  }}>
+                    Refund
+                  </Button>
+                </div>
+              </div>
+              {!!(claim.fraudFlags && Array.isArray(claim.fraudFlags) && claim.fraudFlags.length) ? (
+                <p className="mt-2 text-xs text-muted-foreground">Fraud flags: {(claim.fraudFlags as string[]).join(", ")}</p>
+              ) : null}
+            </div>
+          ))}
+          {!claims.length ? (
+            <p className="text-sm text-muted-foreground">No open claims for this shop.</p>
+          ) : null}
+        </div>
+      </Card>
+
+      {error ? <Alert variant="error">{error}</Alert> : null}
 
       <div className="grid gap-4">
         {filteredOrders.map((order) => (
           <Card key={String(order._id || "")}>
             <CardTitle>Order #{String(order._id || "").slice(-6)}</CardTitle>
             <CardDescription className="mt-2">
-              {order.items?.[0]?.product?.name || "Multiple items"} â€¢ {order.totalAmount ?? 0} BDT
+              {order.items?.[0]?.product?.name || "Multiple items"} - {order.totalAmount ?? 0} BDT
             </CardDescription>
             <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
               <label className="flex items-center gap-2 text-xs">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={order._id ? selectedIds.has(order._id) : false}
-                  onChange={(event) => {
+                  onCheckedChange={(checked) => {
                     if (!order._id) return;
                     setSelectedIds((current) => {
                       const next = new Set(current);
-                      if (event.target.checked) {
+                      if (checked) {
                         next.add(order._id as string);
                       } else {
                         next.delete(order._id as string);
@@ -338,25 +416,19 @@ export default function OrdersPage() {
                 />
                 Select
               </label>
-              <span>Status: {order.status || "PLACED"}</span>
+              <Badge variant={resolveStatusVariant(order.status)}>
+                {order.status || "PLACED"}
+              </Badge>
               <span>{order.createdAt ? new Date(order.createdAt).toLocaleString() : "Pending"}</span>
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-3">
-              <select
-                className="h-11 rounded-full border border-border bg-background px-4 text-sm"
-                defaultValue={order.status || "PLACED"}
-                onChange={(event) => {
-                  if (!order._id) return;
-                  void handleStatusUpdate(order._id, event.target.value);
-                }}
+              <SelectDropdown
+                label="Status"
+                value={order.status || "PLACED"}
+                onValueChange={(value) => order._id && handleStatusUpdate(order._id, value)}
+                options={statusSelectOptions}
                 disabled={busyId === order._id}
-              >
-                {statusOptions.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
+              />
               <Button variant="secondary" onClick={() => handlePrintInvoice(order)}>
                 Print invoice
               </Button>
@@ -384,9 +456,17 @@ export default function OrdersPage() {
         ) : null}
       </div>
 
-      {statusMessage ? <p className="text-xs text-emerald-700">{statusMessage}</p> : null}
+      {statusMessage ? <Alert variant="success">{statusMessage}</Alert> : null}
     </div>
   );
+}
+
+function resolveStatusVariant(status?: string) {
+  const value = String(status || "").toUpperCase();
+  if (["DELIVERED", "PAID", "COMPLETED"].includes(value)) return "success";
+  if (["CANCELLED", "FAILED", "REFUNDED", "PAYMENT_FAILED"].includes(value)) return "danger";
+  if (["PAYMENT_PENDING", "PENDING", "CONFIRMED", "SHIPPED"].includes(value)) return "warning";
+  return "neutral";
 }
 
 function buildInvoiceHtml(

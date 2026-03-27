@@ -1,0 +1,88 @@
+apply plugin: 'com.android.application'
+apply plugin: 'org.jetbrains.kotlin.android'
+apply plugin: 'com.facebook.react'
+
+def appRoot = new File(projectDir, '../..').canonicalFile
+def appsRoot = new File(projectDir, '../../../../..').canonicalFile
+def repoRoot = new File(projectDir, '../../../../../..').canonicalFile
+ext.REACT_NATIVE_NODE_MODULES_DIR = new File(appsRoot, 'node_modules/react-native').canonicalPath
+
+react {
+    debuggableVariants = ['debug']
+    entryFile = file('../../index.js')
+    root = appRoot
+    reactNativeDir = new File(appsRoot, 'node_modules/react-native').canonicalFile
+    codegenDir = new File(appsRoot, 'node_modules/@react-native/codegen').canonicalFile
+    cliFile = new File(repoRoot, 'apps/frontend/mobile-app/shared/react-native-bundle-cli.js').canonicalFile
+    hermesCommand = new File(repoRoot, 'node_modules/hermes-compiler/hermesc/%OS-BIN%/hermesc').path
+    nodeExecutableAndArgs = ['node', '--max-old-space-size=4096']
+    extraPackagerArgs = ['--max-workers', '1']
+    autolinkLibrariesWithApp()
+}
+
+def enableProguardInReleaseBuilds = true
+def releaseStoreFile = findProperty('DOKANX_UPLOAD_STORE_FILE') ?: System.getenv('DOKANX_UPLOAD_STORE_FILE')
+def releaseKeyAlias = findProperty('DOKANX_UPLOAD_KEY_ALIAS') ?: System.getenv('DOKANX_UPLOAD_KEY_ALIAS')
+def releaseStorePassword = findProperty('DOKANX_UPLOAD_STORE_PASSWORD') ?: System.getenv('DOKANX_UPLOAD_STORE_PASSWORD')
+def releaseKeyPassword = findProperty('DOKANX_UPLOAD_KEY_PASSWORD') ?: System.getenv('DOKANX_UPLOAD_KEY_PASSWORD')
+def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
+
+android {
+    ndkVersion rootProject.ext.ndkVersion
+    buildToolsVersion rootProject.ext.buildToolsVersion
+    compileSdk rootProject.ext.compileSdkVersion
+
+    namespace 'com.dokanx.merchant'
+    defaultConfig {
+        applicationId 'com.dokanx.merchant'
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName '1.0'
+        externalNativeBuild {
+            cmake {
+                cppFlags '-Wno-error=deprecated-declarations'
+            }
+        }
+    }
+    signingConfigs {
+        debug {
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+        if (releaseStoreFile) {
+            release {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+            manifestPlaceholders = [usesCleartextTraffic: 'true']
+        }
+        release {
+            signingConfig signingConfigs.findByName('release') ?: signingConfigs.debug
+            debuggable false
+            minifyEnabled enableProguardInReleaseBuilds
+            shrinkResources enableProguardInReleaseBuilds
+            manifestPlaceholders = [usesCleartextTraffic: 'true']
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    implementation('com.facebook.react:react-android')
+
+    if (hermesEnabled.toBoolean()) {
+        implementation('com.facebook.react:hermes-android')
+    } else {
+        implementation jscFlavor
+    }
+}

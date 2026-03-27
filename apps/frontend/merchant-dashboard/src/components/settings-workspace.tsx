@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Button, Input } from "@dokanx/ui";
+import { useEffect, useMemo, useState } from "react";
+import { Alert, Button, SelectDropdown, TextInput } from "@dokanx/ui";
 
 import {
   addTeamMember,
@@ -70,6 +70,21 @@ export function SettingsWorkspace() {
   const [submittingTheme, setSubmittingTheme] = useState(false);
   const [submittingSettings, setSubmittingSettings] = useState(false);
   const [submittingTeam, setSubmittingTeam] = useState(false);
+  const themeOptions = useMemo(
+    () =>
+      themes.map((theme) => ({
+        label: `${theme.name || theme.slug || theme._id || theme.id || "Theme"}${theme.category ? ` (${theme.category})` : ""}`,
+        value: String(theme._id || theme.id || "")
+      })),
+    [themes]
+  );
+  const teamRoleOptions = useMemo(
+    () => [
+      { label: "Staff", value: "STAFF" },
+      { label: "Owner", value: "OWNER" }
+    ],
+    []
+  );
 
   async function loadThemes() {
     setLoadingThemes(true);
@@ -253,72 +268,30 @@ export function SettingsWorkspace() {
           description="Profile, logo, and brand color overrides persist to the backend."
         >
           <div className="grid gap-4">
-            <label className="grid gap-2 text-sm">
-              <span>Shop name</span>
-              <Input value={settings.shopName} onChange={(event) => setSettings((current) => ({ ...current, shopName: event.target.value }))} />
-            </label>
-            <label className="grid gap-2 text-sm">
-              <span>Support email</span>
-              <Input value={settings.supportEmail} onChange={(event) => setSettings((current) => ({ ...current, supportEmail: event.target.value }))} />
-            </label>
-            <label className="grid gap-2 text-sm">
-              <span>WhatsApp</span>
-              <Input value={settings.whatsapp} onChange={(event) => setSettings((current) => ({ ...current, whatsapp: event.target.value }))} />
-            </label>
-            <label className="grid gap-2 text-sm">
-              <span>Payout schedule</span>
-              <Input value={settings.payoutSchedule} onChange={(event) => setSettings((current) => ({ ...current, payoutSchedule: event.target.value }))} />
-            </label>
-            <label className="grid gap-2 text-sm">
-              <span>Logo URL</span>
-              <Input value={settings.logoUrl} onChange={(event) => setSettings((current) => ({ ...current, logoUrl: event.target.value }))} />
-            </label>
-            <label className="grid gap-2 text-sm">
-              <span>Storefront domain</span>
-              <Input value={settings.storefrontDomain} onChange={(event) => setSettings((current) => ({ ...current, storefrontDomain: event.target.value }))} />
-            </label>
-            <label className="grid gap-2 text-sm">
-              <span>Address line 1</span>
-              <Input value={settings.addressLine1} onChange={(event) => setSettings((current) => ({ ...current, addressLine1: event.target.value }))} />
-            </label>
-            <label className="grid gap-2 text-sm">
-              <span>Address line 2</span>
-              <Input value={settings.addressLine2} onChange={(event) => setSettings((current) => ({ ...current, addressLine2: event.target.value }))} />
-            </label>
+            <TextInput label="Shop name" value={settings.shopName} onChange={(event) => setSettings((current) => ({ ...current, shopName: event.target.value }))} />
+            <TextInput label="Support email" value={settings.supportEmail} onChange={(event) => setSettings((current) => ({ ...current, supportEmail: event.target.value }))} />
+            <TextInput label="WhatsApp" value={settings.whatsapp} onChange={(event) => setSettings((current) => ({ ...current, whatsapp: event.target.value }))} />
+            <TextInput label="Payout schedule" value={settings.payoutSchedule} onChange={(event) => setSettings((current) => ({ ...current, payoutSchedule: event.target.value }))} />
+            <TextInput label="Logo URL" value={settings.logoUrl} onChange={(event) => setSettings((current) => ({ ...current, logoUrl: event.target.value }))} />
+            <TextInput label="Storefront domain" value={settings.storefrontDomain} onChange={(event) => setSettings((current) => ({ ...current, storefrontDomain: event.target.value }))} />
+            <TextInput label="Address line 1" value={settings.addressLine1} onChange={(event) => setSettings((current) => ({ ...current, addressLine1: event.target.value }))} />
+            <TextInput label="Address line 2" value={settings.addressLine2} onChange={(event) => setSettings((current) => ({ ...current, addressLine2: event.target.value }))} />
             <div className="grid gap-4 md:grid-cols-2">
-              <label className="grid gap-2 text-sm">
-                <span>City</span>
-                <Input value={settings.city} onChange={(event) => setSettings((current) => ({ ...current, city: event.target.value }))} />
-              </label>
-              <label className="grid gap-2 text-sm">
-                <span>Country</span>
-                <Input value={settings.country} onChange={(event) => setSettings((current) => ({ ...current, country: event.target.value }))} />
-              </label>
+              <TextInput label="City" value={settings.city} onChange={(event) => setSettings((current) => ({ ...current, city: event.target.value }))} />
+              <TextInput label="Country" value={settings.country} onChange={(event) => setSettings((current) => ({ ...current, country: event.target.value }))} />
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              <label className="grid gap-2 text-sm">
-                <span>VAT rate (%)</span>
-                <Input value={settings.vatRate} onChange={(event) => setSettings((current) => ({ ...current, vatRate: event.target.value }))} />
-              </label>
-              <label className="grid gap-2 text-sm">
-                <span>Default discount (%)</span>
-                <Input value={settings.defaultDiscountRate} onChange={(event) => setSettings((current) => ({ ...current, defaultDiscountRate: event.target.value }))} />
-              </label>
+              <TextInput label="VAT rate (%)" value={settings.vatRate} onChange={(event) => setSettings((current) => ({ ...current, vatRate: event.target.value }))} />
+              <TextInput label="Default discount (%)" value={settings.defaultDiscountRate} onChange={(event) => setSettings((current) => ({ ...current, defaultDiscountRate: event.target.value }))} />
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              <label className="grid gap-2 text-sm">
-                <span>Primary color</span>
-                <Input value={settings.brandPrimaryColor} onChange={(event) => setSettings((current) => ({ ...current, brandPrimaryColor: event.target.value }))} />
-              </label>
-              <label className="grid gap-2 text-sm">
-                <span>Accent color</span>
-                <Input value={settings.brandAccentColor} onChange={(event) => setSettings((current) => ({ ...current, brandAccentColor: event.target.value }))} />
-              </label>
+              <TextInput label="Primary color" value={settings.brandPrimaryColor} onChange={(event) => setSettings((current) => ({ ...current, brandPrimaryColor: event.target.value }))} />
+              <TextInput label="Accent color" value={settings.brandAccentColor} onChange={(event) => setSettings((current) => ({ ...current, brandAccentColor: event.target.value }))} />
             </div>
           </div>
           <div className="mt-6 flex gap-3">
-            <Button onClick={handleSaveSettings} disabled={submittingSettings}>
-              {submittingSettings ? "Saving..." : "Save Settings"}
+            <Button onClick={handleSaveSettings} loading={submittingSettings} loadingText="Saving settings">
+              Save Settings
             </Button>
           </div>
         </WorkspaceCard>
@@ -328,27 +301,16 @@ export function SettingsWorkspace() {
           description="Theme application now carries brand overrides so storefront identity stays coherent."
         >
           <div className="grid gap-4">
-            <label className="grid gap-2 text-sm">
-              <span>Available themes</span>
-              <select
-                className="h-11 rounded-full border border-border bg-background px-4 text-sm"
-                value={selectedThemeId}
-                onChange={(event) => setSelectedThemeId(event.target.value)}
-                disabled={loadingThemes || themes.length === 0}
-              >
-                {themes.map((theme) => {
-                  const value = String(theme._id || theme.id || "");
-                  return (
-                    <option key={value} value={value}>
-                      {theme.name || value} {theme.category ? `(${theme.category})` : ""}
-                    </option>
-                  );
-                })}
-              </select>
-            </label>
+            <SelectDropdown
+              label="Available themes"
+              value={selectedThemeId}
+              onValueChange={setSelectedThemeId}
+              options={themeOptions}
+              disabled={loadingThemes || themes.length === 0}
+            />
             <div className="flex gap-3">
-              <Button onClick={handleApplyTheme} disabled={submittingTheme || loadingThemes || !selectedThemeId}>
-                {submittingTheme ? "Working..." : "Apply Theme"}
+              <Button onClick={handleApplyTheme} loading={submittingTheme} loadingText="Applying theme" disabled={loadingThemes || !selectedThemeId}>
+                Apply Theme
               </Button>
               <Button variant="ghost" onClick={handleResetTheme} disabled={submittingTheme}>
                 Reset Theme
@@ -362,20 +324,13 @@ export function SettingsWorkspace() {
           description="Owner-managed team roles and permission overrides are now backed by live shop endpoints."
         >
           <div className="grid gap-4">
-            <Input value={teamDraft.name} onChange={(event) => setTeamDraft((current) => ({ ...current, name: event.target.value }))} />
-            <Input value={teamDraft.email} onChange={(event) => setTeamDraft((current) => ({ ...current, email: event.target.value }))} />
-            <Input value={teamDraft.phone} onChange={(event) => setTeamDraft((current) => ({ ...current, phone: event.target.value }))} />
-            <select
-              className="h-11 rounded-full border border-border bg-background px-4 text-sm"
-              value={teamDraft.role}
-              onChange={(event) => setTeamDraft((current) => ({ ...current, role: event.target.value }))}
-            >
-              <option value="STAFF">Staff</option>
-              <option value="OWNER">Owner</option>
-            </select>
-            <Input value={teamDraft.permissions} onChange={(event) => setTeamDraft((current) => ({ ...current, permissions: event.target.value }))} />
-            <Button onClick={handleAddTeamMember} disabled={submittingTeam}>
-              {submittingTeam ? "Saving..." : "Add Or Update Team Member"}
+            <TextInput label="Name" value={teamDraft.name} onChange={(event) => setTeamDraft((current) => ({ ...current, name: event.target.value }))} />
+            <TextInput label="Email" value={teamDraft.email} onChange={(event) => setTeamDraft((current) => ({ ...current, email: event.target.value }))} />
+            <TextInput label="Phone" value={teamDraft.phone} onChange={(event) => setTeamDraft((current) => ({ ...current, phone: event.target.value }))} />
+            <SelectDropdown label="Role" value={teamDraft.role} onValueChange={(value) => setTeamDraft((current) => ({ ...current, role: value }))} options={teamRoleOptions} />
+            <TextInput label="Permissions (comma separated)" value={teamDraft.permissions} onChange={(event) => setTeamDraft((current) => ({ ...current, permissions: event.target.value }))} />
+            <Button onClick={handleAddTeamMember} loading={submittingTeam} loadingText="Saving team member">
+              Add Or Update Team Member
             </Button>
           </div>
           <div className="mt-6 grid gap-3">
@@ -413,7 +368,7 @@ export function SettingsWorkspace() {
 
         {message ? (
           <WorkspaceCard title="Status" description="Latest settings mutation result">
-            <p className="text-sm text-muted-foreground">{message}</p>
+            <Alert variant="info">{message}</Alert>
           </WorkspaceCard>
         ) : null}
       </div>

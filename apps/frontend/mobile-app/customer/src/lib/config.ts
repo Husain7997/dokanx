@@ -1,1 +1,1 @@
-export const DEFAULT_TENANT_ID = "demo-tenant";
+export { DEFAULT_TENANT_ID } from "../../../shared/constants";

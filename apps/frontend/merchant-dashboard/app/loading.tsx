@@ -1,5 +1,5 @@
-import { Skeleton } from "@dokanx/ui";
+import { PageLoading } from "@dokanx/ui";
 
 export default function Loading() {
-  return <Skeleton className="h-80 w-full" />;
+  return <PageLoading label="Merchant workspace" title="Syncing your dashboard, orders, and inventory" />;
 }

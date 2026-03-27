@@ -1,34 +1,43 @@
 {
-  "name": "@dokanx/merchant-dashboard",
-  "version": "0.0.1",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
-  },
-  "dependencies": {
-    "@dokanx/api-client": "file:../../backend/packages/api-client",
-    "@dokanx/auth": "file:../../backend/packages/auth",
-    "@dokanx/hooks": "file:../../backend/packages/hooks",
-    "@dokanx/types": "file:../../backend/packages/types",
-    "@dokanx/ui": "file:../../backend/packages/ui",
-    "@dokanx/utils": "file:../../backend/packages/utils",
-    "@tanstack/react-query": "^5.68.0",
-    "next": "^15.2.0",
-    "qrcode": "^1.5.3",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "zustand": "^5.0.3"
-  },
-  "devDependencies": {
-    "@dokanx/config": "file:../../backend/packages/config",
-    "@types/node": "^24.0.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "autoprefixer": "^10.4.21",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^3.4.17",
-    "typescript": "^5.8.2"
-  }
+    "name":  "@dokanx/merchant-dashboard",
+    "version":  "0.0.1",
+    "private":  true,
+    "scripts":  {
+                    "dev":  "set NEXT_DIST_DIR=.next-dev-merchant\\u0026\\u0026 node --max-old-space-size=4096 .\\node_modules\\next\\dist\\bin\\next dev -H 0.0.0.0",
+                    "build":  "next build",
+                    "start":  "next start"
+                },
+    "dependencies":  {
+                         "@alloc/quick-lru":  "^5.2.0",
+                         "@dokanx/api-client":  "file:../../backend/packages/api-client",
+                         "@dokanx/auth":  "file:../../backend/packages/auth",
+                         "@dokanx/hooks":  "file:../../backend/packages/hooks",
+                         "@dokanx/types":  "file:../../backend/packages/types",
+                         "@dokanx/ui":  "file:../../backend/packages/ui",
+                         "@dokanx/utils":  "file:../../backend/packages/utils",
+                         "@next/swc-win32-x64-msvc":  "^15.5.13",
+                         "@tanstack/react-query":  "^5.68.0",
+                         "maplibre-gl":  "^4.7.1",
+                         "micromatch":  "^4.0.8",
+                         "next":  "^15.2.0",
+                         "qrcode":  "^1.5.3",
+                         "react":  "^19.2.3",
+                         "react-dom":  "^19.2.3",
+                         "react-test-renderer":  "^19.2.3",
+                         "socket.io-client":  "^4.8.3",
+                         "zustand":  "^5.0.3"
+                     },
+    "devDependencies":  {
+                            "@dokanx/config":  "file:../../backend/packages/config",
+                            "@types/node":  "^24.0.0",
+                            "@types/react":  "^19.0.0",
+                            "@types/react-dom":  "^19.0.0",
+                            "autoprefixer":  "^10.4.21",
+                            "postcss":  "^8.5.6",
+                            "tailwindcss":  "^3.4.17",
+                            "typescript":  "^5.8.2"
+                        }
 }
+
+
+

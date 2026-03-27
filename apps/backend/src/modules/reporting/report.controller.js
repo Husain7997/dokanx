@@ -1,4 +1,5 @@
 const reportService = require("./report.service");
+const { t } = require("@/core/infrastructure");
 
 exports.getShopSummary = async (req, res) => {
   const shopId = req.user.shopId;

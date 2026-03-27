@@ -1,6 +1,6 @@
 const TaxRule = require('../../models/TaxRule');
 const Ledger = require('../../models/ledger.model');
-const ShopWallet = require('../../models/ShopWallet');
+const walletAdapter = require('../../services/wallet/walletAdapter.service');
 
 exports.applyVAT = async (order) => {
   const vatRule = await TaxRule.findOne({ type: 'VAT', active: true });
@@ -30,7 +30,7 @@ exports.applyWithholding = async (payout) => {
   const whAmount = (payout.amount * whRule.rate) / 100;
 
   // Ledger entry (debit Shop payable, credit Platform)
-  const shopWallet = await ShopWallet.findById(payout.shopWalletId);
+  const shopWallet = await walletAdapter.findById(payout.shopWalletId);
 
   await Ledger.create({
     walletId: shopWallet._id,

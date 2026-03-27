@@ -5,8 +5,11 @@ const OAuthApp = require("../../models/oauthApp.model");
 const Developer = require("../../models/developer.model");
 const AppInstallation = require("../../models/appInstallation.model");
 const { redis } = require("../../core/infrastructure");
-const { hashSecret } = require("../../utils/crypto.util");
+const crypto = require("crypto");
+const { decryptSecret, hashSecret } = require("../../utils/crypto.util");
 const { recordPlatformAudit } = require("../platform-hardening/platform-audit.service");
+
+const localRateBuckets = new Map();
 
 function getBearerToken(req) {
   const header = req.headers.authorization || "";
@@ -95,11 +98,22 @@ async function resolveAuthContext(req) {
 }
 
 async function incrementRateWindow(key, ttlSeconds) {
-  const count = await redis.incr(key);
-  if (count === 1) {
-    await redis.expire(key, ttlSeconds);
+  try {
+    const count = await redis.incr(key);
+    if (count === 1) {
+      await redis.expire(key, ttlSeconds);
+    }
+    return count;
+  } catch (_error) {
+    const now = Date.now();
+    const existing = localRateBuckets.get(key);
+    if (!existing || existing.expiresAt <= now) {
+      localRateBuckets.set(key, { count: 1, expiresAt: now + ttlSeconds * 1000 });
+      return 1;
+    }
+    existing.count += 1;
+    return existing.count;
   }
-  return count;
 }
 
 async function enforceRateLimit(identifier, limitPerMinute, limitPerDay) {
@@ -148,7 +162,12 @@ async function enforceReplayProtection(req) {
   }
 
   const replayKey = `replay:${nonce}`;
-  const stored = await redis.set(replayKey, "1", "EX", 300, "NX");
+  let stored;
+  try {
+    stored = await redis.set(replayKey, "1", "EX", 300, "NX");
+  } catch (_error) {
+    stored = "OK";
+  }
   if (stored !== "OK") {
     const error = new Error("Replay attack detected");
     error.statusCode = 409;
@@ -156,17 +175,37 @@ async function enforceReplayProtection(req) {
   }
 }
 
-function validateRequestSignature(req, rawCredential) {
-  const needsSignature = !["GET", "HEAD", "OPTIONS"].includes(req.method);
-  if (!needsSignature) return;
+function buildSignatureBase(req, payload) {
   const timestamp = req.headers["x-dokanx-timestamp"];
   const nonce = req.headers["x-dokanx-nonce"];
+  const bodyHash = crypto.createHash("sha256").update(payload).digest("hex");
+  return [req.method, req.originalUrl, String(timestamp || ""), String(nonce || ""), bodyHash].join(".");
+}
+
+function signRequest(secret, base) {
+  return crypto.createHmac("sha256", secret).update(base).digest("hex");
+}
+
+function validateRequestSignature(req, auth) {
+  const needsSignature = !["GET", "HEAD", "OPTIONS"].includes(req.method);
+  if (!needsSignature) return;
   const signature = req.headers["x-dokanx-signature"];
-  const payload =
-    typeof req.body === "string" ? req.body : JSON.stringify(req.body || {});
-  const base = [req.method, req.originalUrl, String(timestamp || ""), String(nonce || ""), payload].join(".");
-  const expected = hashSecret(`${rawCredential}.${base}`);
-  if (expected !== signature) {
+  const payload = typeof req.rawBody === "string" ? req.rawBody : (typeof req.body === "string" ? req.body : JSON.stringify(req.body || {}));
+  const base = buildSignatureBase(req, payload);
+  const dedicatedSecret =
+    decryptSecret(auth.apiKey?.signingSecretCipher, auth.apiKey?.signingSecretIv) ||
+    decryptSecret(auth.app?.signingSecretCipher, auth.app?.signingSecretIv) ||
+    null;
+
+  const candidates = [];
+  if (dedicatedSecret) {
+    candidates.push(signRequest(dedicatedSecret, base));
+  }
+  if (auth.legacy || !dedicatedSecret) {
+    candidates.push(hashSecret(`${auth.rawCredential}.${base}`));
+  }
+
+  if (!candidates.includes(signature)) {
     const error = new Error("Invalid request signature");
     error.statusCode = 401;
     throw error;
@@ -209,7 +248,7 @@ async function buildPlatformContext(req) {
     Number(process.env.PUBLIC_API_RATE_LIMIT_PER_DAY || 5000);
   await enforceRateLimit(String(identifier), limitPerMinute, limitPerDay);
   await enforceReplayProtection(req);
-  validateRequestSignature(req, auth.rawCredential);
+  validateRequestSignature(req, auth);
 
   const shopId = String(getRequestedShopId(req) || "");
   const installation = shopId

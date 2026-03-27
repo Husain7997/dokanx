@@ -55,6 +55,8 @@ async function processPayout({ shopId }) {
 
   eventBus.emit("PAYOUT_COMPLETED", {
     payoutId: payout._id,
+    shopId: payout.shopId,
+    amount: payout.amount,
   });
 
   return payout;

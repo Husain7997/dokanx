@@ -1,183 +1,207 @@
-const Product = require("../models/product.model");
+﻿const Product = require("../models/product.model");
 const Inventory = require("../models/Inventory.model");
 const ProductReview = require("../models/productReview.model");
-const { createAudit } = require("../utils/audit.util");
-const { t } =
-  require('@/core/infrastructure');
+const { t } = require("@/core/infrastructure");
 
-// exports.createProduct = async (req, res) => {
+function normalizeProtectionConfig(value, fallbackType) {
+  if (!value || typeof value !== "object") {
+    return {
+      enabled: false,
+      durationDays: 0,
+      type: fallbackType,
+    };
+  }
 
-//   if (!req.shop)
-//     return res.status(400).json({
-//       message: "Tenant shop missing"
-//     });
+  return {
+    enabled: Boolean(value.enabled),
+    durationDays: Math.max(0, Number(value.durationDays || 0)),
+    type: value.type ? String(value.type) : fallbackType,
+  };
+}
 
-//   const { name, price, description, stock = 0 } = req.body;
+function normalizeProductPayload(body) {
+  const source = body || {};
+  return {
+    name: String(source.name || "").trim(),
+    category: String(source.category || "General").trim() || "General",
+    price: Number(source.price || 0),
+    costPrice: Math.max(0, Number(source.costPrice || 0)),
+    stock: Math.max(0, Number(source.stock || 0)),
+    barcode: typeof source.barcode === "string" && source.barcode.trim() ? source.barcode.trim() : null,
+    imageUrl: typeof source.imageUrl === "string" ? source.imageUrl.trim() : "",
+    slug: typeof source.slug === "string" && source.slug.trim() ? source.slug.trim() : null,
+    discountRate: Math.max(0, Math.min(100, Number(source.discountRate || 0))),
+    warranty: normalizeProtectionConfig(source.warranty, "service"),
+    guarantee: normalizeProtectionConfig(source.guarantee, "replacement"),
+  };
+}
 
-//   const product = await Product.create({
-//     name,
-//     price,
-//     description,
-//     shopId: req.shop._id,
-//     owner: req.user._id,
-//   });
+async function syncInventory(shopId, productId, stock) {
+  await Inventory.updateOne(
+    { shopId, product: productId },
+    {
+      $set: {
+        stock,
+        isActive: true,
+      },
+      $setOnInsert: {
+        reserved: 0,
+        inventoryVersion: 0,
+        isReconciling: false,
+      },
+    },
+    { upsert: true }
+  );
+}
 
-//   const inventory = await Inventory.create({
-//     shopId: req.shop._id,
-//     product: product._id,
-//     stock,
-//     reserved: 0,
-//     status: stock > 0 ? "IN_STOCK" : "OUT_OF_STOCK"
-//   });
+async function createProductRecord({ shopId, ownerId, source }) {
+  const payload = normalizeProductPayload(source);
+  if (!payload.name) {
+    throw new Error("Product name is required");
+  }
 
-//   await createAudit({
-//     action: "CREATE_PRODUCT",
-//     performedBy: req.user._id,
-//     targetType: "Product",
-//     targetId: product._id,
-//     req
-//   });
+  const product = await Product.create({
+    name: payload.name,
+    category: payload.category,
+    price: payload.price,
+    costPrice: payload.costPrice,
+    stock: payload.stock,
+    discountRate: payload.discountRate,
+    slug: payload.slug,
+    barcode: payload.barcode,
+    imageUrl: payload.imageUrl,
+    shopId,
+    owner: ownerId,
+    reserved: 0,
+    inventoryVersion: 0,
+    warranty: payload.warranty,
+    guarantee: payload.guarantee,
+  });
 
-//   res.status(201).json({
-//     message: t("common.created", req.lang),
-//     product,
-//     inventory
-//   });
-// };
+  await Inventory.create({
+    shopId,
+    product: product._id,
+    stock: payload.stock,
+    reserved: 0,
+    inventoryVersion: 0,
+    isActive: true,
+    isReconciling: false,
+  });
+
+  return product;
+}
 
 exports.createProduct = async (req, res) => {
   try {
-
     if (!req.shop) {
-      return res.status(404).json({
-        success:false,
-        message:"Shop not found"
-      });
+      return res.status(404).json({ success: false, message: "Shop not found" });
     }
 
-    const { name, price, stock, barcode, slug } = req.body;
-
-    /* =====================
-       1️⃣ CREATE PRODUCT
-    ===================== */
-
-    const product = await Product.create({
-      name,
-      price,
-      slug: slug || null,
-      barcode: barcode || null,
+    const product = await createProductRecord({
       shopId: req.shop._id,
-      owner: req.user._id
+      ownerId: req.user._id,
+      source: req.body,
     });
 
-    /* =====================
-       2️⃣ CREATE INVENTORY
-    ===================== */
-
-    const inventory = await Inventory.create({
-      shopId: req.shop._id,
-      product: product._id,
-      stock: Number(stock)||0,
-      reserved: 0,
-      inventoryVersion: 0,
-      isActive: true,
-      isReconciling: false
-    });
-
-    /* =====================
-       3️⃣ RESPONSE
-    ===================== */
-
-    res.status(201).json({
-      success:true,
-      product,
-      inventory
-    });
-
+    return res.status(201).json({ success: true, data: product });
   } catch (err) {
     console.error("CREATE PRODUCT ERROR:", err);
-
-    res.status(500).json({
-      success:false,
-      message:"Product creation failed"
+    return res.status(err.message === "Product name is required" ? 400 : 500).json({
+      success: false,
+      message: err.message === "Product name is required" ? err.message : "Product creation failed",
     });
+  }
+};
+
+exports.bulkCreateProducts = async (req, res) => {
+  try {
+    if (!req.shop) {
+      return res.status(404).json({ success: false, message: "Shop not found" });
+    }
+
+    const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
+    if (!rows.length) {
+      return res.status(400).json({ success: false, message: "rows array is required" });
+    }
+
+    const created = [];
+    const errors = [];
+
+    for (let index = 0; index < rows.length; index += 1) {
+      try {
+        const product = await createProductRecord({
+          shopId: req.shop._id,
+          ownerId: req.user._id,
+          source: rows[index],
+        });
+        created.push(product);
+      } catch (error) {
+        errors.push({
+          index,
+          name: rows[index]?.name || "",
+          message: error instanceof Error ? error.message : "Unable to create this row",
+        });
+      }
+    }
+
+    return res.status(created.length ? 201 : 400).json({
+      success: created.length > 0,
+      createdCount: created.length,
+      failedCount: errors.length,
+      data: created,
+      errors,
+    });
+  } catch (err) {
+    console.error("BULK PRODUCT CREATE ERROR:", err);
+    return res.status(500).json({ success: false, message: "Bulk product creation failed" });
   }
 };
 
 exports.updateProduct = async (req, res) => {
   try {
     if (!req.shop) {
-      return res.status(404).json({
-        success: false,
-        message: "Shop not found",
-      });
+      return res.status(404).json({ success: false, message: "Shop not found" });
     }
 
     const { productId } = req.params;
-    const { name, price, stock, barcode, slug } = req.body;
-
     const product = await Product.findOne({ _id: productId, shopId: req.shop._id });
     if (!product) {
-      return res.status(404).json({
-        success: false,
-        message: "Product not found",
-      });
+      return res.status(404).json({ success: false, message: "Product not found" });
     }
 
-    if (typeof name === "string" && name.trim()) {
-      product.name = name.trim();
-    }
-    if (typeof slug === "string" && slug.trim()) {
-      product.slug = slug.trim();
-    }
-    if (typeof price === "number") {
-      product.price = price;
-    }
-    if (typeof barcode === "string" && barcode.trim()) {
-      product.barcode = barcode.trim();
-    }
-    if (typeof stock === "number") {
-      product.stock = Math.max(0, stock);
-    }
+    const payload = normalizeProductPayload({ ...product.toObject(), ...req.body });
+    product.name = payload.name;
+    product.category = payload.category;
+    product.price = payload.price;
+    product.costPrice = payload.costPrice;
+    product.stock = payload.stock;
+    product.discountRate = payload.discountRate;
+    product.slug = payload.slug;
+    product.barcode = payload.barcode;
+    product.imageUrl = payload.imageUrl;
+    product.warranty = payload.warranty;
+    product.guarantee = payload.guarantee;
 
     await product.save();
+    await syncInventory(req.shop._id, product._id, payload.stock);
 
-    if (typeof stock === "number") {
-      await Inventory.updateOne(
-        { shopId: req.shop._id, product: product._id },
-        { $set: { stock: Math.max(0, stock) } }
-      );
-    }
-
-    return res.status(200).json({
-      success: true,
-      data: product,
-    });
+    return res.status(200).json({ success: true, data: product });
   } catch (err) {
     console.error("UPDATE PRODUCT ERROR:", err);
-    return res.status(500).json({
-      success: false,
-      message: "Product update failed",
-    });
+    return res.status(500).json({ success: false, message: "Product update failed" });
   }
 };
 
 exports.deleteProduct = async (req, res) => {
   try {
     if (!req.shop) {
-      return res.status(404).json({
-        success: false,
-        message: "Shop not found",
-      });
+      return res.status(404).json({ success: false, message: "Shop not found" });
     }
 
     const { productId } = req.params;
     const product = await Product.findOne({ _id: productId, shopId: req.shop._id });
     if (!product) {
-      return res.status(404).json({
-        success: false,
-        message: "Product not found",
-      });
+      return res.status(404).json({ success: false, message: "Product not found" });
     }
 
     product.isActive = false;
@@ -188,45 +212,34 @@ exports.deleteProduct = async (req, res) => {
       { $set: { isActive: false } }
     );
 
-    return res.status(200).json({
-      success: true,
-      message: "Product archived",
-    });
+    return res.status(200).json({ success: true, message: "Product archived" });
   } catch (err) {
     console.error("DELETE PRODUCT ERROR:", err);
-    return res.status(500).json({
-      success: false,
-      message: "Product archive failed",
-    });
+    return res.status(500).json({ success: false, message: "Product archive failed" });
   }
 };
+
 exports.getProductsByShop = async (req, res) => {
   try {
     const { shopId } = req.params;
-    const exists = await Product.findOne({
-      name: req.body.name,
-      shopId: req.shop._id
-    });
-
-    if (exists) {
-      return res.status(400).json({
-        success: false,
-        message: "Product already exists in this shop",
-      });
+    const { q } = req.query;
+    if (!shopId) {
+      return res.status(400).json({ success: false, message: "shopId required" });
     }
 
-    const products = await Product.find({ shopId: shopId });
+    const filter = { shopId, isActive: { $ne: false } };
+    if (q) {
+      filter.$or = [
+        { name: { $regex: String(q), $options: "i" } },
+        { category: { $regex: String(q), $options: "i" } },
+        { barcode: { $regex: String(q), $options: "i" } },
+      ];
+    }
 
-    res.status(200).json({
-      message: t('common.updated', req.lang),
-      count: products.length,
-      data: products,
-    });
+    const products = await Product.find(filter).sort({ createdAt: -1 }).lean();
+    return res.status(200).json({ message: t("common.updated", req.lang), count: products.length, data: products });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch products",
-    });
+    return res.status(500).json({ success: false, message: "Failed to fetch products" });
   }
 };
 
@@ -237,18 +250,21 @@ exports.listProducts = async (req, res) => {
     if (shopId) filter.shopId = shopId;
     if (slug) filter.slug = slug;
     if (minStock) filter.stock = { $gte: Number(minStock) };
-    if (q) filter.name = { $regex: String(q), $options: "i" };
+    if (q) {
+      filter.$or = [
+        { name: { $regex: String(q), $options: "i" } },
+        { category: { $regex: String(q), $options: "i" } },
+        { barcode: { $regex: String(q), $options: "i" } },
+      ];
+    }
 
     const query = Product.find(filter);
     if (limit) query.limit(Number(limit));
     const products = await query.lean();
 
-    res.json({
-      count: products.length,
-      data: products,
-    });
+    return res.json({ count: products.length, data: products });
   } catch (error) {
-    res.status(500).json({ message: "Failed to fetch products" });
+    return res.status(500).json({ message: "Failed to fetch products" });
   }
 };
 
@@ -256,30 +272,23 @@ exports.getProductDetail = async (req, res) => {
   try {
     const product = await Product.findById(req.params.productId).lean();
     if (!product) return res.status(404).json({ message: "Product not found" });
-    res.json({ data: product });
+    return res.json({ data: product });
   } catch (error) {
-    res.status(500).json({ message: "Failed to fetch product" });
+    return res.status(500).json({ message: "Failed to fetch product" });
   }
 };
 
-
-
 exports.getProductInventory = async (req, res) => {
-
   const inventory = await Inventory.findOne({
     shopId: req.shop._id,
-    product: req.params.productId
+    product: req.params.productId,
   });
 
-  if (!inventory)
-    return res.status(404).json({
-      message: "Inventory not found"
-    });
+  if (!inventory) {
+    return res.status(404).json({ message: "Inventory not found" });
+  }
 
-  res.json({
-    available: inventory.stock,
-    reserved: inventory.reserved
-  });
+  return res.json({ available: inventory.stock, reserved: inventory.reserved });
 };
 
 exports.getProductByBarcode = async (req, res) => {
@@ -290,7 +299,7 @@ exports.getProductByBarcode = async (req, res) => {
       return res.status(400).json({ message: "barcode and shopId required" });
     }
 
-    const product = await Product.findOne({ shopId, barcode });
+    const product = await Product.findOne({ shopId, barcode, isActive: { $ne: false } }).lean();
     if (!product) return res.status(404).json({ message: "Product not found" });
 
     return res.json({ data: product });
@@ -302,12 +311,10 @@ exports.getProductByBarcode = async (req, res) => {
 exports.listProductReviews = async (req, res) => {
   try {
     const { productId } = req.params;
-    const reviews = await ProductReview.find({ productId, status: "APPROVED" })
-      .sort({ createdAt: -1 })
-      .lean();
-    res.json({ data: reviews });
+    const reviews = await ProductReview.find({ productId, status: "APPROVED" }).sort({ createdAt: -1 }).lean();
+    return res.json({ data: reviews });
   } catch (error) {
-    res.status(500).json({ message: "Failed to load reviews" });
+    return res.status(500).json({ message: "Failed to load reviews" });
   }
 };
 
@@ -334,8 +341,8 @@ exports.createProductReview = async (req, res) => {
       status: "PENDING",
     });
 
-    res.status(201).json({ message: "Review submitted", data: entry });
+    return res.status(201).json({ message: "Review submitted", data: entry });
   } catch (error) {
-    res.status(500).json({ message: "Failed to submit review" });
+    return res.status(500).json({ message: "Failed to submit review" });
   }
 };

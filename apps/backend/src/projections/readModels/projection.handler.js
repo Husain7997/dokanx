@@ -1,5 +1,6 @@
 const OrderReadModel = require('./order.readModel');
 const ShopDashboard = require('./shopDashboard.readModel');
+const { resolveShopId } = require('../../utils/order-normalization.util');
 
 /**
  * Handles events → projections
@@ -8,20 +9,22 @@ const ShopDashboard = require('./shopDashboard.readModel');
 async function handleOrderCreated(event) {
 
   const { order } = event;
+  const shopId = resolveShopId(order);
+  const total = order.total || order.totalAmount || 0;
 
   await OrderReadModel.create({
     orderId: order._id,
-    shopId: order.shopId,
-    total: order.total,
+    shopId,
+    total,
     status: order.status,
   });
 
   await ShopDashboard.findOneAndUpdate(
-    { shopId: order.shopId },
+    { shopId },
     {
       $inc: {
         totalOrders: 1,
-        totalSales: order.total,
+        totalSales: total,
       },
     },
     { upsert: true }

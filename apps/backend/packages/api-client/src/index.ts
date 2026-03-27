@@ -10,6 +10,7 @@ export * from "./modules/analytics.api";
 export * from "./modules/courier.api";
 export * from "./modules/review.api";
 export * from "./modules/marketplace.api";
+export * from "./modules/recommendation.api";
 import { createApiClient } from "./client";
 import { createAnalyticsApi } from "./modules/analytics.api";
 import { createAuthApi } from "./modules/auth.api";
@@ -17,6 +18,7 @@ import { createCartApi } from "./modules/cart.api";
 import { createCourierApi } from "./modules/courier.api";
 import { createInventoryApi } from "./modules/inventory.api";
 import { createMarketplaceApi } from "./modules/marketplace.api";
+import { createRecommendationApi } from "./modules/recommendation.api";
 import { createOrderApi } from "./modules/order.api";
 import { createProductApi } from "./modules/product.api";
 import { createReviewApi } from "./modules/review.api";
@@ -36,6 +38,7 @@ export function createDokanxApi(options: ApiClientOptions): ApiModules {
     analytics: createAnalyticsApi(client),
     courier: createCourierApi(client),
     review: createReviewApi(client),
-    marketplace: createMarketplaceApi(client)
+    marketplace: createMarketplaceApi(client),
+    recommendation: createRecommendationApi(client)
   };
 }

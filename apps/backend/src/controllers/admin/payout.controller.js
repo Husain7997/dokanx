@@ -6,8 +6,8 @@ const {
 } = require('../../services/payout.service');
 const { processPayout } = require('../../services/payout.service');
 const Shop = require('../../models/shop.model');
-const ShopWallet = require('../../models/ShopWallet');
 const { addJob } = require("@/core/infrastructure");
+const walletAdapter = require("../../services/wallet/walletAdapter.service");
 
 exports.createShopPayout = async (req, res) => {
   try {
@@ -19,7 +19,7 @@ exports.createShopPayout = async (req, res) => {
       });
     }
 
-    const wallet = await ShopWallet.findOne({ shopId: shop._id });
+    const wallet = await walletAdapter.findOne({ shopId: shop._id });
     if (!wallet) {
       return res.status(404).json({
         success: false,
@@ -27,7 +27,7 @@ exports.createShopPayout = async (req, res) => {
       });
     }
 
-    const payout = await processPayout(wallet._id);
+    const payout = await processPayout({ shopId: shop._id });
 
 await addJob("settlement", { walletId: wallet._id });
 

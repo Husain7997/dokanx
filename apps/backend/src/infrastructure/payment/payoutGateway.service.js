@@ -1,70 +1,75 @@
-const axios = require('axios');
-const Ledger = require('../../modules/ledger/ledger.model');
-const ShopWallet = require('../../models/ShopWallet');
-const { isTest } = require('../../config/runtime');
+const axios = require("axios");
+const Ledger = require("../../modules/ledger/ledger.model");
+const walletAdapter = require("../../services/wallet/walletAdapter.service");
+const { isTest } = require("../../config/runtime");
 
-if (isTest) {
-  return mockResult;
+function getMockResult() {
+  return {
+    success: true,
+    transactionId: "mock_txn",
+    status: "SUCCESS",
+  };
 }
 
-/**
- * Payout Types:
- * type = BANK | BKASH | NAGAD
- */
-exports.triggerPayout = async ({
+async function fakeBankTransfer(account, amount) {
+  if (isTest) return getMockResult();
+  return { status: "SUCCESS", txId: `BANK_${Date.now()}` };
+}
+
+async function fakeBKashTransfer(number, amount) {
+  if (isTest) return getMockResult();
+  return { status: "SUCCESS", txId: `BKASH_${Date.now()}` };
+}
+
+async function fakeNagadTransfer(number, amount) {
+  if (isTest) return getMockResult();
+  return { status: "SUCCESS", txId: `NAGAD_${Date.now()}` };
+}
+
+async function triggerPayout({
   walletId,
   amount,
   type,
   referenceId,
-  idempotencyKey
-}) => {
-  // Idempotency check (prevent double payout)
+  idempotencyKey,
+}) {
   const existing = await Ledger.findOne({
-    meta: { referenceId, idempotencyKey }
+    meta: { referenceId, idempotencyKey },
   });
   if (existing) return existing;
 
-  // Wallet fetch
-  const wallet = await ShopWallet.findById(walletId);
-  if (!wallet) throw new Error('Wallet not found');
+  const wallet = await walletAdapter.findById(walletId);
+  if (!wallet) throw new Error("Wallet not found");
 
-  // Here call external API
   let result;
   switch (type) {
-    case 'BANK':
+    case "BANK":
       result = await fakeBankTransfer(wallet.bankAccount, amount);
       break;
-    case 'BKASH':
+    case "BKASH":
       result = await fakeBKashTransfer(wallet.bkashNumber, amount);
       break;
-    case 'NAGAD':
+    case "NAGAD":
       result = await fakeNagadTransfer(wallet.nagadNumber, amount);
       break;
     default:
-      throw new Error('Unsupported payout type');
+      throw new Error("Unsupported payout type");
   }
 
-  // Ledger entry (immutable)
+  const providerStatus = result.status || (result.success ? "SUCCESS" : "FAILED");
+
   const ledgerEntry = await Ledger.create({
     walletId,
-    type: 'PAYOUT',
-    direction: 'DEBIT',
+    type: "PAYOUT",
+    direction: "DEBIT",
     amount,
-    meta: { referenceId, idempotencyKey, provider: type, status: result.status }
+    meta: { referenceId, idempotencyKey, provider: type, status: providerStatus },
   });
 
   return ledgerEntry;
-};
+}
 
-/**
- * Fake external calls (replace with real API SDK / HTTP)
- */
-const fakeBankTransfer = async (account, amount) => {
-  return { status: 'SUCCESS', txId: `BANK_${Date.now()}` };
-};
-const fakeBKashTransfer = async (number, amount) => {
-  return { status: 'SUCCESS', txId: `BKASH_${Date.now()}` };
-};
-const fakeNagadTransfer = async (number, amount) => {
-  return { status: 'SUCCESS', txId: `NAGAD_${Date.now()}` };
+module.exports = {
+  triggerPayout,
+  getMockResult,
 };

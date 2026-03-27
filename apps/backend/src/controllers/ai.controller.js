@@ -8,6 +8,7 @@ const { getExplainableRecommendations } = require("../modules/ai-engine/recommen
 const { getTrendingProducts, getDemandForecast, getLowStockAlerts } = require("../modules/ai-engine/demand.service");
 const { getOfferTargetCustomers } = require("../modules/ai-engine/customer-score.service");
 const { getTopCustomerSnapshots, getRiskyCustomerSnapshots } = require("../modules/ai-engine/feature-store/feature-store.service");
+const { registerRealtimeFeedback } = require("../modules/ai-engine/realtime-feature.service");
 const recommendationService = require("../services/recommendation.service");
 const fraudService = require("../services/fraud.service");
 
@@ -20,6 +21,7 @@ exports.getRecommendations = async (req, res) => {
     location: req.query.location || null,
     limit,
     shopId: req.traffic?.type === "direct" ? req.traffic?.scopeShopId || null : null,
+    sessionId: req.headers["x-session-id"] || req.headers["x-device-id"] || req.ip,
   });
   res.json({
     data: [
@@ -170,6 +172,13 @@ exports.recordFeedback = async (req, res) => {
     eventType,
     context: context || "general",
     metadata: metadata || {},
+  });
+  await registerRealtimeFeedback({
+    userId: req.user?._id || null,
+    sessionId: req.headers["x-session-id"] || req.headers["x-device-id"] || req.ip,
+    productId: productId || null,
+    shopId: shopId || null,
+    eventType,
   });
   res.status(201).json({ data: created });
 };

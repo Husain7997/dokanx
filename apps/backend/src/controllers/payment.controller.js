@@ -19,12 +19,18 @@ const Settlement = require("../models/settlement.model");
 const { ensureIdempotent } = require('../utils/idempotency');
 const paymentGateway = require("../services/payment/paymentGateway.service");
 const { createAudit } = require("../utils/audit.util");
+const fraudService = require("../services/fraud.service");
+const { t } = require("@/core/infrastructure");
+const { resolveShopId } = require("../utils/order-normalization.util");
 
 // const features = require('../config/features');
 
 
 
 console.log("✅ payment.controller.js LOADED");
+
+const ALLOWED_PAYMENT_PROVIDERS = new Set(["bkash", "nagad", "stripe"]);
+const DEFAULT_PAYMENT_PROVIDER = "bkash";
 
 /* ================================
    INITIATE PAYMENT
@@ -35,13 +41,22 @@ exports.initiatePayment = async (req, res, next) => {
   try {
     const { orderId } = req.params;
     const { provider } = req.body || {};
+    const normalizedProvider = String(provider || DEFAULT_PAYMENT_PROVIDER).trim().toLowerCase();
+
+    if (!normalizedProvider) {
+      return res.status(400).json({ message: "provider is required" });
+    }
+
+    if (!ALLOWED_PAYMENT_PROVIDERS.has(normalizedProvider)) {
+      return res.status(400).json({ message: "Invalid payment provider" });
+    }
 
     const order = await Order.findById(orderId);
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    const gateway = provider || process.env.DEFAULT_PAYMENT_PROVIDER || "bkash";
+    const gateway = normalizedProvider;
 
     const gatewayResult = await paymentGateway.createPayment({
       provider: gateway,
@@ -56,12 +71,11 @@ let attempt = await PaymentAttempt.findOne({
 });
 
 if (!attempt) {
-  const providerPaymentId = "pay_" + order._id;
   await addJob("settlement", { orderId: order._id });
   
   attempt = await PaymentAttempt.create({
     order: order._id,
-    shopId: order.shop,
+    shopId: resolveShopId(order),
     amount: order.totalAmount,
 
     provider: gatewayResult.provider,
@@ -73,7 +87,42 @@ if (!attempt) {
     status: "PENDING",
     processed: false
   });
+} else {
+  attempt.provider = gatewayResult.provider;
+  attempt.gateway = gateway;
+  attempt.providerPaymentId = gatewayResult.providerPaymentId;
+  attempt.amount = order.totalAmount;
+  await attempt.save();
 }
+
+    await createAudit({
+      action: "PAYMENT_INITIATED",
+      performedBy: req.user?._id || null,
+      targetType: "Order",
+      targetId: order._id,
+      req,
+      meta: {
+        provider: gatewayResult.provider,
+        providerPaymentId: gatewayResult.providerPaymentId,
+        amount: Number(order.totalAmount || 0),
+        deviceFingerprint: req.headers["x-device-fingerprint"] || null,
+      },
+    });
+
+    try {
+      await fraudService.evaluateTransaction({
+        orderId: order._id,
+        paymentAttemptId: attempt._id,
+        source: "payment_initiated",
+        context: {
+          ip: req.ip,
+          userAgent: req.headers["user-agent"] || "",
+          deviceFingerprint: req.headers["x-device-fingerprint"] || "",
+        },
+      });
+    } catch (fraudError) {
+      console.warn("Fraud evaluation failed", fraudError?.message || fraudError);
+    }
 
 
     res.status(201).json({
@@ -212,8 +261,26 @@ exports.refundPayment = async (req, res) => {
     },
   });
 
+  try {
+    await fraudService.evaluateTransaction({
+      orderId: order._id,
+      source: "refund_processed",
+      context: {
+        ip: req.ip,
+        userAgent: req.headers["user-agent"] || "",
+        deviceFingerprint: req.headers["x-device-fingerprint"] || "",
+      },
+    });
+  } catch (fraudError) {
+    console.warn("Fraud evaluation failed", fraudError?.message || fraudError);
+  }
+
   res.json({
     success: true,
     refundedAmount: amount,
   });
 };
+
+
+
+

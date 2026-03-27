@@ -7,16 +7,17 @@ import { ThemeProvider, ToastProvider, ToastRegion } from "@dokanx/ui";
 
 import { AuthProvider } from "@dokanx/auth";
 import { getApiBaseUrl } from "@dokanx/utils";
+import type { TenantConfig } from "@dokanx/types";
 
 import { createQueryClient } from "@/lib/query-client";
 
-const developerTenant = {
+const developerTenant: TenantConfig = {
   id: "developer-portal",
   slug: "developer-portal",
   name: "Developer Portal",
   currency: "BDT",
   language: "en",
-  theme: "developer-theme",
+  theme: "storefront-theme",
   logo: null
 };
 

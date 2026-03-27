@@ -1,12 +1,21 @@
 const CustomerIdentity = require("./customer.identity.model");
+const {
+  createGlobalCustomerId,
+  normalizePhone,
+} = require("./customer.identity.service");
 
 async function findOrCreateCustomer(phone, name) {
-  let customer = await CustomerIdentity.findOne({ phone });
+  const normalizedPhone = normalizePhone(phone);
+  let customer = await CustomerIdentity.findOne({
+    $or: [{ phone }, { normalizedPhone }],
+  });
 
   if (!customer) {
     customer = await CustomerIdentity.create({
       phone,
+      normalizedPhone,
       name,
+      globalCustomerId: createGlobalCustomerId(),
     });
   }
 

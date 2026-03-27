@@ -7,7 +7,6 @@ import { getApiBaseUrl } from "@dokanx/utils";
 export const api = createDokanxApi({
   baseUrl: getApiBaseUrl(),
   getAccessToken: () => useAuthStore.getState().accessToken,
-  getRefreshToken: () => useAuthStore.getState().refreshToken,
   getTenant: () => useAuthStore.getState().tenant,
   onUnauthorized: () => useAuthStore.getState().clearSession()
 });

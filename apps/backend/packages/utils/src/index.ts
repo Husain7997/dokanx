@@ -12,6 +12,7 @@ export function toRole(value: string | undefined | null): AuthRole {
   if (normalized === "admin") return "admin";
   if (normalized === "staff") return "staff";
   if (normalized === "developer") return "developer";
+  if (normalized === "agent") return "agent";
   return "customer";
 }
 
@@ -73,12 +74,23 @@ function normalizeApiBaseUrl(value?: string) {
   return `${trimmed}/api`;
 }
 
+function getBrowserApiBaseUrl() {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+
+  const protocol = window.location.protocol || "http:";
+  const hostname = window.location.hostname || "localhost";
+  return `${protocol}//${hostname}:5001/api`;
+}
+
 export function getApiBaseUrl(explicitBaseUrl?: string) {
   return normalizeApiBaseUrl(
     explicitBaseUrl ||
       process.env.E2E_API_URL ||
       process.env.NEXT_PUBLIC_API_URL ||
       process.env.API_URL ||
+      getBrowserApiBaseUrl() ||
       "http://localhost:5001/api"
   );
 }

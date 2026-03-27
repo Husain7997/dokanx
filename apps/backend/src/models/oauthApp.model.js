@@ -25,6 +25,14 @@ const oauthAppSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    signingSecretCipher: {
+      type: String,
+      default: null,
+    },
+    signingSecretIv: {
+      type: String,
+      default: null,
+    },
     sandboxMode: {
       type: Boolean,
       default: false,
@@ -36,10 +44,12 @@ const oauthAppSchema = new mongoose.Schema(
     rateLimitPerMinute: {
       type: Number,
       default: 60,
+      min: 1,
     },
     rateLimitPerDay: {
       type: Number,
       default: 5000,
+      min: 1,
     },
     clientId: {
       type: String,
@@ -59,6 +69,8 @@ const oauthAppSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+oauthAppSchema.index({ developerId: 1, status: 1, createdAt: -1 });
 
 module.exports =
   mongoose.models.OAuthApp ||

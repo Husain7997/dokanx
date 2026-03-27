@@ -58,8 +58,7 @@ export function OrderTrackingWorkspace({ orderId }: OrderTrackingWorkspaceProps)
 
     try {
       const payment = await initiatePayment(orderId, {
-        paymentMethod,
-        hasOwnGateway: paymentMethod === "stripe",
+        provider: paymentMethod,
       });
       setHandoffUrl(payment.paymentUrl || null);
       setMessage(payment.message || "Payment retry initiated.");

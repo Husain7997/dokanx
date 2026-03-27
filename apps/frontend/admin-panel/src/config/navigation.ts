@@ -30,9 +30,19 @@ export const adminNavigation = [
     description: "Catalog moderation"
   },
   {
-    label: "Orders",
+    label: "Fraud",
     href: "/orders",
-    description: "Operational orders"
+    description: "Fraud review queue"
+  },
+  {
+    label: "Notifications",
+    href: "/notifications",
+    description: "Real-time alerts"
+  },
+  {
+    label: "Logistics",
+    href: "/logistics",
+    description: "Courier orchestration"
   },
   {
     label: "Payments",
@@ -93,6 +103,11 @@ export const adminNavigation = [
     label: "Merchants",
     href: "/merchants",
     description: "Merchant lifecycle"
+  },
+  {
+    label: "Agents",
+    href: "/agents",
+    description: "Lead funnel and referrals"
   },
   {
     label: "Users",

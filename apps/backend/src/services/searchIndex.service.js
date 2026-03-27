@@ -12,7 +12,10 @@ async function rebuildIndex() {
     entityType: "product",
     entityId: product._id,
     shopId: product.shopId || null,
-    text: `${product.name || ""} ${product.category || ""}`.trim(),
+    name: product.name || "",
+    category: product.category || "",
+    brand: product.brand || "",
+    text: `${product.name || ""} ${product.category || ""} ${product.brand || ""}`.trim(),
   }));
 
   const shops = await Shop.find().lean();
@@ -20,6 +23,7 @@ async function rebuildIndex() {
     entityType: "shop",
     entityId: shop._id,
     shopId: shop._id,
+    name: shop.name || "",
     text: `${shop.name || ""} ${shop.domain || ""} ${shop.slug || ""}`.trim(),
   }));
 
@@ -60,13 +64,17 @@ async function updateIncrementalIndex() {
     entityType: "product",
     entityId: product._id,
     shopId: product.shopId || null,
-    text: `${product.name || ""} ${product.category || ""} ${product.barcode || ""}`.trim(),
+    name: product.name || "",
+    category: product.category || "",
+    brand: product.brand || "",
+    text: `${product.name || ""} ${product.category || ""} ${product.brand || ""} ${product.barcode || ""}`.trim(),
   }));
 
   const shopDocs = shops.map((shop) => ({
     entityType: "shop",
     entityId: shop._id,
     shopId: shop._id,
+    name: shop.name || "",
     text: `${shop.name || ""} ${shop.domain || ""} ${shop.slug || ""}`.trim(),
   }));
 

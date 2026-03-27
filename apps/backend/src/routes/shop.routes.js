@@ -7,21 +7,22 @@ const {
   blockCustomer,
   getMyShops,
   listPublicShops,
-  listCustomers
+  listCustomers,
+  createCustomer,
 } = require('../controllers/shop.controller');
 
 const {
   getShopSettings,
   updateShopSettings,
   listTeamMembers,
+  listTeamActivity,
   addTeamMember,
   updateTeamMember,
 } = require("../controllers/shop.settings.controller");
 const { listShopReviews } = require("../controllers/shop/review.controller");
 const { listShopPayments } = require("../controllers/shop/payment.controller");
 
-const { protect,  allowRoles } = require("../middlewares");
-// const allowRoles = require('../middlewares/rbac.middleware');
+const { protect, allowRoles } = require("../middlewares");
 
 const canUpdateOrderStatus = (req, res, next) => next();
 console.log("protect TYPE:", typeof protect);
@@ -58,6 +59,13 @@ router.get(
   listCustomers
 );
 
+router.post(
+  "/me/customers",
+  protect,
+  allowRoles("OWNER", "STAFF", "ADMIN"),
+  createCustomer
+);
+
 router.get(
   "/me/reviews",
   protect,
@@ -84,6 +92,13 @@ router.get(
   protect,
   allowRoles("OWNER", "ADMIN"),
   listTeamMembers
+);
+
+router.get(
+  "/me/team/activity",
+  protect,
+  allowRoles("OWNER", "ADMIN"),
+  listTeamActivity
 );
 
 router.post(

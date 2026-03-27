@@ -1,4 +1,5 @@
 const { addJob } = require("../../core/infrastructure");
+const crypto = require("crypto");
 const AppInstallation = require("../../models/appInstallation.model");
 const WebhookSubscription = require("../../models/webhookSubscription.model");
 const WebhookJob = require("../../models/webhook-job.model");
@@ -23,18 +24,37 @@ async function dispatch(event, payload) {
     if (!(await shouldDeliver(subscription, payload))) {
       continue;
     }
-    const webhookJob = await WebhookJob.create({
-      subscriptionId: subscription._id,
-      appId: subscription.appId || null,
-      shopId: payload?.shopId || null,
-      event,
-      payload,
-      targetUrl: subscription.url,
-      status: "pending",
-      retryCount: 0,
-      nextRetryAt: new Date(),
-    });
-    await addJob("webhook-delivery", { webhookJobId: webhookJob._id }, { removeOnComplete: true });
+    const payloadString = JSON.stringify(payload || {});
+    const dedupeKey = crypto
+      .createHash("sha256")
+      .update(`${subscription._id}:${event}:${payloadString}`)
+      .digest("hex");
+    const deliveryId = crypto.randomUUID();
+    const result = await WebhookJob.findOneAndUpdate(
+      { dedupeKey },
+      {
+        $setOnInsert: {
+          subscriptionId: subscription._id,
+          appId: subscription.appId || null,
+          shopId: payload?.shopId || null,
+          event,
+          payload,
+          targetUrl: subscription.url,
+          deliveryId,
+          dedupeKey,
+          status: "pending",
+          retryCount: 0,
+          nextRetryAt: new Date(),
+        },
+      },
+      { upsert: true, new: true, includeResultMetadata: true }
+    );
+    const webhookJob = result.value || result;
+    const createdNow = Boolean(result?.lastErrorObject?.upserted);
+    if (!createdNow || webhookJob.status === "success" || webhookJob.status === "dead_letter") {
+      continue;
+    }
+    await addJob("webhook-delivery", { webhookJobId: webhookJob._id }, { removeOnComplete: true, jobId: webhookJob.deliveryId });
   }
 }
 

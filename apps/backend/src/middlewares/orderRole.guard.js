@@ -1,66 +1,58 @@
 const Order = require("../models/order.model");
 
+function normalizeNextStatus(status) {
+  const normalized = String(status || "").trim().toUpperCase();
+  return normalized === "ACCEPTED" ? "CONFIRMED" : normalized;
+}
+
 exports.canUpdateOrderStatus = async (req, res, next) => {
   try {
     const user = req.user;
-    const role = user?.role;
-
-    console.log("ROLE CHECK:", role);
-
+    const role = String(user?.role || "").toLowerCase();
     const orderId = req.params.orderId;
-    const { status } = req.body;
+    const { status } = req.body || {};
 
     if (!status) {
       return res.status(400).json({ message: "Status is required" });
     }
 
-    const nextStatus = status.trim().toUpperCase();
-
+    const requestedStatus = String(status || "").trim().toUpperCase();
+    const nextStatus = normalizeNextStatus(status);
     const order = await Order.findById(orderId);
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    const currentStatus = order.status;
+    const transitions = {
+      PLACED: ["PAYMENT_PENDING", "CANCELLED"],
+      PAYMENT_PENDING: ["CONFIRMED", "CANCELLED"],
+      CONFIRMED: ["SHIPPED", "CANCELLED"],
+      SHIPPED: ["DELIVERED"],
+      DELIVERED: ["REFUNDED"],
+      PAYMENT_FAILED: ["CANCELLED"],
+      CANCELLED: [],
+      REFUNDED: [],
+    };
 
- const transitions = {
-  PLACED: ["PAYMENT_PENDING", "CANCELLED"],
-PAYMENT_PENDING: ["CONFIRMED", "PAYMENT_FAILED"],
-  CONFIRMED: ["SHIPPED", "CANCELLED"],
-  SHIPPED: ["DELIVERED"],
-  DELIVERED: ["REFUNDED"],   // ✅ ADD THIS
-  REFUNDED: []
-};
-
-
-    // ✅ FIRST declare
-    const allowedNext = transitions[currentStatus] || [];
-
-    // ✅ THEN use
-    console.log("ORDER STATUS DEBUG:", {
-      current: currentStatus,
-      next: nextStatus,
-      role,
-      allowedNext
-    });
+    const allowedNext = transitions[String(order.status || "").toUpperCase()] || [];
 
     if (!allowedNext.includes(nextStatus)) {
       return res.status(400).json({
-        message: `Invalid transition from ${currentStatus} to ${nextStatus}`
+        message: `Invalid transition from ${order.status} to ${requestedStatus}`,
       });
     }
 
-    // role-based restriction (future-proof)
     if (role === "customer" && nextStatus !== "CANCELLED") {
       return res.status(403).json({ message: "Unauthorized role" });
     }
 
-    next();
+    req.body.status = requestedStatus;
+    return next();
   } catch (err) {
     console.error("ORDER ROLE GUARD ERROR:", err);
     return res.status(500).json({
-      message: "Order status update failed"
+      message: "Order status update failed",
     });
   }
 };

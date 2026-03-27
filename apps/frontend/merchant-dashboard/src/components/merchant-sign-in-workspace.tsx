@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@dokanx/auth";
-import { Button, Card, CardDescription, CardTitle, Input } from "@dokanx/ui";
+import { Alert, Button, Card, CardDescription, CardTitle, TextInput } from "@dokanx/ui";
 
 export function MerchantSignInWorkspace() {
   const auth = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [credentials, setCredentials] = useState({
     email: "owner@test.com",
     password: "Secret123!",
@@ -17,10 +18,17 @@ export function MerchantSignInWorkspace() {
 
   useEffect(() => {
     if (auth.status === "authenticated") {
-      router.replace("/settings");
+      const requestedReturnTo = searchParams.get("returnTo");
+      const defaultReturnTo = auth.user?.roleName === "agent" ? "/agent/learn" : "/settings";
+      const returnTo =
+        requestedReturnTo && requestedReturnTo.startsWith("/") && !requestedReturnTo.startsWith("//")
+          ? requestedReturnTo
+          : defaultReturnTo;
+
+      router.replace(returnTo);
       router.refresh();
     }
-  }, [auth.status, router]);
+  }, [auth.status, auth.user?.roleName, router, searchParams]);
 
   async function handleLogin() {
     setSubmitting(true);
@@ -45,7 +53,7 @@ export function MerchantSignInWorkspace() {
             Run your storefront like a real operation.
           </h1>
           <p className="mt-3 text-sm text-muted-foreground">
-            Use an OWNER, STAFF, or ADMIN account to access products, settings, analytics, and team workflows.
+            Use an OWNER, STAFF, ADMIN, or AGENT account to access the correct workspace.
           </p>
           <div className="mt-6 grid gap-4 text-sm">
             <div className="rounded-2xl border border-border/50 bg-background/70 p-4">
@@ -66,37 +74,33 @@ export function MerchantSignInWorkspace() {
         <Card className="self-start rounded-[32px] border border-border/60 bg-card/80 p-6 shadow-[0_18px_45px_rgba(15,23,42,0.12)] backdrop-blur">
           <CardTitle>Merchant sign in</CardTitle>
           <CardDescription className="mt-2">
-            Use an OWNER, STAFF, or ADMIN account to access the merchant workspace.
+            Use an OWNER, STAFF, ADMIN, or AGENT account to access the workspace.
           </CardDescription>
           <div className="mt-6 grid gap-4">
-            <label className="grid gap-2 text-sm">
-              <span>Email</span>
-              <Input
-                type="email"
-                autoComplete="email"
-                value={credentials.email}
-                onChange={(event) => setCredentials((current) => ({ ...current, email: event.target.value }))}
-              />
-            </label>
-            <label className="grid gap-2 text-sm">
-              <span>Password</span>
-              <Input
-                type="password"
-                autoComplete="current-password"
-                value={credentials.password}
-                onChange={(event) => setCredentials((current) => ({ ...current, password: event.target.value }))}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    void handleLogin();
-                  }
-                }}
-              />
-            </label>
-            <Button onClick={handleLogin} disabled={submitting}>
-              {submitting ? "Working..." : "Sign In"}
+            <TextInput
+              label="Email"
+              type="email"
+              autoComplete="email"
+              value={credentials.email}
+              onChange={(event) => setCredentials((current) => ({ ...current, email: event.target.value }))}
+            />
+            <TextInput
+              label="Password"
+              type="password"
+              autoComplete="current-password"
+              value={credentials.password}
+              onChange={(event) => setCredentials((current) => ({ ...current, password: event.target.value }))}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void handleLogin();
+                }
+              }}
+            />
+            <Button onClick={handleLogin} loading={submitting} loadingText="Signing in">
+              Sign In
             </Button>
-            {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
+            {message ? <Alert variant="info">{message}</Alert> : null}
           </div>
         </Card>
       </div>

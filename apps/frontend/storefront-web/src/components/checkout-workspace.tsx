@@ -5,7 +5,7 @@ import { useAuth } from "@dokanx/auth";
 import { Button, Card, CardDescription, CardTitle, CheckoutLayout, Input } from "@dokanx/ui";
 import type { Cart } from "@dokanx/types";
 
-import { createOrder, getProfile, getRuntimeCart, initiatePayment, saveCart } from "@/lib/runtime-api";
+import { createOrder, getMyWallet, getProfile, getRuntimeCart, initiatePayment, saveCart } from "@/lib/runtime-api";
 
 type CheckoutWorkspaceProps = {
   cart: Cart;
@@ -20,6 +20,14 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
   const auth = useAuth();
   const [cartState, setCartState] = useState<Cart>(cart);
   const [hydrated, setHydrated] = useState(false);
+  const [addresses, setAddresses] = useState<Array<{ id?: string; label?: string; line1?: string; city?: string; isDefault?: boolean }>>([]);
+  const [walletSnapshot, setWalletSnapshot] = useState<{
+    balance?: { cash?: number; credit?: number; bank?: number };
+    lastTransactions?: Array<{ _id?: string; amount?: number; orderId?: string; note?: string; createdAt?: string }>;
+  } | null>(null);
+  const [selectedAddressId, setSelectedAddressId] = useState("");
+  const [deliveryMode, setDeliveryMode] = useState("standard");
+  const [paymentMode, setPaymentMode] = useState<"ONLINE" | "COD" | "WALLET" | "CREDIT">("ONLINE");
   const [customer, setCustomer] = useState({
     fullName: "Husain Ahmed",
     phone: "01700000000",
@@ -61,7 +69,10 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
       if (auth.status !== "authenticated") return;
 
       try {
-        const response = await getProfile();
+        const [response, walletResponse] = await Promise.all([
+          getProfile(),
+          getMyWallet().catch(() => null),
+        ]);
         const user = response.user || response.data || {};
         const addresses = Array.isArray(user.addresses) ? user.addresses : [];
         const defaultAddress = addresses.find((item: { isDefault?: boolean }) => item.isDefault) || addresses[0];
@@ -74,6 +85,9 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
           phone: String(defaultAddress?.phone || user.phone || current.phone),
           address: String(defaultAddress?.line1 || current.address),
         }));
+        setAddresses(addresses);
+        setSelectedAddressId(String(defaultAddress?.id || ""));
+        setWalletSnapshot(walletResponse?.data || null);
 
         if (defaultPayment?.provider) {
           const provider = String(defaultPayment.provider || "").toLowerCase();
@@ -92,6 +106,12 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
     () => cartState.items.filter((item) => !isMongoId(item.productId)).map((item) => item.productId),
     [cartState.items],
   );
+  const uniqueShopIds = useMemo(
+    () => Array.from(new Set(cartState.items.map((item) => String((item as typeof item & { shopId?: string }).shopId || "")).filter(Boolean))),
+    [cartState.items],
+  );
+  const walletCashBalance = Number(walletSnapshot?.balance?.cash || 0);
+  const walletInsufficient = paymentMode === "WALLET" && walletCashBalance < totals.total;
 
   useEffect(() => {
     async function hydrateCart() {
@@ -149,6 +169,18 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
       return;
     }
 
+    if (uniqueShopIds.length > 1) {
+      setSubmitting(false);
+      setStatus("Checkout currently supports one shop per order. Split the cart by shop before continuing.");
+      return;
+    }
+
+    if (paymentMode === "WALLET" && walletInsufficient) {
+      setSubmitting(false);
+      setStatus(`Wallet balance is too low for this order. Available ${walletCashBalance} BDT, required ${totals.total} BDT. Switch to COD or ONLINE.`);
+      return;
+    }
+
     try {
       const shopId = customer.shopId.trim() || String(auth.user?.shopId || "");
       const cartPayload = {
@@ -165,8 +197,20 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
         items: cartState.items.map((item) => ({
           product: item.productId,
           quantity: item.quantity,
-          price: item.price,
         })),
+        addressId: selectedAddressId || undefined,
+        deliveryMode,
+        paymentMode,
+        notes: customer.notes,
+        deliveryAddress: selectedAddressId
+          ? undefined
+          : {
+              line1: customer.address,
+              city: "Dhaka",
+              area: "",
+              postalCode: "",
+              country: "BD",
+            },
         totalAmount: totals.total,
         shippingFee: totals.shipping,
       });
@@ -179,26 +223,43 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
         throw new Error("Order created without an order id.");
       }
 
-      const payment = await initiatePayment(orderId, {
-        paymentMethod,
-        hasOwnGateway: paymentMethod === "stripe",
-      });
-
       setSubmitted(true);
-      setHandoff({
-        orderId,
-        gateway: payment.gateway,
-        provider: payment.provider,
-        paymentUrl: payment.paymentUrl,
-        handoffType: payment.handoffType,
-        transactionId: payment.transactionId,
-        sessionId: payment.sessionId,
-        successUrl: payment.successUrl,
-      });
-      setStatus(payment.message || order.message || "Order submitted and payment handoff is ready.");
+      if (paymentMode === "ONLINE") {
+        const payment = await initiatePayment(orderId, {
+          provider: paymentMethod,
+        });
+
+        setHandoff({
+          orderId,
+          gateway: payment.gateway,
+          provider: payment.provider,
+          paymentUrl: payment.paymentUrl,
+          handoffType: payment.handoffType,
+          transactionId: payment.transactionId,
+          sessionId: payment.sessionId,
+          successUrl: payment.successUrl,
+        });
+        setStatus(payment.message || order.message || "Order submitted and payment handoff is ready.");
+      } else if (paymentMode === "WALLET") {
+        setWalletSnapshot((current) => current ? {
+          ...current,
+          balance: {
+            cash: Math.max(0, Number(current.balance?.cash || 0) - totals.total),
+            credit: Number(current.balance?.credit || 0),
+            bank: Number(current.balance?.bank || 0),
+          },
+        } : current);
+        setStatus(order.message || "Order submitted and paid with wallet balance.");
+      } else {
+        setStatus(order.message || `Order submitted with ${paymentMode} payment mode.`);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to submit order.";
-      setStatus(message);
+      setStatus(
+        paymentMode === "WALLET" && message.toLowerCase().includes("wallet")
+          ? `${message} Choose COD or ONLINE to continue checkout.`
+          : message
+      );
     } finally {
       setSubmitting(false);
     }
@@ -246,7 +307,7 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
         <Card>
           <CardTitle>Customer and delivery details</CardTitle>
           <CardDescription className="mt-2">
-            Checkout now saves the cart and submits a real order request when the session and product IDs are valid.
+            Checkout now submits a real customer order with address, delivery mode, and payment mode.
           </CardDescription>
           <div className="mt-6 grid gap-4 md:grid-cols-2">
             <label className="grid gap-2 text-sm">
@@ -266,17 +327,59 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
               <Input value={customer.notes} onChange={(event) => setCustomer((current) => ({ ...current, notes: event.target.value }))} placeholder="Gate code, landmark, preferred slot" />
             </label>
             <label className="grid gap-2 text-sm md:col-span-2">
+              <span>Saved address</span>
+              <select
+                className="h-11 rounded-full border border-border bg-background px-4 text-sm"
+                value={selectedAddressId}
+                onChange={(event) => setSelectedAddressId(event.target.value)}
+              >
+                <option value="">Use manual address below</option>
+                {addresses.map((address) => (
+                  <option key={String(address.id || address.label || "")} value={String(address.id || "")}>
+                    {String(address.label || "Address")} - {String(address.line1 || "")}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-2 text-sm md:col-span-2">
               <span>Shop ID</span>
               <Input value={customer.shopId} onChange={(event) => setCustomer((current) => ({ ...current, shopId: event.target.value }))} placeholder="Required if your customer session is not linked to a shop" />
             </label>
+            <label className="grid gap-2 text-sm">
+              <span>Delivery mode</span>
+              <select
+                className="h-11 rounded-full border border-border bg-background px-4 text-sm"
+                value={deliveryMode}
+                onChange={(event) => setDeliveryMode(event.target.value)}
+              >
+                <option value="standard">Standard</option>
+                <option value="express">Express</option>
+                <option value="pickup">Pickup</option>
+              </select>
+            </label>
+            <label className="grid gap-2 text-sm">
+              <span>Payment mode</span>
+              <select
+                className="h-11 rounded-full border border-border bg-background px-4 text-sm"
+                value={paymentMode}
+                onChange={(event) => setPaymentMode(event.target.value as "ONLINE" | "COD" | "WALLET" | "CREDIT")}
+              >
+                <option value="ONLINE">Online</option>
+                <option value="COD">Cash on delivery</option>
+                <option value="CREDIT">Credit</option>
+                <option value="WALLET">Wallet ({walletCashBalance} BDT)</option>
+              </select>
+            </label>
             <label className="grid gap-2 text-sm md:col-span-2">
-              <span>Payment method</span>
+              <span>Online gateway</span>
               <select
                 className="h-11 rounded-full border border-border bg-background px-4 text-sm"
                 value={paymentMethod}
                 onChange={(event) => setPaymentMethod(event.target.value)}
+                disabled={paymentMode !== "ONLINE"}
               >
                 <option value="bkash">bKash redirect</option>
+                <option value="nagad">Nagad redirect</option>
                 <option value="stripe">Stripe hosted checkout</option>
               </select>
             </label>
@@ -302,6 +405,41 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
           {!invalidProductIds.length && customer.shopId ? (
             <div className="mt-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm">
               Checkout is preloaded with live shop context: {customer.shopId}
+            </div>
+          ) : null}
+          {uniqueShopIds.length > 1 ? (
+            <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm">
+              Multi-shop checkout is currently disabled. This cart spans {uniqueShopIds.length} shops.
+            </div>
+          ) : null}
+          {paymentMode === "WALLET" ? (
+            <div className={`mt-4 rounded-2xl border p-4 text-sm ${walletInsufficient ? "border-amber-500/30 bg-amber-500/5" : "border-emerald-500/30 bg-emerald-500/5"}`}>
+              <p className="font-medium">Wallet balance</p>
+              <p className="mt-2">Available: {walletCashBalance} BDT</p>
+              <p>Required: {totals.total} BDT</p>
+              {walletInsufficient ? (
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <Button size="sm" variant="secondary" onClick={() => setPaymentMode("ONLINE")}>
+                    Switch to Online
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => setPaymentMode("COD")}>
+                    Switch to COD
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          {walletSnapshot?.lastTransactions?.length ? (
+            <div className="mt-4 rounded-2xl border border-border/60 bg-muted/20 p-4 text-sm">
+              <p className="font-medium">Recent wallet activity</p>
+              <div className="mt-3 grid gap-2">
+                {walletSnapshot.lastTransactions.slice(0, 3).map((transaction) => (
+                  <div key={String(transaction._id || transaction.orderId || transaction.createdAt || "")} className="flex items-center justify-between gap-4">
+                    <span>{transaction.orderId ? `Order ${transaction.orderId}` : transaction.note || "Wallet transaction"}</span>
+                    <span>{Number(transaction.amount || 0)} BDT</span>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : null}
           {handoff ? (

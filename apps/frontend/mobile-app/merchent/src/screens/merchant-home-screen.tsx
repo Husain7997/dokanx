@@ -1,5 +1,4 @@
-import { StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, StyleSheet, Text, View } from "react-native";
 
 export function MerchantHomeScreen() {
   return (
@@ -25,13 +24,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   title: {
-    fontSize: 20,
+    fontSize: 28,
     fontWeight: "700",
     color: "#111827",
   },
   subtitle: {
-    fontSize: 13,
-    color: "#6b7280",
-    textAlign: "center",
+    fontSize: 14,
+    color: "#4b5563",
   },
 });

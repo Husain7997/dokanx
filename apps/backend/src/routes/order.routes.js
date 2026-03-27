@@ -2,54 +2,61 @@ const express = require('express');
 const router = express.Router();
 
 const { protect, allowRoles } = require('../middlewares');
-// const tenant = require('../middlewares/tenant.middleware');
-// const allowRoles = require('../middlewares/role.middleware');
 const checkUserNotBlocked = require("../middlewares/checkUserNotBlocked");
 const optionalAuth = require("../middlewares/optionalAuth.middleware");
-// const { resolveShop } = require("../middlewares/shop.middleware");
-// const auth = require("../middlewares/auth.middleware");
+const idempotency = require("../core/idempotency/idempotency.middleware");
 const { canUpdateOrderStatus } = require("../middlewares/orderRole.guard");
 
 const {
-  // createOrder,
   updateOrderStatus,
   placeOrder,
-  getOrders
+  getOrders,
+  getMyOrders,
+  getOrderById,
 } = require('../controllers/order.controller');
 
-console.log("canUpdateOrderStatus TYPE:", typeof canUpdateOrderStatus);
-console.log("updateOrderStatus TYPE:", typeof updateOrderStatus);
-// CUSTOMER → order create
 router.post(
   "/",
-  // resolveShop,
   optionalAuth,
-  // tenant,
+  idempotency,
   checkUserNotBlocked,
-
   allowRoles('CUSTOMER'),
   placeOrder
 );
-// UPDATE ORDER STATUS (OWNER / ADMIN)
+
+router.get(
+  "/my",
+  protect,
+  allowRoles("CUSTOMER", "OWNER", "STAFF", "ADMIN"),
+  (req, res, next) => {
+    const role = String(req.user?.role || "").toUpperCase();
+    if (role === "CUSTOMER") {
+      return getMyOrders(req, res, next);
+    }
+    return getOrders(req, res, next);
+  }
+);
+
+router.get(
+  "/:orderId",
+  protect,
+  allowRoles("CUSTOMER", "OWNER", "STAFF", "ADMIN"),
+  getOrderById
+);
+
 router.patch(
   "/:orderId/status",
-  // resolveShop,
-  protect,                 // ✅ MUST
-  // tenant,                  // ✅ tenant context
+  protect,
   checkUserNotBlocked,
-  allowRoles("OWNER", "ADMIN", "CUSTOMER"),
-  canUpdateOrderStatus,    // role + order state guard
+  allowRoles("OWNER", "STAFF", "ADMIN", "CUSTOMER"),
+  canUpdateOrderStatus,
   updateOrderStatus
 );
 
-
-
-// OWNER / ADMIN → view orders
 router.get(
   '/',
   protect,
-  // tenant,
-  allowRoles('OWNER', 'ADMIN'),
+  allowRoles('OWNER', 'STAFF', 'ADMIN'),
   getOrders
 );
 

@@ -17,8 +17,6 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 type PersistedSession = {
   accessToken: string;
-  refreshToken: string;
-  refreshTokenExpiresAt: string;
   user: AuthUser;
 };
 
@@ -41,8 +39,6 @@ export function AuthProvider({
   storageKey = storageKeys.session
 }: AuthProviderProps) {
   const accessToken = useAuthStore((state) => state.accessToken);
-  const refreshToken = useAuthStore((state) => state.refreshToken);
-  const refreshTokenExpiresAt = useAuthStore((state) => state.refreshTokenExpiresAt);
   const user = useAuthStore((state) => state.user);
   const status = useAuthStore((state) => state.status);
   const currentTenant = useAuthStore((state) => state.tenant);
@@ -63,6 +59,23 @@ export function AuthProvider({
     }
   }, [currentTenant?.id, currentTenant?.slug, setTenant, tenant]);
 
+  async function fetchCurrentUser(accessTokenValue: string) {
+    const response = await fetch(`${baseUrl}/me`, {
+      headers: {
+        Authorization: `Bearer ${accessTokenValue}`,
+        ...(tenant?.id ? { "x-tenant-id": tenant.id } : {}),
+        ...(tenant?.slug ? { "x-tenant-slug": tenant.slug } : {})
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error("Session validation failed");
+    }
+
+    const data = await response.json();
+    return sanitizeUser((data && typeof data === "object" && "user" in data ? data.user : data) || {});
+  }
+
   async function login(payload: { email: string; password: string }) {
     const response = await fetch(`${baseUrl}/auth/login`, {
       method: "POST",
@@ -82,8 +95,6 @@ export function AuthProvider({
     const data = await response.json();
     const session = {
       accessToken: String(data.accessToken || data.token || ""),
-      refreshToken: String(data.refreshToken || ""),
-      refreshTokenExpiresAt: String(data.refreshTokenExpiresAt || ""),
       user: sanitizeUser(data.user || {})
     };
     localStorage.setItem(storageKey, JSON.stringify(session));
@@ -91,30 +102,16 @@ export function AuthProvider({
   }
 
   async function refreshSession() {
-    if (!refreshToken) return;
-
-    const response = await fetch(`${baseUrl}/auth/refresh`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(tenant?.id ? { "x-tenant-id": tenant.id } : {}),
-        ...(tenant?.slug ? { "x-tenant-slug": tenant.slug } : {})
-      },
-      body: JSON.stringify({ refreshToken })
-    });
-
-    if (!response.ok) {
+    if (!accessToken) {
       clearSession();
       localStorage.removeItem(storageKey);
       throw new Error("Session refresh failed");
     }
 
-    const data = await response.json();
+    const nextUser = await fetchCurrentUser(accessToken);
     const session = {
-      accessToken: String(data.accessToken || data.token || ""),
-      refreshToken: String(data.refreshToken || ""),
-      refreshTokenExpiresAt: String(data.refreshTokenExpiresAt || ""),
-      user: sanitizeUser(data.user || {})
+      accessToken,
+      user: nextUser
     };
     localStorage.setItem(storageKey, JSON.stringify(session));
     setSession(session);
@@ -127,7 +124,8 @@ export function AuthProvider({
       null
     );
 
-    if (!persisted?.refreshToken) {
+    if (!persisted?.accessToken) {
+      localStorage.removeItem(storageKey);
       clearSession();
       return;
     }
@@ -136,21 +134,14 @@ export function AuthProvider({
       setSession(persisted);
       await refreshSession();
     } catch {
+      localStorage.removeItem(storageKey);
       clearSession();
     }
   }
 
   async function logout() {
-    try {
-      await fetch(`${baseUrl}/auth/logout`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken })
-      });
-    } finally {
-      localStorage.removeItem(storageKey);
-      clearSession();
-    }
+    localStorage.removeItem(storageKey);
+    clearSession();
   }
 
   useEffect(() => {
@@ -161,8 +152,8 @@ export function AuthProvider({
   const value = useMemo<AuthContextValue>(
     () => ({
       accessToken,
-      refreshToken,
-      refreshTokenExpiresAt,
+      refreshToken: null,
+      refreshTokenExpiresAt: null,
       user,
       tenant: currentTenant,
       status,
@@ -173,7 +164,7 @@ export function AuthProvider({
       hasRole: (...roles) =>
         !!user?.roleName && roles.includes(user.roleName)
     }),
-    [accessToken, currentTenant, refreshToken, refreshTokenExpiresAt, status, user]
+    [accessToken, currentTenant, status, user]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

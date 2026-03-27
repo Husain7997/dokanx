@@ -9,9 +9,22 @@ const Shop = require("../../../models/shop.model");
 const User = require("../../../models/user.model");
 const WarrantyClaim = require("../../warranty-engine/warrantyClaim.model");
 const cache = require("../../../infrastructure/redis/cache.service");
+const {
+  clampWindow,
+  WINDOW_DAYS,
+  getRollingAggregate,
+} = require("./feature-aggregation.service");
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function buildWindowBoundary(snapshotWindow = "30d") {
+  const days = WINDOW_DAYS[clampWindow(snapshotWindow)];
+  const boundary = new Date();
+  boundary.setHours(0, 0, 0, 0);
+  boundary.setDate(boundary.getDate() - (days - 1));
+  return boundary;
 }
 
 function clamp(value, min = 0, max = 100) {
@@ -26,11 +39,20 @@ async function withCache(key, ttl, resolver) {
   return value;
 }
 
-async function buildCustomerFeatures(userId) {
+async function buildCustomerFeatures(userId, { snapshotWindow = "30d" } = {}) {
+  const boundary = buildWindowBoundary(snapshotWindow);
   const [orders, searchLogs, creditSales] = await Promise.all([
-    Order.find({ customerId: userId }).select("items totalAmount createdAt paymentStatus status").lean(),
-    SearchQueryLog.find({ userId }).sort({ createdAt: -1 }).limit(20).select("query createdAt").lean(),
-    CreditSale.find({ customerId: userId }).select("amount outstandingAmount status createdAt").lean(),
+    Order.find({ customerId: userId, createdAt: { $gte: boundary } })
+      .select("items totalAmount createdAt paymentStatus status")
+      .lean(),
+    SearchQueryLog.find({ userId, createdAt: { $gte: boundary } })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .select("query createdAt")
+      .lean(),
+    CreditSale.find({ customerId: userId, createdAt: { $gte: boundary } })
+      .select("amount outstandingAmount status createdAt")
+      .lean(),
   ]);
 
   const totalOrders = orders.length;
@@ -77,14 +99,18 @@ async function buildCustomerFeatures(userId) {
     searchQueries: searchLogs.map((row) => row.query).filter(Boolean).slice(0, 10),
     outstandingCredit: Number(outstandingCredit.toFixed(2)),
     paymentReliability: Number(paymentReliability.toFixed(4)),
+    windowDays: WINDOW_DAYS[clampWindow(snapshotWindow)],
   };
 }
 
-async function buildProductFeatures(productId) {
+async function buildProductFeatures(productId, { snapshotWindow = "30d" } = {}) {
+  const boundary = buildWindowBoundary(snapshotWindow);
   const [orders, views, claims] = await Promise.all([
-    Order.find({ "items.product": productId }).select("items status createdAt").lean(),
-    Event.countDocuments({ type: "PRODUCT_VIEW", aggregateId: productId }),
-    WarrantyClaim.find({ productId }).select("status resolutionType").lean(),
+    Order.find({ "items.product": productId, createdAt: { $gte: boundary } })
+      .select("items status createdAt")
+      .lean(),
+    Event.countDocuments({ type: "PRODUCT_VIEW", aggregateId: productId, createdAt: { $gte: boundary } }),
+    WarrantyClaim.find({ productId, createdAt: { $gte: boundary } }).select("status resolutionType").lean(),
   ]);
 
   const totalSales = orders.reduce((sum, order) => {
@@ -104,14 +130,16 @@ async function buildProductFeatures(productId) {
     popularityScore,
     claimCount: claims.length,
     views,
+    windowDays: WINDOW_DAYS[clampWindow(snapshotWindow)],
   };
 }
 
-async function buildShopFeatures(shopId) {
+async function buildShopFeatures(shopId, { snapshotWindow = "30d" } = {}) {
+  const boundary = buildWindowBoundary(snapshotWindow);
   const [orders, claims, reviews] = await Promise.all([
-    Order.find({ shopId }).select("status").lean(),
-    WarrantyClaim.find({ shopId }).select("status").lean(),
-    ProductReview.find({ shopId, status: "APPROVED" }).select("rating").lean(),
+    Order.find({ shopId, createdAt: { $gte: boundary } }).select("status createdAt").lean(),
+    WarrantyClaim.find({ shopId, createdAt: { $gte: boundary } }).select("status").lean(),
+    ProductReview.find({ shopId, status: "APPROVED", createdAt: { $gte: boundary } }).select("rating").lean(),
   ]);
 
   const totalOrders = orders.length;
@@ -127,42 +155,70 @@ async function buildShopFeatures(shopId) {
     fulfillmentRate: Number(fulfillmentRate.toFixed(4)),
     claimRate: Number(claimRate.toFixed(4)),
     ratingScore: Number(ratingScore.toFixed(2)),
+    windowDays: WINDOW_DAYS[clampWindow(snapshotWindow)],
   };
 }
 
-async function storeSnapshot(featureType, entityId, features) {
+async function storeSnapshot(featureType, entityId, features, { snapshotWindow = "30d", version = "v2" } = {}) {
   const explanations = Object.entries(features)
     .slice(0, 6)
     .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(", ") : value}`);
 
   return AiFeatureSnapshot.findOneAndUpdate(
-    { featureType, entityId, snapshotDate: todayKey() },
-    { featureType, entityId, snapshotDate: todayKey(), features, explanations },
+    { featureType, entityId, snapshotDate: todayKey(), snapshotWindow, version },
+    {
+      featureType,
+      entityId,
+      snapshotDate: todayKey(),
+      snapshotWindow,
+      version,
+      snapshotTimestamp: new Date(),
+      features,
+      explanations,
+    },
     { new: true, upsert: true }
   );
 }
 
-async function getSnapshot(featureType, entityId, builder) {
-  const cacheKey = `ai:features:${featureType}:${entityId}:${todayKey()}`;
+async function getSnapshot(featureType, entityId, builder, { snapshotWindow = "30d", version = "v2" } = {}) {
+  const windowKey = clampWindow(snapshotWindow);
+  const cacheKey = `ai:features:${featureType}:${entityId}:${todayKey()}:${windowKey}:${version}`;
   return withCache(cacheKey, 86400, async () => {
-    const existing = await AiFeatureSnapshot.findOne({ featureType, entityId, snapshotDate: todayKey() }).lean();
-    if (existing) return existing;
-    const features = await builder(entityId);
-    const snapshot = await storeSnapshot(featureType, entityId, features);
-    return snapshot.toObject ? snapshot.toObject() : snapshot;
+    const existing =
+      (await AiFeatureSnapshot.findOne({
+        featureType,
+        entityId,
+        snapshotDate: todayKey(),
+        snapshotWindow: windowKey,
+        version,
+      }).lean()) ||
+      (await AiFeatureSnapshot.findOne({
+        featureType,
+        entityId,
+        snapshotDate: todayKey(),
+      }).lean());
+    if (existing) {
+      existing.rolling = await getRollingAggregate({ featureType, entityId, snapshotWindow: windowKey, version });
+      return existing;
+    }
+    const features = await builder(entityId, { snapshotWindow: windowKey });
+    const snapshot = await storeSnapshot(featureType, entityId, features, { snapshotWindow: windowKey, version });
+    const result = snapshot.toObject ? snapshot.toObject() : snapshot;
+    result.rolling = await getRollingAggregate({ featureType, entityId, snapshotWindow: windowKey, version });
+    return result;
   });
 }
 
-async function getCustomerSnapshot(userId) {
-  return getSnapshot("customer", userId, buildCustomerFeatures);
+async function getCustomerSnapshot(userId, options = {}) {
+  return getSnapshot("customer", userId, buildCustomerFeatures, options);
 }
 
-async function getProductSnapshot(productId) {
-  return getSnapshot("product", productId, buildProductFeatures);
+async function getProductSnapshot(productId, options = {}) {
+  return getSnapshot("product", productId, buildProductFeatures, options);
 }
 
-async function getShopSnapshot(shopId) {
-  return getSnapshot("shop", shopId, buildShopFeatures);
+async function getShopSnapshot(shopId, options = {}) {
+  return getSnapshot("shop", shopId, buildShopFeatures, options);
 }
 
 async function buildDailySnapshots() {
@@ -172,22 +228,61 @@ async function buildDailySnapshots() {
     Shop.find({}).select("_id").lean(),
   ]);
 
-  for (const customer of customers) await storeSnapshot("customer", customer._id, await buildCustomerFeatures(customer._id));
-  for (const product of products) await storeSnapshot("product", product._id, await buildProductFeatures(product._id));
-  for (const shop of shops) await storeSnapshot("shop", shop._id, await buildShopFeatures(shop._id));
+  const windows = ["1d", "7d", "30d"];
+
+  for (const customer of customers) {
+    for (const snapshotWindow of windows) {
+      await storeSnapshot(
+        "customer",
+        customer._id,
+        await buildCustomerFeatures(customer._id, { snapshotWindow }),
+        { snapshotWindow }
+      );
+    }
+  }
+  for (const product of products) {
+    for (const snapshotWindow of windows) {
+      await storeSnapshot(
+        "product",
+        product._id,
+        await buildProductFeatures(product._id, { snapshotWindow }),
+        { snapshotWindow }
+      );
+    }
+  }
+  for (const shop of shops) {
+    for (const snapshotWindow of windows) {
+      await storeSnapshot(
+        "shop",
+        shop._id,
+        await buildShopFeatures(shop._id, { snapshotWindow }),
+        { snapshotWindow }
+      );
+    }
+  }
 
   return { customers: customers.length, products: products.length, shops: shops.length };
 }
 
 async function getTopCustomerSnapshots(limit = 10) {
-  return AiFeatureSnapshot.find({ featureType: "customer", snapshotDate: todayKey() })
+  return AiFeatureSnapshot.find({
+    featureType: "customer",
+    snapshotDate: todayKey(),
+    snapshotWindow: "30d",
+    version: "v2",
+  })
     .sort({ "features.totalSpent": -1 })
     .limit(limit)
     .lean();
 }
 
 async function getRiskyCustomerSnapshots(limit = 10) {
-  return AiFeatureSnapshot.find({ featureType: "customer", snapshotDate: todayKey() })
+  return AiFeatureSnapshot.find({
+    featureType: "customer",
+    snapshotDate: todayKey(),
+    snapshotWindow: "30d",
+    version: "v2",
+  })
     .sort({ "features.creditScore": 1, "features.outstandingCredit": -1 })
     .limit(limit)
     .lean();

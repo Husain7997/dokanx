@@ -3,11 +3,11 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { clearCartRequest, getCartRequest, saveCartRequest } from "@/lib/api-client";
-import { useAuthStore } from "@/store/auth-store";
-import type { CartItem } from "@/store/cart-store";
-import { useCartStore } from "@/store/cart-store";
-import { useTenantStore } from "@/store/tenant-store";
+import { clearCartRequest, getCartRequest, saveCartRequest } from "../lib/api-client";
+import { useAuthStore } from "../store/auth-store";
+import type { CartItem } from "../store/cart-store";
+import { useCartStore } from "../store/cart-store";
+import { useTenantStore } from "../store/tenant-store";
 
 export function CartScreen() {
   const navigation = useNavigation();

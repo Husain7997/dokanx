@@ -3,7 +3,7 @@ const OAuthApp = require("../models/oauthApp.model");
 const OAuthAuthCode = require("../models/oauthAuthCode.model");
 const OAuthToken = require("../models/oauthToken.model");
 const ApiKey = require("../models/apiKey.model");
-const { hashSecret, randomToken } = require("../utils/crypto.util");
+const { encryptSecret, hashSecret, randomToken } = require("../utils/crypto.util");
 const { createAudit } = require("../utils/audit.util");
 
 const DEFAULT_SCOPES = [
@@ -41,8 +41,10 @@ exports.createApp = async (req, res) => {
   const clientSecret = `dkx_secret_${randomToken(24)}`;
   const webhookSecret = `whsec_${randomToken(20)}`;
   const apiKeySecret = `dkx_${randomToken(24)}`;
+  const signingSecret = `sig_${randomToken(24)}`;
   const clientSecretHash = hashSecret(clientSecret);
   const webhookSecretHash = hashSecret(webhookSecret);
+  const signingSecretEncrypted = encryptSecret(signingSecret);
 
   const app = await OAuthApp.create({
     developerId: developer._id,
@@ -51,6 +53,8 @@ exports.createApp = async (req, res) => {
     redirectUris: Array.isArray(redirectUris) ? redirectUris : [],
     scopes: Array.isArray(scopes) && scopes.length ? scopes : DEFAULT_SCOPES,
     webhookSecretHash,
+    signingSecretCipher: signingSecretEncrypted.cipher,
+    signingSecretIv: signingSecretEncrypted.iv,
     sandboxMode: Boolean(sandboxMode),
     ipWhitelist: Array.isArray(ipWhitelist) ? ipWhitelist : [],
     rateLimitPerMinute: Number(rateLimitPerMinute || 60),
@@ -65,6 +69,8 @@ exports.createApp = async (req, res) => {
     name: `${name} default key`,
     keyHash: hashSecret(apiKeySecret),
     keyPreview: `dkx_***${apiKeySecret.slice(-6)}`,
+    signingSecretCipher: signingSecretEncrypted.cipher,
+    signingSecretIv: signingSecretEncrypted.iv,
     permissions: app.scopes,
     legacy: false,
     migrationStatus: "migrated",
@@ -81,6 +87,7 @@ exports.createApp = async (req, res) => {
     clientSecret,
     apiKey: apiKeySecret,
     webhookSecret,
+    signingSecret,
     key,
   });
 

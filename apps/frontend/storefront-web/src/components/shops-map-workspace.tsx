@@ -1,7 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { Badge, Button, Card, CardDescription, CardTitle, Input } from "@dokanx/ui";
+
+import { clusterShops, computeBounds, detectCurrentLocation, getDistanceKm } from "@/lib/map-engine";
 
 type ShopDirectoryItem = {
   slug: string;
@@ -35,6 +38,8 @@ export function ShopsMapWorkspace({ initialShops }: ShopsMapWorkspaceProps) {
   const [thana, setThana] = useState("all");
   const [market, setMarket] = useState("all");
   const [category, setCategory] = useState("all");
+  const [focusedSlug, setFocusedSlug] = useState<string | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   const districts = useMemo(() => uniqueValues(initialShops, "district"), [initialShops]);
   const thanas = useMemo(() => uniqueValues(initialShops, "thana"), [initialShops]);
@@ -57,15 +62,18 @@ export function ShopsMapWorkspace({ initialShops }: ShopsMapWorkspaceProps) {
     });
   }, [initialShops, query, district, thana, market, category]);
 
-  const mapBounds = useMemo(() => {
-    const lats = initialShops.map((shop) => shop.lat);
-    const lngs = initialShops.map((shop) => shop.lng);
-    const minLat = Math.min(...lats);
-    const maxLat = Math.max(...lats);
-    const minLng = Math.min(...lngs);
-    const maxLng = Math.max(...lngs);
-    return { minLat, maxLat, minLng, maxLng };
-  }, [initialShops]);
+  const mapBounds = useMemo(() => computeBounds(filtered), [filtered]);
+  const clusters = useMemo(() => clusterShops(filtered), [filtered]);
+
+  useEffect(() => {
+    let active = true;
+    detectCurrentLocation().then((location) => {
+      if (active) setCurrentLocation(location);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   function getPinPosition(shop: ShopDirectoryItem, index: number) {
     const { minLat, maxLat, minLng, maxLng } = mapBounds;
@@ -138,13 +146,20 @@ export function ShopsMapWorkspace({ initialShops }: ShopsMapWorkspaceProps) {
             ))}
           </select>
         </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <Badge variant="neutral">{filtered.length} visible shops</Badge>
+          <Badge variant="neutral">{clusters.length} marker groups</Badge>
+          <Badge variant={currentLocation ? "success" : "warning"}>
+            {currentLocation ? "Location detected" : "Location unavailable"}
+          </Badge>
+        </div>
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_460px]">
         <div className="grid gap-4">
           {filtered.length ? (
             filtered.map((shop) => (
-              <Card key={shop.slug} className="border-border/60 bg-card/70">
+              <Card key={shop.slug} className={`border-border/60 bg-card/70 ${focusedSlug === shop.slug ? "ring-2 ring-primary/40" : ""}`}>
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <CardTitle>{shop.name}</CardTitle>
@@ -163,12 +178,17 @@ export function ShopsMapWorkspace({ initialShops }: ShopsMapWorkspaceProps) {
                   <Badge variant="neutral">{shop.thana}</Badge>
                   <Badge variant="neutral">{shop.market}</Badge>
                   <Badge variant="neutral">{shop.category}</Badge>
+                  {currentLocation ? (
+                    <Badge variant="success">
+                      {getDistanceKm(currentLocation, { lat: shop.lat, lng: shop.lng }).toFixed(1)} km
+                    </Badge>
+                  ) : null}
                 </div>
                 <div className="mt-4 flex flex-wrap gap-3">
                   <Button asChild>
-                    <a href={`/shop/${shop.slug}`}>View shop</a>
+                    <Link href={`/shop/${shop.slug}`}>View shop</Link>
                   </Button>
-                  <Button variant="secondary">Show on map</Button>
+                  <Button variant="secondary" onClick={() => setFocusedSlug(shop.slug)}>Show on map</Button>
                 </div>
               </Card>
             ))
@@ -183,28 +203,74 @@ export function ShopsMapWorkspace({ initialShops }: ShopsMapWorkspaceProps) {
         </div>
 
         <Card className="relative overflow-hidden border-border/60 bg-card/70">
-          <CardTitle>Live map</CardTitle>
+          <CardTitle>Full map</CardTitle>
           <CardDescription className="mt-2">
-            Map pins update as you filter shops.
+            Marker groups update as you filter shops and zoom into dense areas.
           </CardDescription>
           <div className="relative mt-6 h-[520px] overflow-hidden rounded-3xl border border-border/60 bg-[radial-gradient(circle_at_top_left,rgba(15,118,110,0.18),transparent_55%),radial-gradient(circle_at_bottom_right,rgba(37,99,235,0.18),transparent_55%),linear-gradient(135deg,rgba(15,23,42,0.05),rgba(15,23,42,0.18))]">
             <div className="absolute inset-0 opacity-50 [background-image:linear-gradient(transparent_23px,rgba(148,163,184,0.12)_24px),linear-gradient(90deg,transparent_23px,rgba(148,163,184,0.12)_24px)] [background-size:24px_24px]" />
-            {filtered.map((shop, index) => {
-              const pos = getPinPosition(shop, index);
+            {clusters.map((cluster, index) => {
+              const representative = cluster.shops[0];
+              const pos = getPinPosition(
+                {
+                  slug: representative.slug,
+                  name: representative.name,
+                  description: "",
+                  rating: "",
+                  verified: true,
+                  district: representative.district,
+                  thana: representative.thana,
+                  market: representative.market,
+                  category: representative.category,
+                  address: "",
+                  lat: cluster.lat,
+                  lng: cluster.lng,
+                },
+                index
+              );
               return (
-                <div
-                  key={`${shop.slug}-pin`}
+                <Link
+                  key={`${cluster.id}-pin`}
+                  href={`/shop/${representative.slug}`}
                   className="absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-2"
                   style={pos}
+                  onMouseEnter={() => setFocusedSlug(representative.slug)}
                 >
-                  <span className="h-3 w-3 rounded-full bg-primary shadow-[0_0_0_6px_rgba(59,130,246,0.15)]" />
-                  <span className="rounded-full bg-background/90 px-3 py-1 text-xs shadow-sm">
-                    {shop.name}
+                  <span className={`flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-xs font-semibold text-white shadow-[0_0_0_6px_rgba(59,130,246,0.15)] ${cluster.count > 1 ? "bg-emerald-600" : "bg-primary"}`}>
+                    {cluster.count}
                   </span>
-                </div>
+                  <span className="rounded-full bg-background/90 px-3 py-1 text-xs shadow-sm">
+                    {cluster.count > 1 ? `${cluster.count} shops` : representative.name}
+                  </span>
+                </Link>
               );
             })}
+            {currentLocation ? (
+              <span
+                className="absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-400 shadow-[0_0_0_10px_rgba(251,191,36,0.2)]"
+                style={getPinPosition(
+                  {
+                    slug: "current-location",
+                    name: "You",
+                    description: "",
+                    rating: "",
+                    verified: true,
+                    district: "",
+                    thana: "",
+                    market: "",
+                    category: "",
+                    address: "",
+                    lat: currentLocation.lat,
+                    lng: currentLocation.lng,
+                  },
+                  filtered.length + 1
+                )}
+              />
+            ) : null}
           </div>
+          <p className="mt-4 text-xs text-muted-foreground">
+            Current location is shown in amber. Clicking a cluster opens the first mapped shop in that cluster.
+          </p>
         </Card>
       </div>
     </div>

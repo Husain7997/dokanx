@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button, Card, CardDescription, CardTitle, FinanceLedgerView, Input } from "@dokanx/ui";
+import { Alert, Button, Card, CardDescription, CardTitle, FinanceLedgerView, TextInput } from "@dokanx/ui";
 
-import { getWalletSummary, listWalletLedger, listWalletLedgerFiltered, topupWallet, transferWallet } from "@/lib/runtime-api";
+import { getWalletReport, getWalletSummary, listWalletLedger, listWalletLedgerFiltered, topupWallet, transferWallet } from "@/lib/runtime-api";
 
 type WalletSummary = {
   balance?: number;
@@ -27,18 +27,27 @@ export default function WalletPage() {
   const [filterType, setFilterType] = useState("");
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
+  const [report, setReport] = useState<{
+    totalIncome?: number;
+    totalExpense?: number;
+    totalCheque?: number;
+    totalDue?: number;
+    profitLoss?: number;
+  } | null>(null);
 
   useEffect(() => {
     let active = true;
     async function load() {
       try {
-        const [response, ledgerResponse] = await Promise.all([
+        const [response, ledgerResponse, reportResponse] = await Promise.all([
           getWalletSummary(),
           listWalletLedger(50),
+          getWalletReport(),
         ]);
         if (!active) return;
         setWallet(response.data || null);
         setLedger(Array.isArray(ledgerResponse.data) ? ledgerResponse.data : []);
+        setReport(reportResponse.data || null);
       } catch (err) {
         if (!active) return;
         setError(err instanceof Error ? err.message : "Unable to load wallet summary.");
@@ -52,12 +61,7 @@ export default function WalletPage() {
 
   return (
     <div className="grid gap-6">
-      {error ? (
-        <Card>
-          <CardTitle>Wallet</CardTitle>
-          <CardDescription className="mt-2">{error}</CardDescription>
-        </Card>
-      ) : null}
+      {error ? <Alert variant="error">{error}</Alert> : null}
       <Card>
         <CardTitle>Wallet actions</CardTitle>
         <CardDescription className="mt-2">
@@ -66,7 +70,7 @@ export default function WalletPage() {
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           <div className="grid gap-3 rounded-2xl border border-border/60 p-4">
             <p className="text-sm font-semibold">Top up wallet</p>
-            <Input value={topupAmount} onChange={(event) => setTopupAmount(event.target.value)} placeholder="Amount" />
+            <TextInput value={topupAmount} onChange={(event) => setTopupAmount(event.target.value)} placeholder="Amount" />
             <Button
               onClick={async () => {
                 setBusy(true);
@@ -90,15 +94,16 @@ export default function WalletPage() {
                   setBusy(false);
                 }
               }}
-              disabled={busy}
+              loading={busy}
+              loadingText="Processing top up"
             >
-              {busy ? "Processing..." : "Top up"}
+              Top up
             </Button>
           </div>
           <div className="grid gap-3 rounded-2xl border border-border/60 p-4">
             <p className="text-sm font-semibold">Transfer to shop</p>
-            <Input value={targetShopId} onChange={(event) => setTargetShopId(event.target.value)} placeholder="Target shop ID" />
-            <Input value={transferAmount} onChange={(event) => setTransferAmount(event.target.value)} placeholder="Amount" />
+            <TextInput value={targetShopId} onChange={(event) => setTargetShopId(event.target.value)} placeholder="Target shop ID" />
+            <TextInput value={transferAmount} onChange={(event) => setTransferAmount(event.target.value)} placeholder="Amount" />
             <Button
               variant="secondary"
               onClick={async () => {
@@ -123,9 +128,11 @@ export default function WalletPage() {
                   setBusy(false);
                 }
               }}
-              disabled={busy || !targetShopId}
+              loading={busy}
+              loadingText="Processing transfer"
+              disabled={!targetShopId}
             >
-              {busy ? "Processing..." : "Transfer"}
+              Transfer
             </Button>
           </div>
         </div>
@@ -136,31 +143,62 @@ export default function WalletPage() {
           Filter ledger entries by type and date range.
         </CardDescription>
         <div className="mt-6 grid gap-4 md:grid-cols-4">
-          <Input value={filterType} onChange={(event) => setFilterType(event.target.value)} placeholder="Type (e.g. WALLET_CREDIT)" />
-          <Input type="date" value={filterFrom} onChange={(event) => setFilterFrom(event.target.value)} />
-          <Input type="date" value={filterTo} onChange={(event) => setFilterTo(event.target.value)} />
+          <TextInput value={filterType} onChange={(event) => setFilterType(event.target.value)} placeholder="Type (e.g. WALLET_CREDIT)" />
+          <TextInput type="date" value={filterFrom} onChange={(event) => setFilterFrom(event.target.value)} />
+          <TextInput type="date" value={filterTo} onChange={(event) => setFilterTo(event.target.value)} />
           <Button
             onClick={async () => {
               setBusy(true);
               setError(null);
-              try {
-                const ledgerResponse = await listWalletLedgerFiltered({
-                  limit: 50,
-                  type: filterType || undefined,
-                  dateFrom: filterFrom || undefined,
-                  dateTo: filterTo || undefined,
-                });
+                try {
+                  const [ledgerResponse, reportResponse] = await Promise.all([
+                    listWalletLedgerFiltered({
+                      limit: 50,
+                      type: filterType || undefined,
+                      dateFrom: filterFrom || undefined,
+                      dateTo: filterTo || undefined,
+                    }),
+                    getWalletReport({
+                      type: filterType || undefined,
+                      dateFrom: filterFrom || undefined,
+                      dateTo: filterTo || undefined,
+                    }),
+                  ]);
                 setLedger(Array.isArray(ledgerResponse.data) ? ledgerResponse.data : []);
+                setReport(reportResponse.data || null);
               } catch (err) {
                 setError(err instanceof Error ? err.message : "Unable to load ledger.");
               } finally {
                 setBusy(false);
               }
             }}
-            disabled={busy}
+            loading={busy}
+            loadingText="Loading ledger"
           >
-            {busy ? "Loading..." : "Apply"}
+            Apply
           </Button>
+        </div>
+      </Card>
+      <Card>
+        <CardTitle>Accounting summary</CardTitle>
+        <CardDescription className="mt-2">Income, expense, due settlement, and profit/loss from the normalized wallet ledger.</CardDescription>
+        <div className="mt-6 grid gap-4 md:grid-cols-4">
+          <div className="rounded-2xl border border-border/60 p-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Income</p>
+            <p className="mt-2 text-xl font-semibold">{report?.totalIncome ?? 0} BDT</p>
+          </div>
+          <div className="rounded-2xl border border-border/60 p-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Expense</p>
+            <p className="mt-2 text-xl font-semibold">{report?.totalExpense ?? 0} BDT</p>
+          </div>
+          <div className="rounded-2xl border border-border/60 p-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Due Settlements</p>
+            <p className="mt-2 text-xl font-semibold">{report?.totalDue ?? 0} BDT</p>
+          </div>
+          <div className="rounded-2xl border border-border/60 p-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Profit/Loss</p>
+            <p className="mt-2 text-xl font-semibold">{report?.profitLoss ?? 0} BDT</p>
+          </div>
         </div>
       </Card>
       <FinanceLedgerView

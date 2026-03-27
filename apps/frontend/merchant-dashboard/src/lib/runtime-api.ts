@@ -96,6 +96,9 @@ type CustomerListResponse = {
     createdAt?: string;
     orderCount?: number;
     totalSpend?: number;
+    totalDue?: number;
+    creditSales?: number;
+    globalCustomerId?: string;
   } & JsonValue>;
 };
 
@@ -139,6 +142,32 @@ type WalletLedgerResponse = {
   } & JsonValue>;
 };
 
+type WalletReportResponse = {
+  data?: {
+    totalIncome?: number;
+    totalExpense?: number;
+    totalCheque?: number;
+    totalDue?: number;
+    profitLoss?: number;
+    rows?: Array<Record<string, unknown>>;
+  } & JsonValue;
+};
+
+type ClaimResponse = {
+  data?: Array<{
+    _id?: string;
+    orderId?: string;
+    productId?: string;
+    customerId?: string;
+    status?: string;
+    type?: string;
+    resolutionType?: string | null;
+    reason?: string;
+    createdAt?: string;
+    fraudFlags?: string[];
+  } & JsonValue>;
+};
+
 type CarrierResponse = {
   data?: Array<{
     id?: string;
@@ -155,6 +184,8 @@ type TrackingResponse = {
     events?: Array<{
       status?: string;
       message?: string;
+      location?: string;
+      geo?: { lat?: number; lng?: number };
       timestamp?: string;
     }>;
   } & JsonValue;
@@ -202,7 +233,15 @@ type ShipmentResponse = {
     carrier?: string;
     status?: string;
     createdAt?: string;
+    events?: Array<{
+      status?: string;
+      message?: string;
+      location?: string;
+      geo?: { lat?: number; lng?: number };
+      timestamp?: string;
+    }>;
   } & JsonValue>;
+  nextCursor?: string | null;
 };
 
 type OrderListResponse = {
@@ -229,6 +268,18 @@ type InventoryListResponse = {
     reorderPoint?: number;
     updatedAt?: string;
   } & JsonValue>;
+};
+
+type AgentMeResponse = {
+  data?: {
+    _id?: string;
+    agentCode?: string;
+    referralLink?: string;
+    clickCount?: number;
+    shopConversionCount?: number;
+    totalEarnings?: number;
+    status?: string;
+  } & JsonValue;
 };
 
 function getHeaders() {
@@ -419,6 +470,16 @@ export function listAnalyticsSnapshots(query: {
   return request<{ data?: Array<Record<string, unknown>> }>(`/analytics/warehouse${search.toString() ? `?${search.toString()}` : ""}`);
 }
 
+export function buildAnalyticsSnapshots(payload: {
+  dateFrom?: string;
+  dateTo?: string;
+}) {
+  return request<{ success?: boolean }>("/analytics/warehouse/build", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function listCampaigns() {
   return request<{ data?: Array<Record<string, unknown>> }>("/marketing/campaigns");
 }
@@ -501,12 +562,114 @@ export function transferWallet(payload: { toShopId: string; amount: number }) {
   });
 }
 
+export function getWalletReport(params: {
+  dateFrom?: string;
+  dateTo?: string;
+  type?: string;
+  customerId?: string;
+  walletType?: string;
+} = {}) {
+  const search = new URLSearchParams();
+  if (params.dateFrom) search.set("dateFrom", params.dateFrom);
+  if (params.dateTo) search.set("dateTo", params.dateTo);
+  if (params.type) search.set("type", params.type);
+  if (params.customerId) search.set("customerId", params.customerId);
+  if (params.walletType) search.set("walletType", params.walletType);
+  return request<WalletReportResponse>(`/shop/wallet/reports${search.toString() ? `?${search.toString()}` : ""}`);
+}
+
+export function createCreditSale(payload: {
+  orderId: string;
+  customerId: string;
+  shopId?: string;
+  amount: number;
+}) {
+  return request<MutationResponse>("/credit/sales", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getCustomerDue(customerId: string) {
+  return request<{
+    data?: {
+      customerId?: string;
+      totalDue?: number;
+      shopWiseDue?: Array<{ shopId?: string; amount?: number }>;
+      sales?: Array<Record<string, unknown>>;
+    } & JsonValue;
+  }>(`/credit/customers/${encodeURIComponent(customerId)}`);
+}
+
+export function getCustomerProfile(globalCustomerId: string) {
+  return request<{
+    data?: {
+      customer?: {
+        _id?: string;
+        name?: string;
+        email?: string;
+        phone?: string;
+        globalCustomerId?: string;
+      };
+      orders?: Array<Record<string, unknown>>;
+      dues?: Array<Record<string, unknown>>;
+      payments?: Array<Record<string, unknown>>;
+      claims?: Array<Record<string, unknown>>;
+      walletSummary?: {
+        totalIncome?: number;
+        totalExpense?: number;
+        totalDue?: number;
+        totalDueSettlements?: number;
+      };
+    } & JsonValue;
+  }>(`/customers/${encodeURIComponent(globalCustomerId)}`);
+}
+
+export function payCustomerDue(payload: {
+  creditSaleId?: string;
+  customerId?: string;
+  amount: number;
+  referenceId: string;
+  metadata?: JsonValue;
+}) {
+  return request<MutationResponse>("/credit/payments", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listShopClaims(shopId: string) {
+  return request<ClaimResponse>(`/claims/shop/${encodeURIComponent(shopId)}`);
+}
+
+export function updateClaimStatus(claimId: string, payload: {
+  status: string;
+  resolutionType?: "repair" | "replacement" | "refund";
+  amount?: number;
+  decisionNote?: string;
+}) {
+  return request<{ data?: JsonValue }>(`/claims/${encodeURIComponent(claimId)}/status`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function listCarriers() {
   return request<CarrierResponse>("/shipping/carriers");
 }
 
-export function listShipments(limit = 50) {
-  const search = new URLSearchParams({ limit: String(limit) });
+export function listShipments(
+  params: { limit?: number; dateFrom?: string; dateTo?: string; cursor?: string } | number = 50
+) {
+  const resolved =
+    typeof params === "number"
+      ? { limit: params }
+      : { limit: params.limit, dateFrom: params.dateFrom, dateTo: params.dateTo, cursor: params.cursor };
+  const search = new URLSearchParams();
+  if (resolved.limit) search.set("limit", String(resolved.limit));
+  if (resolved.dateFrom) search.set("dateFrom", resolved.dateFrom);
+  if (resolved.dateTo) search.set("dateTo", resolved.dateTo);
+  if (resolved.cursor) search.set("cursor", resolved.cursor);
   return request<ShipmentResponse>(`/shipping/shipments?${search.toString()}`);
 }
 
@@ -519,6 +682,17 @@ export function createShipment(payload: { orderId: string; carrier: string }) {
 
 export function trackShipment(trackingNumber: string) {
   return request<TrackingResponse>(`/shipping/track/${encodeURIComponent(trackingNumber)}`);
+}
+
+export async function downloadShipmentLabelPdf(trackingNumber: string) {
+  const response = await fetch(`${getApiBaseUrl()}/shipping/labels/${encodeURIComponent(trackingNumber)}/pdf`, {
+    headers: getHeaders(),
+  });
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+    throw new Error(payload?.message || "Unable to download label.");
+  }
+  return response.blob();
 }
 
 export function listMarketplaceApps() {
@@ -535,12 +709,24 @@ export function listShopPayments(status = "ALL", limit = 50) {
   return request<PaymentAttemptResponse>(`/shops/me/payments?${search.toString()}`);
 }
 
-export function listOrders() {
-  return request<OrderListResponse>("/orders");
+export function listOrders(limit?: number) {
+  const search = new URLSearchParams();
+  if (typeof limit === "number" && Number.isFinite(limit) && limit > 0) {
+    search.set("limit", String(limit));
+  }
+  return request<OrderListResponse>(`/orders${search.toString() ? `?${search.toString()}` : ""}`);
 }
 
-export function listInventory() {
-  return request<InventoryListResponse>("/inventory");
+export function getAgentMe() {
+  return request<AgentMeResponse>("/agents/me");
+}
+
+export function listInventory(limit?: number) {
+  const search = new URLSearchParams();
+  if (typeof limit === "number" && Number.isFinite(limit) && limit > 0) {
+    search.set("limit", String(limit));
+  }
+  return request<InventoryListResponse>(`/inventory${search.toString() ? `?${search.toString()}` : ""}`);
 }
 
 export function updateOrderStatus(orderId: string, status: string) {
@@ -554,5 +740,93 @@ export function refundPayment(orderId: string, amount: number, reason?: string) 
   return request<{ message?: string; refundedAmount?: number }>(`/payments/refund`, {
     method: "POST",
     body: JSON.stringify({ orderId, amount, reason }),
+  });
+}
+
+export function listNotifications() {
+  return request<{
+    data?: Array<{
+      _id?: string;
+      title?: string;
+      message?: string;
+      type?: string;
+      isRead?: boolean;
+      createdAt?: string;
+      metadata?: JsonValue;
+    } & JsonValue>;
+  }>("/notifications");
+}
+
+export function markNotificationRead(notificationId: string) {
+  return request<{ data?: JsonValue }>(`/notifications/${notificationId}/read`, {
+    method: "PATCH",
+  });
+}
+
+export function markAllNotificationsRead() {
+  return request<{ updated?: number }>("/notifications/read-all", {
+    method: "PATCH",
+  });
+}
+
+export function registerPushToken(token: string) {
+  return request<{ success?: boolean }>("/notifications/push-tokens/register", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+}
+
+export function unregisterPushToken(token: string) {
+  return request<{ success?: boolean }>("/notifications/push-tokens/unregister", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+}
+
+export function getNotificationSettings() {
+  return request<{
+    data?: {
+      channels?: {
+        email?: boolean;
+        sms?: boolean;
+        push?: boolean;
+        inApp?: boolean;
+        webhook?: boolean;
+      };
+      categories?: {
+        order?: boolean;
+        payment?: boolean;
+        inventory?: boolean;
+        marketing?: boolean;
+        system?: boolean;
+      };
+    } & JsonValue;
+  }>("/notifications/settings");
+}
+
+export function updateNotificationSettings(payload: {
+  channels?: {
+    email?: boolean;
+    sms?: boolean;
+    push?: boolean;
+    inApp?: boolean;
+    webhook?: boolean;
+  };
+  categories?: {
+    order?: boolean;
+    payment?: boolean;
+    inventory?: boolean;
+    marketing?: boolean;
+    system?: boolean;
+  };
+}) {
+  return request<{
+    data?: {
+      channels?: Record<string, boolean>;
+      categories?: Record<string, boolean>;
+    } & JsonValue;
+  }>("/notifications/settings", {
+    method: "PUT",
+    body: JSON.stringify(payload),
   });
 }

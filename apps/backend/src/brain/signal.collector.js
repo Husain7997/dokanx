@@ -1,14 +1,6 @@
 const { addJob } = require("@/core/infrastructure");
-const { calcStockVelocity, calcRevenueTrend, calcRefundRate, detectOrderSpike } = require("./signal.calculators");
+const { collectSignalsForShop } = require("./analytics.handlers");
 module.exports.collectSignals = async ({ shopId }) => {
-   await addJob("collectSignals", { shopId });
-  return {
-    stockVelocity: await calcStockVelocity(shopId),
-    revenueTrend: await calcRevenueTrend(shopId),
-    refundRate: await calcRefundRate(shopId),
-    orderSpike: await detectOrderSpike(shopId),
-    
-
-  };
- 
+  await addJob("collectSignals", { shopId }, { queueName: "analytics" });
+  return collectSignalsForShop({ shopId });
 };

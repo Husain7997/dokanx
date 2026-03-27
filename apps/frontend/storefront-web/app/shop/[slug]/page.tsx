@@ -3,10 +3,14 @@ import Link from "next/link";
 import { headers } from "next/headers";
 
 import { StorefrontProductGrid } from "@/components/storefront-product-grid";
-import { getProductsData, getShopBySlug } from "@/lib/server-data";
+import { getProductsData, getShopBySlug, getShopRecommendations } from "@/lib/server-data";
 import { getTenantConfig } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
+
+function getDisplayText(value: unknown, fallback: string) {
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
 
 export default async function ShopPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -28,6 +32,9 @@ export default async function ShopPage({ params }: { params: Promise<{ slug: str
   }
 
   const products = await getProductsData(tenant, { shopId: String(shop._id || ""), limit: "12" });
+  const recommendations = await getShopRecommendations(tenant, String(shop._id || ""));
+  const nearbyPopular = (recommendations.nearby_popular_shops as Array<Record<string, unknown>>) || [];
+  const topRated = (recommendations.top_rated_shops as Array<Record<string, unknown>>) || [];
 
   return (
     <div className="grid gap-8">
@@ -82,6 +89,31 @@ export default async function ShopPage({ params }: { params: Promise<{ slug: str
           <StorefrontProductGrid products={products} />
         </div>
       </div>
+
+      {(nearbyPopular.length || topRated.length) ? (
+        <Card>
+          <CardTitle>Recommended shops</CardTitle>
+          <CardDescription className="mt-2">More trusted shops you may like.</CardDescription>
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
+            {[...nearbyPopular, ...topRated].slice(0, 4).map((shopItem, index) => (
+              <div key={String(shopItem._id || shopItem.slug || index)} className="space-y-3">
+                <Badge variant="secondary">
+                  {getDisplayText(shopItem.city, getDisplayText(shopItem.country, "Nearby"))}
+                </Badge>
+                <CardTitle className="text-lg">{getDisplayText(shopItem.name, "Shop")}</CardTitle>
+                <CardDescription>
+                  {(shopItem.trustScore ? `Trust ${shopItem.trustScore}` : "Verified storefront")}
+                </CardDescription>
+                {shopItem.slug ? (
+                  <Button asChild size="sm" variant="secondary">
+                    <Link href={`/shop/${shopItem.slug}`}>Visit shop</Link>
+                  </Button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : null}
     </div>
   );
 }

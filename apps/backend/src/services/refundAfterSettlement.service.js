@@ -1,4 +1,4 @@
-const ShopWallet = require("../models/ShopWallet");
+const walletAdapter = require("./wallet/walletAdapter.service");
 
 async function processRefundAfterSettlement(shopId, amount) {
   if (!shopId) throw new Error("shopId is required");
@@ -6,7 +6,7 @@ async function processRefundAfterSettlement(shopId, amount) {
     throw new Error("Invalid amount");
   }
 
-  const wallet = await ShopWallet.findOneAndUpdate(
+  const wallet = await walletAdapter.findOneAndUpdate(
     { shopId: shopId },
     { $inc: { balance: amount } },
     { upsert: true, new: true }

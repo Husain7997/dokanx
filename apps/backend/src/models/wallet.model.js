@@ -9,17 +9,22 @@ const WalletSchema = new mongoose.Schema(
       unique: true,
       index: true
     },
-isFrozen: {
-  type: Boolean,
-  default: false,
-},
+    isFrozen: {
+      type: Boolean,
+      default: false,
+    },
     balance: {
       type: Number,
       default: 0
     },
-available_balance: { type: Number, default: 0 },
-  pending_settlement: { type: Number, default: 0 },
-  withdrawable_balance: { type: Number, default: 0 },
+    available_balance: { type: Number, default: 0 },
+    pending_settlement: { type: Number, default: 0 },
+    withdrawable_balance: { type: Number, default: 0 },
+    balances: {
+      cash: { type: Number, default: 0 },
+      credit: { type: Number, default: 0 },
+      bank: { type: Number, default: 0 },
+    },
     currency: {
       type: String,
       default: "BDT"

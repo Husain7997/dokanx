@@ -1,3 +1,14 @@
 module.exports = {
-  assets: ["./src/assets"],
+  dependencies: {
+    'react-native-geolocation-service': {
+      platforms: {
+        android: null,
+      },
+    },
+    'react-native-maps': {
+      platforms: {
+        android: null,
+      },
+    },
+  },
 };

@@ -36,6 +36,8 @@ const {
 
 const { logger } =
   require("@/core/infrastructure");
+const { assertLockManagerHealthy } =
+  require("@/core/infrastructure");
 
 const { registerWorkers } =
   require("./workers");
@@ -48,17 +50,15 @@ const { registerWorkers } =
 async function startServer() {
 
   try {
-
-    /* ---------- DATABASE ---------- */
-    await connectMongo();
-    logger.info("Mongo Connected");
+    assertLockManagerHealthy();
+    logger.info("Lock manager self-test passed");
 
     /* ---------- EVENTS ---------- */
     loadEvents();
 
     /* ---------- WORKERS ---------- */
+    registerWorkers();
 
-registerWorkers();
     /* ---------- HTTP SERVER ---------- */
     const server = http.createServer(app);
 
@@ -71,16 +71,19 @@ registerWorkers();
     const PORT = process.env.PORT || 5001;
 
     server.listen(PORT, () => {
-      logger.info(`🚀 DokanX running on ${PORT}`);
+      logger.info("DokanX running on " + PORT);
     });
+
+    void connectMongo({ reason: "startup", background: true });
+    logger.info("Mongo connection bootstrap scheduled");
 
     require("./infrastructure/graceful/shutdown")(server);
 
   } catch (err) {
-  console.error("🔥 BOOT ERROR DETAILS:", err);
-  logger.error("Server Boot Failed", err);
-  process.exit(1);
-}
+    console.error("BOOT ERROR DETAILS:", err);
+    logger.error("Server Boot Failed", err);
+    process.exit(1);
+  }
 }
 
 startServer();

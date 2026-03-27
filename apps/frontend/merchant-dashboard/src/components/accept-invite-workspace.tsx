@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuthStore } from "@dokanx/auth";
-import { Button, Card, CardDescription, CardTitle, Input } from "@dokanx/ui";
+import { Alert, Button, Card, CardDescription, CardTitle, TextInput } from "@dokanx/ui";
 import { storageKeys, toRole } from "@dokanx/utils";
 
 import { acceptInvitation } from "@/lib/runtime-api";
@@ -39,8 +39,6 @@ export function AcceptInviteWorkspace() {
 
       const session = {
         accessToken: String(response.accessToken || response.token || ""),
-        refreshToken: String(response.refreshToken || ""),
-        refreshTokenExpiresAt: String(response.refreshTokenExpiresAt || ""),
         user: {
           id: String((response.user as { _id?: string; id?: string } | undefined)?._id || (response.user as { id?: string } | undefined)?.id || ""),
           name: String((response.user as { name?: string } | undefined)?.name || ""),
@@ -69,27 +67,18 @@ export function AcceptInviteWorkspace() {
           Set your password once. The legacy shared temp password flow has been removed.
         </CardDescription>
         <div className="mt-6 grid gap-4">
-          <label className="grid gap-2 text-sm">
-            <span>Invite token</span>
-            <Input value={token} readOnly />
-          </label>
-          <label className="grid gap-2 text-sm">
-            <span>Name</span>
-            <Input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} />
-          </label>
-          <label className="grid gap-2 text-sm">
-            <span>Password</span>
-            <Input type="password" value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} />
-          </label>
+          <TextInput label="Invite token" value={token} readOnly />
+          <TextInput label="Name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} />
+          <TextInput label="Password" type="password" value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} />
           <div className="flex gap-3">
-            <Button onClick={handleAccept} disabled={submitting || !hasToken}>
-              {submitting ? "Working..." : "Accept Invite"}
+            <Button onClick={handleAccept} loading={submitting} loadingText="Accepting invite" disabled={!hasToken}>
+              Accept Invite
             </Button>
             <Button asChild variant="secondary">
               <a href="/dashboard">Open dashboard</a>
             </Button>
           </div>
-          {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
+          {message ? <Alert variant="info">{message}</Alert> : null}
         </div>
       </Card>
     </div>

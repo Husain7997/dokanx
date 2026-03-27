@@ -8,9 +8,11 @@
   "dependencies": {
     "@dokanx/types": "file:../types",
     "@dokanx/utils": "file:../utils",
+    "react-dom": "^19.2.3",
+    "react-test-renderer": "^19.2.3",
     "zustand": "^5.0.3"
   },
   "peerDependencies": {
-    "react": "^19.0.0"
+    "react": "^19.2.3"
   }
 }

@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Shop = require("../models/shop.model");
 
 async function tenantResolver(req, _res, next) {
@@ -10,12 +11,15 @@ async function tenantResolver(req, _res, next) {
     }
 
     let shop = null;
-    if (tenantId) {
-      shop = await Shop.findById(tenantId);
-    } else if (tenantSlug) {
+
+    if (tenantSlug) {
       shop = await Shop.findOne({
         $or: [{ slug: tenantSlug }, { domain: tenantSlug }],
       });
+    }
+
+    if (!shop && tenantId && mongoose.isValidObjectId(tenantId)) {
+      shop = await Shop.findById(tenantId);
     }
 
     if (shop) {

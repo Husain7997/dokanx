@@ -16,6 +16,7 @@ const webhookSchema = new mongoose.Schema(
     url: {
       type: String,
       required: true,
+      match: /^https?:\/\//i,
     },
     events: {
       type: [String],
@@ -40,6 +41,9 @@ const webhookSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+webhookSchema.index({ appId: 1, status: 1, updatedAt: -1 });
+webhookSchema.index({ developerId: 1, url: 1 });
 
 module.exports =
   mongoose.models.WebhookSubscription ||

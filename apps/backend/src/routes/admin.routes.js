@@ -11,6 +11,8 @@ const analyticsController = require("../controllers/admin/analytics.controller")
 const recommendationController = require("../controllers/admin/recommendation.controller");
 const fraudController = require("../controllers/admin/fraud.controller");
 const apiKeyAdminController = require("../controllers/admin/api-key.admin.controller");
+const queueAdminController = require("../controllers/admin/queue.admin.controller");
+const agentController = require("../modules/agent/agent.controller");
 
 // ❗❗ খুব গুরুত্বপূর্ণ: function হিসেবে পাঠাচ্ছি
 router.get("/users",
@@ -84,6 +86,12 @@ router.get("/fraud/reports",
   fraudController.getReports
 );
 
+router.get("/queues/status",
+  protect,
+  allowRoles("ADMIN"),
+  queueAdminController.getQueueStatus
+);
+
 router.post("/fraud/check-transaction",
   protect,
   allowRoles("ADMIN"),
@@ -100,6 +108,18 @@ router.get("/shops",
   protect,
   allowRoles("ADMIN"),
   adminController.listShops
+);
+
+router.get("/agents",
+  protect,
+  allowRoles("ADMIN"),
+  agentController.listAdminAgents
+);
+
+router.put("/agents/:id/status",
+  protect,
+  allowRoles("ADMIN"),
+  agentController.updateStatus
 );
 
 router.post("/keys/migrate",

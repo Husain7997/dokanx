@@ -18,6 +18,22 @@ const aiFeatureSnapshotSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    snapshotWindow: {
+      type: String,
+      enum: ["1d", "7d", "30d"],
+      default: "30d",
+      index: true,
+    },
+    version: {
+      type: String,
+      default: "v2",
+      index: true,
+    },
+    snapshotTimestamp: {
+      type: Date,
+      default: Date.now,
+      index: true,
+    },
     features: {
       type: Object,
       default: {},
@@ -31,9 +47,11 @@ const aiFeatureSnapshotSchema = new mongoose.Schema(
 );
 
 aiFeatureSnapshotSchema.index(
-  { featureType: 1, entityId: 1, snapshotDate: 1 },
+  { featureType: 1, entityId: 1, snapshotDate: 1, snapshotWindow: 1, version: 1 },
   { unique: true }
 );
+aiFeatureSnapshotSchema.index({ snapshotTimestamp: -1 });
+aiFeatureSnapshotSchema.index({ featureType: 1, snapshotWindow: 1, snapshotTimestamp: -1 });
 
 module.exports =
   mongoose.models.AiFeatureSnapshot ||

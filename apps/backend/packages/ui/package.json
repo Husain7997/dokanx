@@ -22,13 +22,18 @@
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-toast": "^1.2.15",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "chart.js": "^4.4.6",
+    "chartjs-plugin-annotation": "^3.0.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.6.2",
+    "react-chartjs-2": "^5.2.0",
+    "react-test-renderer": "^19.2.3",
+    "recharts": "^2.12.7",
     "tailwind-merge": "^3.3.1"
   },
   "peerDependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
   }
 }

@@ -1,7 +1,10 @@
+import path from "path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  reactStrictMode: true,
   distDir: process.env.NEXT_DIST_DIR || ".next",
+  outputFileTracingRoot: path.join(__dirname, "../../.."),
   allowedDevOrigins: [
     "http://127.0.0.1:4200",
     "http://127.0.0.1:4201",

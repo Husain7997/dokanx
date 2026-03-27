@@ -110,4 +110,16 @@ export type ApiModules = {
     installed: () => Promise<ApiEnvelope<MarketplaceApp[]>>;
     adminList: () => Promise<ApiEnvelope<MarketplaceApp[]>>;
   };
+  recommendation: {
+    home: (query?: Record<string, string | number | boolean | undefined>) => Promise<ApiEnvelope<Record<string, unknown>>>;
+    product: (
+      productId: string,
+      query?: Record<string, string | number | boolean | undefined>
+    ) => Promise<ApiEnvelope<Record<string, unknown>>>;
+    shop: (
+      shopId: string,
+      query?: Record<string, string | number | boolean | undefined>
+    ) => Promise<ApiEnvelope<Record<string, unknown>>>;
+    trending: (query?: Record<string, string | number | boolean | undefined>) => Promise<ApiEnvelope<Record<string, unknown>>>;
+  };
 };

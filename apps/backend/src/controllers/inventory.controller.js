@@ -42,7 +42,20 @@ exports.lockTest = async (req, res) => {
 exports.listInventory = async (req, res) => {
   const shopId = req.shop?._id;
   if (!shopId) return res.status(400).json({ message: "Shop missing" });
-  const rows = await Inventory.find({ shopId }).lean();
+  const rawLimit = Number(req.query.limit);
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0
+    ? Math.min(rawLimit, 200)
+    : null;
+  const filter = { shopId };
+  const sort = { updatedAt: -1, createdAt: -1 };
+
+  let query = Inventory.find(filter).sort(sort);
+
+  if (limit) {
+    query = query.limit(limit);
+  }
+
+  const rows = await query.lean();
   res.json({ data: rows });
 };
 

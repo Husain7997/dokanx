@@ -17,6 +17,8 @@ exports.parseWebhook = async (payload) => {
     trackingNumber: payload.trackingNumber,
     status: payload.status,
     message: payload.message || "",
+    location: payload.location || "",
+    geo: payload.geo || undefined,
   };
 };
 

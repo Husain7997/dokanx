@@ -17,6 +17,29 @@ type ProfileResponse = {
 type MutationResponse = {
   message?: string;
   data?: JsonValue;
+  token?: string;
+  accessToken?: string;
+  user?: JsonValue;
+};
+
+type AgentLeadRegistrationResponse = {
+  message?: string;
+  data?: {
+    tempPassword?: string;
+    user?: {
+      _id?: string;
+      name?: string;
+      email?: string;
+      phone?: string;
+      role?: string;
+    };
+    agent?: {
+      _id?: string;
+      agentCode?: string;
+      referralLink?: string;
+      status?: string;
+    };
+  };
 };
 
 type PreferencePayload = {
@@ -43,6 +66,7 @@ type RuntimeCartItem = {
   quantity: number;
   price: number;
   imageUrl?: string;
+  shopId?: string;
 };
 
 type RuntimeCartResponse = {
@@ -81,12 +105,29 @@ type SearchSuggestionResponse = {
   count?: number;
 };
 
+type MarketplaceSearchResponse = {
+  products?: RuntimeProduct[];
+  shops?: Array<{
+    _id?: string;
+    name?: string;
+    slug?: string;
+    domain?: string;
+    ratingAverage?: number;
+    distanceKm?: number | null;
+    trustScore?: number | null;
+  }>;
+  categories?: string[];
+};
+
 type ShopSearchResponse = {
   data?: Array<{
     _id?: string;
     name?: string;
     slug?: string;
     domain?: string;
+    ratingAverage?: number;
+    distanceKm?: number | null;
+    trustScore?: number | null;
   }>;
   count?: number;
 };
@@ -120,6 +161,25 @@ type ProductReviewResponse = {
     message?: string;
     createdAt?: string;
   }>;
+  count?: number;
+};
+
+type HomeRecommendationResponse = {
+  data?: {
+    trending_products?: RuntimeProduct[];
+    recommended_products?: RuntimeProduct[];
+    flash_deals?: RuntimeProduct[];
+    recently_viewed?: RuntimeProduct[];
+    popular_shops?: Array<{
+      _id?: string;
+      name?: string;
+      slug?: string;
+      city?: string;
+      country?: string;
+      trustScore?: number;
+      popularityScore?: number;
+    }>;
+  };
 };
 
 type EtaSettingsResponse = {
@@ -130,6 +190,111 @@ type EtaSettingsResponse = {
     trafficFactors?: Array<{ maxDistanceKm?: number; minutes?: number }>;
     distanceBrackets?: Array<{ maxDistanceKm?: number; minutes?: number }>;
   };
+};
+
+type TrafficContextResponse = {
+  data?: {
+    type?: "direct" | "marketplace";
+    isMarketplaceEnabled?: boolean;
+    scopeShopId?: string | null;
+  };
+};
+
+type CustomerOverviewResponse = {
+  data?: {
+    customer?: {
+      _id?: string;
+      name?: string;
+      email?: string;
+      phone?: string;
+      globalCustomerId?: string;
+    };
+    orders?: Array<Record<string, unknown>>;
+    dues?: Array<Record<string, unknown>>;
+    payments?: Array<Record<string, unknown>>;
+    claims?: Array<Record<string, unknown>>;
+    walletSummary?: {
+      totalIncome?: number;
+      totalExpense?: number;
+      totalDue?: number;
+      totalDueSettlements?: number;
+    };
+  };
+};
+
+type WalletMeResponse = {
+  data?: {
+    balance?: {
+      cash?: number;
+      credit?: number;
+      bank?: number;
+    };
+    ledgerSummary?: {
+      totalCredits?: number;
+      totalDebits?: number;
+      totalTransactions?: number;
+    };
+    lastTransactions?: Array<{
+      _id?: string;
+      amount?: number;
+      walletType?: string;
+      transactionType?: string;
+      direction?: string;
+      referenceId?: string;
+      shopId?: string;
+      orderId?: string;
+      note?: string;
+      createdAt?: string;
+    }>;
+  };
+};
+
+type CreditMeResponse = {
+  data?: {
+    customerId?: string;
+    totalDue?: number;
+    perShopDue?: Array<{ shopId?: string; amount?: number }>;
+    sales?: Array<Record<string, unknown>>;
+    paymentHistory?: Array<Record<string, unknown>>;
+    creditAccounts?: Array<{
+      shopId?: string;
+      outstandingBalance?: number;
+      creditLimit?: number;
+      availableCredit?: number;
+      status?: string;
+    }>;
+  };
+};
+
+type DeliveryGroupResponse = {
+  data?: {
+    _id?: string;
+    deliveryCharge?: number;
+    totalDistance?: number;
+    zone?: string;
+    route?: Array<Record<string, unknown>>;
+  };
+};
+
+type ClaimResponse = {
+  data?: Array<{
+    _id?: string;
+    orderId?: string;
+    productId?: string;
+    type?: string;
+    status?: string;
+    resolutionType?: string | null;
+    reason?: string;
+    decisionNote?: string;
+    createdAt?: string;
+    fraudFlags?: string[];
+    protectionSnapshot?: {
+      enabled?: boolean;
+      durationDays?: number;
+      type?: string;
+      expiryDate?: string;
+    };
+  }>;
 };
 
 const guestCartStorageKey = "dokanx.guest-cart-token";
@@ -161,6 +326,16 @@ function getAuthHeaders() {
   };
 }
 
+function getSearchHeaders() {
+  if (typeof window === "undefined") return {};
+  const searchId = window.sessionStorage.getItem("dokanx.search-id");
+  const searchQuery = window.sessionStorage.getItem("dokanx.search-query");
+  return {
+    ...(searchId ? { "x-search-id": searchId } : {}),
+    ...(searchQuery ? { "x-search-query": searchQuery } : {}),
+  };
+}
+
 function buildIdempotencyKey(prefix: string) {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return `${prefix}_${crypto.randomUUID()}`;
@@ -173,6 +348,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     ...init,
     headers: {
       ...getAuthHeaders(),
+      ...getSearchHeaders(),
       ...(init.headers || {}),
     },
   });
@@ -208,6 +384,92 @@ export function getProfile() {
   return request<ProfileResponse>("/me");
 }
 
+export function getTrafficContext() {
+  return request<TrafficContextResponse>("/traffic/context");
+}
+
+export function getCustomerOverview(globalCustomerId: string) {
+  return request<CustomerOverviewResponse>(`/customers/${encodeURIComponent(globalCustomerId)}`);
+}
+
+export function getMyWallet() {
+  return request<WalletMeResponse>("/wallet/me");
+}
+
+export function getDeliveryGroup(groupId: string) {
+  return request<DeliveryGroupResponse>(`/delivery/groups/${encodeURIComponent(groupId)}`);
+}
+
+export function getCustomerDue(customerId: string) {
+  return request<{
+    data?: {
+      customerId?: string;
+      totalDue?: number;
+      shopWiseDue?: Array<{ shopId?: string; amount?: number }>;
+      sales?: Array<Record<string, unknown>>;
+    };
+  }>(`/credit/customers/${encodeURIComponent(customerId)}`);
+}
+
+export function getMyCredit() {
+  return request<CreditMeResponse>("/credit/me");
+}
+
+export function payCustomerDue(payload: {
+  creditSaleId?: string;
+  customerId?: string;
+  amount: number;
+  referenceId: string;
+  paymentMode?: "WALLET" | "ONLINE";
+  provider?: string;
+  metadata?: JsonValue;
+}) {
+  return request<MutationResponse>("/credit/payments", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    headers: {
+      "Idempotency-Key": payload.referenceId || buildIdempotencyKey("credit-payment"),
+    },
+  });
+}
+
+export function registerAgentFromLead(payload: {
+  name: string;
+  phone: string;
+  district: string;
+  experience?: string;
+  source?: string;
+}) {
+  return request<AgentLeadRegistrationResponse>("/agents/register-from-lead", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function trackAgentReferralClick(agentCode: string) {
+  return request<{ data?: { agentCode?: string; status?: string; referralLink?: string } }>(
+    `/agents/track-click?ref=${encodeURIComponent(agentCode)}`
+  );
+}
+
+export function createClaim(payload: {
+  orderId: string;
+  productId: string;
+  customerId: string;
+  type: "warranty" | "guarantee";
+  reason: string;
+  evidence?: Array<{ imageUrl?: string; note?: string }>;
+}) {
+  return request<{ data?: JsonValue }>("/claims", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getCustomerClaims(customerId: string) {
+  return request<ClaimResponse>(`/claims/customer/${encodeURIComponent(customerId)}`);
+}
+
 export function updatePreferences(payload: PreferencePayload) {
   return request<ProfileResponse>("/me/preferences", {
     method: "PUT",
@@ -220,20 +482,80 @@ export function getRuntimeCart(shopId?: string) {
   return request<RuntimeCartResponse>(`/cart${query}`);
 }
 
-export function searchRuntimeProducts(query: Record<string, string>) {
-  const search = new URLSearchParams(query).toString();
+export function getHomeProfileBundle(globalCustomerId?: string) {
+  return Promise.all([
+    getProfile().catch(() => null),
+    globalCustomerId ? getCustomerOverview(globalCustomerId).catch(() => null) : Promise.resolve(null),
+  ]);
+}
+
+export function searchRuntimeProducts(query: Record<string, string | undefined>) {
+  const search = new URLSearchParams(
+    Object.entries(query).filter(([, value]) => typeof value === "string" && value.length > 0) as Array<[string, string]>
+  ).toString();
   return request<RuntimeProductListResponse>(`/search/products${search ? `?${search}` : ""}`);
+}
+
+export function searchMarketplace(query: Record<string, string | undefined>) {
+  const search = new URLSearchParams(
+    Object.entries(query).filter(([, value]) => typeof value === "string" && value.length > 0) as Array<[string, string]>
+  ).toString();
+  return request<MarketplaceSearchResponse>(`/search${search ? `?${search}` : ""}`);
 }
 
 export function searchSuggestions(query: string) {
   const search = new URLSearchParams({ q: query }).toString();
-  return request<SearchSuggestionResponse>(`/search/index?${search}`);
+  return request<SearchSuggestionResponse>(`/search/suggestions?${search}`);
 }
 
-export function searchShops(query: string, filters?: { district?: string; market?: string }) {
+export function getHomeRecommendations(params?: { location?: string; limit?: string }) {
+  const search = params ? new URLSearchParams(params).toString() : "";
+  return request<HomeRecommendationResponse>(`/recommendations/home${search ? `?${search}` : ""}`);
+}
+
+export function trackProductView(payload: { productId: string; shopId?: string }) {
+  return request<MutationResponse>("/analytics/events", {
+    method: "POST",
+    body: JSON.stringify({
+      type: "PRODUCT_VIEW",
+      productId: payload.productId,
+      shopId: payload.shopId,
+    }),
+  });
+}
+
+export function trackRecommendationImpression(payload: { productIds: string[]; context: string }) {
+  return request<MutationResponse>("/analytics/events", {
+    method: "POST",
+    body: JSON.stringify({
+      type: "REC_IMPRESSION",
+      productIds: payload.productIds,
+      context: payload.context,
+    }),
+  });
+}
+
+export function trackRecommendationClick(payload: { productId: string; context: string }) {
+  return request<MutationResponse>("/analytics/events", {
+    method: "POST",
+    body: JSON.stringify({
+      type: "REC_CLICK",
+      productId: payload.productId,
+      context: payload.context,
+    }),
+  });
+}
+
+export function searchShops(
+  query: string,
+  filters?: { district?: string; market?: string; lat?: string; lng?: string; distance?: string }
+) {
   const params = new URLSearchParams({ q: query });
   if (filters?.district) params.set("district", filters.district);
   if (filters?.market) params.set("market", filters.market);
+  if (filters?.lat) params.set("lat", filters.lat);
+  if (filters?.lng) params.set("lng", filters.lng);
+  if (filters?.distance) params.set("distance", filters.distance);
   return request<ShopSearchResponse>(`/search/shops?${params.toString()}`);
 }
 
@@ -293,9 +615,21 @@ export function clearCart(shopId: string) {
 export function createOrder(payload: {
   shopId?: string;
   items: Array<{ product: string; quantity: number }>;
+  addressId?: string;
+  deliveryMode: string;
+  paymentMode: string;
+  notes?: string;
+  deliveryAddress?: {
+    line1?: string;
+    city?: string;
+    area?: string;
+    postalCode?: string;
+    country?: string;
+  };
   totalAmount: number;
   shippingFee?: number;
   couponCode?: string;
+  multiShopGroup?: never;
 }) {
   return request<MutationResponse>("/orders", {
     method: "POST",
@@ -306,7 +640,7 @@ export function createOrder(payload: {
   });
 }
 
-export function initiatePayment(orderId: string, payload: { paymentMethod: string; hasOwnGateway?: boolean }) {
+export function initiatePayment(orderId: string, payload: { provider: string }) {
   return request<PaymentHandoffResponse>(`/payments/initiate/${orderId}`, {
     method: "POST",
     headers: {
@@ -327,8 +661,11 @@ export function getOrderDetail(orderId: string) {
   return request<OrderDetailResponse>(`/orders/${orderId}`);
 }
 
-export function getProductReviews(productId: string) {
-  return request<ProductReviewResponse>(`/products/${productId}/reviews`);
+export function getProductReviews(productId: string, params?: { page?: string; limit?: string }) {
+  const search = params ? new URLSearchParams(params).toString() : "";
+  return request<ProductReviewResponse>(
+    `/products/${productId}/reviews${search ? `?${search}` : ""}`
+  );
 }
 
 export function submitProductReview(productId: string, payload: { reviewerName?: string; rating: number; message: string }) {

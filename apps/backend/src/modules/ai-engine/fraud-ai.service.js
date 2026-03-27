@@ -1,15 +1,53 @@
 const Order = require("../../models/order.model");
 const WarrantyClaim = require("../warranty-engine/warrantyClaim.model");
+const cache = require("../../infrastructure/redis/cache.service");
+const { guardRiskDecision } = require("./ai-decision.guard");
 
 function clamp(value) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
 async function getFraudSignals({ customerId, shopId, order, userOrders = [] }) {
+  const ipAddress = order?.metadata?.ipAddress || order?.metadata?.ip || null;
+  const deviceId = order?.metadata?.deviceId || null;
+  const cacheKey = `ai:fraud:${customerId || "guest"}:${shopId || "none"}:${ipAddress || "noip"}:${deviceId || "nodevice"}`;
+  const cached = await cache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   const [claims, refunds, shopOrders] = await Promise.all([
     customerId ? WarrantyClaim.find({ customerId }).select("createdAt status").lean() : [],
     customerId ? Order.find({ customerId, status: "REFUNDED" }).select("_id").lean() : [],
     shopId ? Order.find({ shopId }).select("createdAt status deliveryAddress").lean() : [],
+  ]);
+  const [ipOrders, deviceOrders, linkedAccounts] = await Promise.all([
+    ipAddress
+      ? Order.find({
+          "metadata.ipAddress": ipAddress,
+          createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        })
+          .select("customerId createdAt")
+          .lean()
+      : [],
+    deviceId
+      ? Order.find({
+          "metadata.deviceId": deviceId,
+          createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        })
+          .select("customerId createdAt")
+          .lean()
+      : [],
+    ipAddress || deviceId
+      ? Order.distinct("customerId", {
+          $or: [
+            ...(ipAddress ? [{ "metadata.ipAddress": ipAddress }] : []),
+            ...(deviceId ? [{ "metadata.deviceId": deviceId }] : []),
+          ],
+          customerId: { $ne: null },
+          createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+        })
+      : [],
   ]);
 
   const signals = [];
@@ -35,13 +73,47 @@ async function getFraudSignals({ customerId, shopId, order, userOrders = [] }) {
     signals.push({ code: "LOCATION_PATTERN", label: "Mismatched location pattern", weight: 12, value: city, threshold: "anomalous city mix" });
     score += 12;
   }
-  return { score: clamp(score), signals, explanation: signals.map((signal) => `${signal.label} (${signal.value})`) };
+  if (ipOrders.length >= 4) {
+    signals.push({ code: "IP_VELOCITY", label: "High order velocity per IP", weight: 14, value: ipOrders.length, threshold: ">=4/day" });
+    score += 14;
+  }
+  if (deviceOrders.length >= 4) {
+    signals.push({ code: "DEVICE_VELOCITY", label: "High order velocity per device", weight: 14, value: deviceOrders.length, threshold: ">=4/day" });
+    score += 14;
+  }
+  if (linkedAccounts.length >= 3) {
+    signals.push({ code: "CROSS_ACCOUNT_LINK", label: "Cross-account linkage detected", weight: 16, value: linkedAccounts.length, threshold: ">=3 linked accounts" });
+    score += 16;
+  }
+  const nightOrders = userOrders.filter((row) => {
+    const hour = new Date(row.createdAt).getHours();
+    return hour >= 0 && hour <= 4;
+  }).length;
+  if (nightOrders >= 3) {
+    signals.push({ code: "ABNORMAL_TIME_PATTERN", label: "Abnormal late-night activity", weight: 10, value: nightOrders, threshold: ">=3 between 00:00-04:59" });
+    score += 10;
+  }
+
+  const result = {
+    score: clamp(score),
+    signals,
+    explanation: signals.map((signal) => `${signal.label} (${signal.value})`),
+    safety: guardRiskDecision({ score: clamp(score), signals }),
+  };
+  await cache.set(cacheKey, result, 120);
+  return result;
 }
 
 async function getClaimFraudSignals({ customerId, shopId, productId }) {
-  const [claimsForCustomer, claimsForProduct] = await Promise.all([
+  const [claimsForCustomer, claimsForProduct, recentShopClaims] = await Promise.all([
     customerId ? WarrantyClaim.countDocuments({ customerId }) : 0,
     productId ? WarrantyClaim.countDocuments({ productId }) : 0,
+    shopId
+      ? WarrantyClaim.countDocuments({
+          shopId,
+          createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+        })
+      : 0,
   ]);
   const flags = [];
   let score = 0;
@@ -56,6 +128,10 @@ async function getClaimFraudSignals({ customerId, shopId, productId }) {
   if (shopId && claimsForCustomer >= 2) {
     flags.push("shop_specific_claim_pattern");
     score += 10;
+  }
+  if (recentShopClaims >= 8) {
+    flags.push("weekly_shop_claim_spike");
+    score += 8;
   }
   return { score: clamp(score), flags };
 }

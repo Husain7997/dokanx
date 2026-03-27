@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useAuth } from "@dokanx/auth";
-import { Button, CardDescription, Input } from "@dokanx/ui";
+import { Alert, Button, CardDescription, TextInput } from "@dokanx/ui";
 
 import { WorkspaceCard } from "./workspace-card";
 
@@ -61,17 +61,11 @@ export function OwnerSessionPanel({ title = "Owner session" }: OwnerSessionPanel
       description="Protected product and settings mutations need an authenticated OWNER session with an attached shop."
     >
       <div className="grid gap-4">
-        <label className="grid gap-2 text-sm">
-          <span>Email</span>
-          <Input value={credentials.email} onChange={(event) => setCredentials((current) => ({ ...current, email: event.target.value }))} />
-        </label>
-        <label className="grid gap-2 text-sm">
-          <span>Password</span>
-          <Input type="password" value={credentials.password} onChange={(event) => setCredentials((current) => ({ ...current, password: event.target.value }))} />
-        </label>
+        <TextInput label="Email" value={credentials.email} onChange={(event) => setCredentials((current) => ({ ...current, email: event.target.value }))} />
+        <TextInput label="Password" type="password" value={credentials.password} onChange={(event) => setCredentials((current) => ({ ...current, password: event.target.value }))} />
         <div className="flex gap-3">
-          <Button onClick={handleLogin} disabled={submitting}>
-            {submitting ? "Working..." : "Sign In"}
+          <Button onClick={handleLogin} loading={submitting} loadingText="Signing in">
+            Sign In
           </Button>
           <Button variant="ghost" onClick={handleLogout} disabled={submitting || auth.status !== "authenticated"}>
             Sign Out
@@ -85,7 +79,7 @@ export function OwnerSessionPanel({ title = "Owner session" }: OwnerSessionPanel
             </div>
           ))}
         </div>
-        {message ? <CardDescription>{message}</CardDescription> : null}
+        {message ? <Alert variant="info">{message}</Alert> : null}
       </div>
     </WorkspaceCard>
   );

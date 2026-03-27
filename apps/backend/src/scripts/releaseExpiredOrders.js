@@ -2,6 +2,7 @@ require("dotenv").config();
 const mongoose = require("mongoose");
 
 const Order = require("../models/order.model");
+const { resolveShopId } = require("../utils/order-normalization.util");
 
 
 (async () => {
@@ -14,8 +15,8 @@ const Order = require("../models/order.model");
 
   for (const order of expiredOrders) {
     for (const item of order.items) {
-      await releaseStock({
-        shopId: order.shop,
+        await releaseStock({
+        shopId: resolveShopId(order),
         productId: item.product,
         quantity: item.quantity,
         orderId: order._id,

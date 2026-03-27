@@ -28,7 +28,8 @@ const ALLOWED = [
   "amount",
   "type",
   "referenceId",
-  "meta"
+  "meta",
+  "session"
 ];
 
 const FORBIDDEN = [
@@ -76,12 +77,17 @@ async function execute(command) {
 
   return circuit.guard(async () => {
 
+    const ownedSession =
+      !command.session;
     const session =
+      command.session ||
       await mongoose.startSession();
 
     try {
 
-      session.startTransaction();
+      if (ownedSession) {
+        session.startTransaction();
+      }
 
       const {
         shopId,
@@ -121,6 +127,10 @@ async function execute(command) {
         meta
       }, session);
 
+      if (ownedSession) {
+        await session.commitTransaction();
+      }
+
       await publishEvent(
         "FINANCE_MUTATION",
         {
@@ -131,18 +141,20 @@ async function execute(command) {
         }
       );
 
-      await session.commitTransaction();
-
       return { balance: newBalance };
 
     } catch (err) {
 
-      await session.abortTransaction();
+      if (ownedSession) {
+        await session.abortTransaction();
+      }
       throw err;
 
     } finally {
 
-      session.endSession();
+      if (ownedSession) {
+        session.endSession();
+      }
     }
 
   });

@@ -3,13 +3,22 @@
 import { useEffect, useState } from "react";
 
 import { AdminEtaHealth } from "@/components/admin-eta-health";
-import { getSearchStatus, triggerDeltaReindex, triggerFullReindex } from "@/lib/admin-search-api";
+import { getSearchConversion, getSearchNoResults, getSearchStatus, getSearchTrending, triggerDeltaReindex, triggerFullReindex } from "@/lib/admin-search-api";
 
 export default function SearchAdminPage() {
   const [lastRunAt, setLastRunAt] = useState<string | null>(null);
   const [totalDocs, setTotalDocs] = useState<number | null>(null);
   const [logs, setLogs] = useState<Array<{ _id?: string; level?: string; message?: string; createdAt?: string }>>([]);
   const [status, setStatus] = useState<string | null>(null);
+  const [trending, setTrending] = useState<Array<{ query?: string; count?: number }>>([]);
+  const [noResults, setNoResults] = useState<Array<{ query?: string; count?: number }>>([]);
+  const [conversion, setConversion] = useState<{
+    totalSearches?: number;
+    addToCart?: number;
+    checkout?: number;
+    addToCartRate?: number;
+    checkoutRate?: number;
+  } | null>(null);
 
   async function refresh() {
     const response = await getSearchStatus();
@@ -20,7 +29,25 @@ export default function SearchAdminPage() {
 
   useEffect(() => {
     void refresh();
+    void loadAnalytics();
   }, []);
+
+  async function loadAnalytics() {
+    try {
+      const [trendingResponse, noResultsResponse, conversionResponse] = await Promise.all([
+        getSearchTrending({ days: 7, limit: 8 }),
+        getSearchNoResults({ days: 30, limit: 8 }),
+        getSearchConversion({ days: 30 }),
+      ]);
+      setTrending(trendingResponse.data || []);
+      setNoResults(noResultsResponse.data || []);
+      setConversion(conversionResponse.data || null);
+    } catch {
+      setTrending([]);
+      setNoResults([]);
+      setConversion(null);
+    }
+  }
 
   async function handleFullReindex() {
     const response = await triggerFullReindex();
@@ -68,6 +95,67 @@ export default function SearchAdminPage() {
         <AdminEtaHealth />
       </div>
 
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-3 rounded-3xl border border-white/40 bg-white/70 p-6">
+          <p className="text-sm font-semibold text-foreground">Trending searches (7 days)</p>
+          <div className="grid gap-2 text-xs text-muted-foreground">
+            {trending.length ? (
+              trending.map((item) => (
+                <div key={item.query} className="flex items-center justify-between gap-4">
+                  <span className="font-medium text-foreground">{item.query}</span>
+                  <span>{item.count ?? 0} searches</span>
+                </div>
+              ))
+            ) : (
+              <p>No trending queries yet.</p>
+            )}
+          </div>
+        </div>
+        <div className="grid gap-3 rounded-3xl border border-white/40 bg-white/70 p-6">
+          <p className="text-sm font-semibold text-foreground">No-results keywords (30 days)</p>
+          <div className="grid gap-2 text-xs text-muted-foreground">
+            {noResults.length ? (
+              noResults.map((item) => (
+                <div key={item.query} className="flex items-center justify-between gap-4">
+                  <span className="font-medium text-foreground">{item.query}</span>
+                  <span>{item.count ?? 0} misses</span>
+                </div>
+              ))
+            ) : (
+              <p>No empty searches logged.</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 rounded-3xl border border-white/40 bg-white/70 p-6">
+        <p className="text-sm font-semibold text-foreground">Search conversion (30 days)</p>
+        <div className="mt-2 grid gap-2 text-xs text-muted-foreground md:grid-cols-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em]">Searches</p>
+            <p className="mt-1 text-sm font-semibold text-foreground">{conversion?.totalSearches ?? 0}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em]">Add to cart</p>
+            <p className="mt-1 text-sm font-semibold text-foreground">{conversion?.addToCart ?? 0}</p>
+            <p>{formatRate(conversion?.addToCartRate)}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em]">Checkout</p>
+            <p className="mt-1 text-sm font-semibold text-foreground">{conversion?.checkout ?? 0}</p>
+            <p>{formatRate(conversion?.checkoutRate)}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em]">Drop-off</p>
+            <p className="mt-1 text-sm font-semibold text-foreground">
+              {conversion?.totalSearches
+                ? conversion.totalSearches - (conversion.checkout ?? 0)
+                : 0}
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="grid gap-3 rounded-3xl border border-white/40 bg-white/70 p-6">
         <p className="text-sm font-semibold text-foreground">Recent logs</p>
         <div className="grid gap-2 text-xs text-muted-foreground">
@@ -86,4 +174,9 @@ export default function SearchAdminPage() {
       </div>
     </div>
   );
+}
+
+function formatRate(value?: number) {
+  if (!value || Number.isNaN(value)) return "0%";
+  return `${(value * 100).toFixed(1)}%`;
 }

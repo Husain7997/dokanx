@@ -1,8 +1,8 @@
-const { queue } = require("@/core/infrastructure");
+const { queues } = require("@/core/infrastructure");
 const { dispatchNotification } =
   require("@/infrastructure/notifications/notification.service");
 
-queue.process("notification", async (job) => {
+queues.analytics.process("notification", 3, async (job) => {
   await dispatchNotification(job.data || {});
   return { ok: true };
 });

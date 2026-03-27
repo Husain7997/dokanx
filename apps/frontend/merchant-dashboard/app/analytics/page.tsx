@@ -1,5 +1,5 @@
-import { AnalyticsWorkspace } from "@/components/analytics-workspace";
+import { AnalyticsPageClient } from "./analytics-page-client";
 
 export default function AnalyticsPage() {
-  return <AnalyticsWorkspace />;
+  return <AnalyticsPageClient />;
 }

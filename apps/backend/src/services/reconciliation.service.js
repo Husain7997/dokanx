@@ -1,6 +1,6 @@
 const Ledger = require('../models/ledger.model');
-const ShopWallet = require('../models/ShopWallet');
 const ReconciliationReport = require('../models/ReconciliationReport');
+const walletAdapter = require('./wallet/walletAdapter.service');
 
 exports.runDailyReconciliation = async (dateStr) => {
   const ledgerSum = await Ledger.aggregate([
@@ -20,7 +20,7 @@ exports.runDailyReconciliation = async (dateStr) => {
     }
   ]);
 
-  const walletSum = await ShopWallet.aggregate([
+  const walletSum = await walletAdapter.aggregate([
     {
       $group: {
         _id: null,

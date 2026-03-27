@@ -1,10 +1,15 @@
 const Shop = require("../models/shop.model");
 const User = require("../models/user.model");
 const Order = require("../models/order.model");
+const Product = require("../models/product.model");
+const ShopLocation = require("../models/shopLocation.model");
+const CreditSale = require("../modules/credit-engine/creditSale.model");
+const { buildShopRatings, buildShopDistances } = require("../services/search/search.metrics");
 const { createAudit } = require("../utils/audit.util");
 const jwt = require("jsonwebtoken");
 const { t } =
   require('@/core/infrastructure');
+const agentService = require("../modules/agent/agent.service");
 
 
 
@@ -25,15 +30,25 @@ exports.createShop = async (req, res) => {
       locale: req.body.locale,
       owner: req.user._id,
       isActive: true,
+      acquisitionSource:
+        req.body.agentCode || req.body.ref || req.query.ref
+          ? "agent"
+          : (req.body.acquisitionSource || "organic"),
     });
-await User.findByIdAndUpdate(
-  req.user._id,
-  { shopId: shop._id }
-);
-res.status(201).json({
-  success: true,
-  shop
-});
+
+    await User.findByIdAndUpdate(
+      req.user._id,
+      { shopId: shop._id }
+    );
+
+    const agentCode = req.body.agentCode || req.body.ref || req.query.ref || null;
+    if (agentCode) {
+      await agentService.attachAgentToShop({
+        shopId: shop._id,
+        agentCode,
+      });
+    }
+
     req.user.shopId = shop._id;
     await req.user.save();
 
@@ -47,7 +62,7 @@ res.status(201).json({
 
     res.status(201).json({
       success: true,
-      shop,
+      shop: await Shop.findById(shop._id).lean(),
     });
 
   } catch (err) {
@@ -99,15 +114,116 @@ exports.getMyShops = async (req, res) => {
 /**
  * LIST PUBLIC SHOPS
  */
-exports.listPublicShops = async (_req, res) => {
+exports.listPublicShops = async (req, res) => {
   try {
-    const shops = await Shop.find({ isActive: true, status: "ACTIVE" })
-      .select("name domain slug")
+    const {
+      category,
+      distance,
+      rating,
+      lat,
+      lng,
+      limit,
+    } = req.query || {};
+    const normalizedLat = lat != null ? Number(lat) : null;
+    const normalizedLng = lng != null ? Number(lng) : null;
+    const maxDistance = distance != null ? Number(distance) : null;
+    const minRating = rating != null ? Number(rating) : null;
+    const safeLimit = Math.min(200, Math.max(1, Number(limit || 100)));
+    const filter = { isActive: true, status: "ACTIVE" };
+
+    if (category) {
+      const shopIds = await Product.distinct("shopId", { category: String(category) });
+      if (!shopIds.length) {
+        return res.json({ data: [] });
+      }
+      filter._id = { $in: shopIds };
+    }
+
+    const shops = await Shop.find(filter)
+      .select("name domain slug trustScore popularityScore city country")
+      .limit(safeLimit)
       .lean();
 
-    res.json({
-      data: shops,
+    if (!shops.length) {
+      return res.json({ data: [] });
+    }
+
+    const shopIds = shops.map((shop) => shop._id);
+    const [locations, ratingsMap, distanceMap, categoryRows] = await Promise.all([
+      ShopLocation.find({ shopId: { $in: shopIds }, isActive: true })
+        .sort({ createdAt: 1 })
+        .lean(),
+      buildShopRatings(shopIds),
+      buildShopDistances(shopIds.map((id) => String(id)), normalizedLat, normalizedLng),
+      Product.aggregate([
+        { $match: { shopId: { $in: shopIds }, category: { $nin: [null, ""] } } },
+        { $group: { _id: { shopId: "$shopId", category: "$category" }, count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+      ]),
+    ]);
+
+    const primaryLocationMap = new Map();
+    locations.forEach((location) => {
+      const key = String(location.shopId || "");
+      if (!key || primaryLocationMap.has(key)) return;
+      primaryLocationMap.set(key, location);
     });
+    const categoryMap = new Map();
+    categoryRows.forEach((row) => {
+      const key = String(row?._id?.shopId || "");
+      if (!key || categoryMap.has(key)) return;
+      categoryMap.set(key, String(row?._id?.category || ""));
+    });
+
+    let data = shops.map((shop) => {
+      const location = primaryLocationMap.get(String(shop._id || ""));
+      const coords = location?.coordinates?.coordinates || [];
+      const ratings = ratingsMap.get(String(shop._id || "")) || { avgRating: 0, count: 0 };
+      const distanceKm = distanceMap.get(String(shop._id || "")) ?? null;
+
+      return {
+        _id: shop._id,
+        id: shop._id,
+        shopId: shop._id,
+        name: shop.name,
+        domain: shop.domain || null,
+        slug: shop.slug || null,
+        city: shop.city || location?.city || null,
+        country: shop.country || location?.country || null,
+        lat: coords.length >= 2 ? Number(coords[1]) : null,
+        lng: coords.length >= 2 ? Number(coords[0]) : null,
+        locationName: location?.name || null,
+        category: categoryMap.get(String(shop._id || "")) || null,
+        ratingAverage: Number(ratings.avgRating || 0),
+        ratingCount: Number(ratings.count || 0),
+        distanceKm,
+        trustScore: Number(shop.trustScore || 0),
+        popularityScore: Number(shop.popularityScore || 0),
+        isTrending: Number(shop.popularityScore || 0) >= 10,
+      };
+    });
+
+    data = data.filter((shop) => shop.lat != null && shop.lng != null);
+    if (minRating != null) {
+      data = data.filter((shop) => Number(shop.ratingAverage || 0) >= minRating);
+    }
+    if (maxDistance != null) {
+      data = data.filter((shop) => shop.distanceKm != null && Number(shop.distanceKm) <= maxDistance);
+    }
+
+    data.sort((a, b) => {
+      const scoreA =
+        (a.distanceKm == null ? 0 : 100 - Math.min(100, Number(a.distanceKm) * 5)) +
+        Number(a.ratingAverage || 0) * 10 +
+        Number(a.popularityScore || 0) * 0.2;
+      const scoreB =
+        (b.distanceKm == null ? 0 : 100 - Math.min(100, Number(b.distanceKm) * 5)) +
+        Number(b.ratingAverage || 0) * 10 +
+        Number(b.popularityScore || 0) * 0.2;
+      return scoreB - scoreA;
+    });
+
+    res.json({ data });
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -119,20 +235,40 @@ exports.listPublicShops = async (_req, res) => {
 exports.listCustomers = async (req, res) => {
   try {
     const shopId = req.shop?._id || req.user?.shopId;
+    const queryText = String(req.query?.q || "").trim();
     if (!shopId) {
       return res.status(400).json({ message: "Shop context required" });
     }
 
-    const customers = await User.find({ role: "CUSTOMER", shopId })
-      .select("name email phone createdAt")
+    const orderCustomerIds = await Order.distinct("customerId", { shopId });
+    const customerFilter = {
+      role: "CUSTOMER",
+      $or: [{ shopId }, { _id: { $in: orderCustomerIds.filter(Boolean) } }],
+    };
+    if (queryText) {
+      customerFilter.$and = [
+        {
+          $or: [
+            { name: { $regex: queryText, $options: "i" } },
+            { phone: { $regex: queryText, $options: "i" } },
+            { email: { $regex: queryText, $options: "i" } },
+            { globalCustomerId: { $regex: queryText, $options: "i" } },
+          ],
+        },
+      ];
+    }
+
+    const customers = await User.find(customerFilter)
+      .select("name email phone createdAt globalCustomerId")
       .lean();
 
     const customerIds = customers.map((customer) => customer._id).filter(Boolean);
+    const globalCustomerIds = customers.map((customer) => customer.globalCustomerId).filter(Boolean);
     const orderStats = await Order.aggregate([
-      { $match: { shopId, user: { $in: customerIds } } },
+      { $match: { shopId, customerId: { $in: customerIds } } },
       {
         $group: {
-          _id: "$user",
+          _id: "$customerId",
           orderCount: { $sum: 1 },
           totalSpend: { $sum: "$totalAmount" },
         },
@@ -140,18 +276,32 @@ exports.listCustomers = async (req, res) => {
     ]);
 
     const channelStats = await Order.aggregate([
-      { $match: { shopId, user: { $in: customerIds } } },
+      { $match: { shopId, customerId: { $in: customerIds } } },
       {
         $group: {
-          _id: { user: "$user", channel: "$channel" },
+          _id: { user: "$customerId", channel: "$channel" },
           totalSpend: { $sum: "$totalAmount" },
           orderCount: { $sum: 1 },
         },
       },
     ]);
 
+    const dueStats = await CreditSale.aggregate([
+      { $match: { shopId, customerId: { $in: globalCustomerIds } } },
+      {
+        $group: {
+          _id: "$customerId",
+          totalDue: { $sum: "$outstandingAmount" },
+          creditSales: { $sum: 1 },
+        },
+      },
+    ]);
+
     const statsMap = new Map(
       orderStats.map((row) => [String(row._id), { orderCount: row.orderCount, totalSpend: row.totalSpend }])
+    );
+    const dueMap = new Map(
+      dueStats.map((row) => [String(row._id), { totalDue: row.totalDue, creditSales: row.creditSales }])
     );
 
     const channelMap = new Map();
@@ -170,11 +320,14 @@ exports.listCustomers = async (req, res) => {
     const enriched = customers.map((customer) => {
       const stats = statsMap.get(String(customer._id)) || { orderCount: 0, totalSpend: 0 };
       const spendByChannel = channelMap.get(String(customer._id)) || {};
+      const due = dueMap.get(String(customer.globalCustomerId || "")) || { totalDue: 0, creditSales: 0 };
       return {
         ...customer,
         orderCount: stats.orderCount,
         totalSpend: stats.totalSpend,
         spendByChannel,
+        totalDue: due.totalDue,
+        creditSales: due.creditSales,
       };
     });
 
@@ -186,6 +339,73 @@ exports.listCustomers = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to fetch customers",
+    });
+  }
+};
+
+exports.createCustomer = async (req, res) => {
+  try {
+    const shopId = req.shop?._id || req.user?.shopId;
+    if (!shopId) {
+      return res.status(400).json({ message: "Shop context required" });
+    }
+
+    const name = String(req.body?.name || "").trim();
+    const phone = String(req.body?.phone || "").trim();
+    const email = String(req.body?.email || "").trim().toLowerCase();
+
+    if (!phone) {
+      return res.status(400).json({ message: "Phone is required" });
+    }
+
+    const existing = await User.findOne({
+      role: "CUSTOMER",
+      $or: [
+        { phone },
+        ...(email ? [{ email }] : []),
+      ],
+    });
+
+    if (existing) {
+      if (!existing.shopId) {
+        existing.shopId = shopId;
+        await existing.save();
+      }
+      return res.json({
+        message: "Customer already exists",
+        data: {
+          _id: existing._id,
+          name: existing.name,
+          email: existing.email,
+          phone: existing.phone,
+          globalCustomerId: existing.globalCustomerId,
+        },
+      });
+    }
+
+    const customer = await User.create({
+      name: name || `Customer ${phone.slice(-4)}`,
+      email: email || `customer-${Date.now()}-${phone.replace(/\D/g, "")}@dokanx.local`,
+      phone,
+      password: `Temp#${Date.now()}`,
+      role: "CUSTOMER",
+      shopId,
+    });
+
+    return res.status(201).json({
+      message: "Customer created",
+      data: {
+        _id: customer._id,
+        name: customer.name,
+        email: customer.email,
+        phone: customer.phone,
+        globalCustomerId: customer.globalCustomerId,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to create customer",
     });
   }
 };

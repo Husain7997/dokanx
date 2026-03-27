@@ -8,14 +8,25 @@ module.exports = {
         "card-foreground": "hsl(var(--card-foreground))",
         primary: "hsl(var(--primary))",
         "primary-foreground": "hsl(var(--primary-foreground))",
+        secondary: "hsl(var(--secondary))",
+        "secondary-foreground": "hsl(var(--secondary-foreground))",
+        accent: "hsl(var(--accent))",
+        "accent-foreground": "hsl(var(--accent-foreground))",
+        success: "hsl(var(--success))",
+        warning: "hsl(var(--warning))",
+        danger: "hsl(var(--destructive))",
         muted: "hsl(var(--muted))",
         "muted-foreground": "hsl(var(--muted-foreground))",
-        border: "hsl(var(--border))"
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))"
       },
       borderRadius: {
-        lg: "0.75rem",
-        md: "0.5rem",
-        sm: "0.375rem"
+        sm: "var(--radius-sm)",
+        md: "var(--radius-md)",
+        lg: "var(--radius-lg)",
+        xl: "var(--radius-xl)",
+        full: "var(--radius-pill)"
       }
     }
   }

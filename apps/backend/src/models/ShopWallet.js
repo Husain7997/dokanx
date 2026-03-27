@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const logger = require("../infrastructure/logger/logger");
 
 const ShopWalletSchema = new mongoose.Schema(
   {
@@ -15,6 +16,8 @@ const ShopWalletSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+logger.warn("ShopWallet model is deprecated; use wallet.model.js as canonical wallet source");
 
 module.exports =
   mongoose.models.ShopWallet ||

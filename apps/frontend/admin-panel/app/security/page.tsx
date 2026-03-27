@@ -152,7 +152,7 @@ export default function SecurityPage() {
     try {
       const response = await updateRiskSettings({
         highThreshold: Number(highRiskThreshold),
-        mediumRiskThreshold: Number(mediumRiskThreshold),
+        mediumThreshold: Number(mediumRiskThreshold),
         tag: riskTag || "Security",
       });
       if (response?.data) {
@@ -340,7 +340,15 @@ export default function SecurityPage() {
               <Button
                 size="sm"
                 variant="secondary"
-                onClick={() => exportAuditCsv(loginLogs, `login-logs-${new Date().toISOString().slice(0, 10)}.csv`)}
+                onClick={() =>
+                  exportAuditCsv(
+                    loginLogs,
+                    `login-logs-${new Date().toISOString().slice(0, 10)}.csv`,
+                    highRiskThreshold,
+                    mediumRiskThreshold,
+                    riskTag
+                  )
+                }
               >
                 Export login logs
               </Button>
@@ -375,7 +383,15 @@ export default function SecurityPage() {
               <Button
                 size="sm"
                 variant="secondary"
-                onClick={() => exportAuditCsv(apiLogs, `api-logs-${new Date().toISOString().slice(0, 10)}.csv`)}
+                onClick={() =>
+                  exportAuditCsv(
+                    apiLogs,
+                    `api-logs-${new Date().toISOString().slice(0, 10)}.csv`,
+                    highRiskThreshold,
+                    mediumRiskThreshold,
+                    riskTag
+                  )
+                }
               >
                 Export API logs
               </Button>
@@ -475,7 +491,13 @@ function downloadCsv(csv: string, filename: string) {
   window.URL.revokeObjectURL(url);
 }
 
-function exportAuditCsv(rows: AuditRow[], filename: string, highThreshold: number, mediumThreshold: number, tag: string) {
+function exportAuditCsv(
+  rows: AuditRow[],
+  filename: string,
+  highThreshold = 80,
+  mediumThreshold = 50,
+  tag = "Security"
+) {
   const csvRows = rows.map((log) => ({
     action: log.action || "",
     targetType: log.targetType || "",

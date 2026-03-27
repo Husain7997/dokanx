@@ -26,6 +26,7 @@ async function protect(req, res, next) {
     }
 
     req.user = user;
+    req.user.id = String(user._id);
     req.shop = shop || null;
 console.log("CONTROLLER SHOP:", req.shop?._id);
     next();

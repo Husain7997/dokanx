@@ -14,8 +14,9 @@
     "@dokanx/ui": "file:../../backend/packages/ui",
     "@tanstack/react-query": "^5.68.0",
     "next": "^15.2.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-test-renderer": "^19.2.3",
     "zustand": "^5.0.3"
   },
   "devDependencies": {

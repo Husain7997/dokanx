@@ -9,9 +9,11 @@ const badgeVariants = cva(
     variants: {
       variant: {
         neutral: "bg-accent text-accent-foreground",
+        secondary: "bg-accent text-accent-foreground",
         success: "bg-[hsl(var(--success)/0.14)] text-[hsl(var(--success))]",
         warning: "bg-[hsl(var(--warning)/0.14)] text-[hsl(var(--warning))]",
-        danger: "bg-[hsl(var(--destructive)/0.14)] text-[hsl(var(--destructive))]"
+        danger: "bg-[hsl(var(--destructive)/0.14)] text-[hsl(var(--destructive))]",
+        outline: "border border-border bg-card text-card-foreground"
       }
     },
     defaultVariants: {

@@ -2,13 +2,13 @@
 
 const walletService =
   require("../../services/wallet.service");
-const ShopWallet =
-  require("../../models/ShopWallet");
 const Ledger =
   require("../../modules/ledger/ledger.model");
 
 const { t } =
   require("@/core/infrastructure");
+const walletAdapter =
+  require("../../services/wallet/walletAdapter.service");
 
 exports.topupWallet =
 async (req, res, next) => {
@@ -22,7 +22,7 @@ async (req, res, next) => {
       await walletService.creditWallet({
         shopId,
         amount: req.body.amount,
-        reference: `manual-topup-${Date.now()}`,
+        referenceId: req.body.referenceId || req.body.reference || `manual-topup-${Date.now()}`,
       });
 
     res.json({
@@ -46,13 +46,13 @@ async (req, res, next) => {
     await walletService.debitWallet({
       shopId,
       amount: req.body.amount,
-      reference: `transfer-${Date.now()}`,
+      referenceId: req.body.referenceId || req.body.reference || `transfer-${Date.now()}`,
     });
 
     await walletService.creditWallet({
       shopId: req.body.toShopId,
       amount: req.body.amount,
-      reference: `transfer-${Date.now()}`,
+      referenceId: req.body.referenceId || req.body.reference || `transfer-${Date.now()}`,
     });
 
     res.json({
@@ -73,7 +73,7 @@ async (req, res, next) => {
       return res.status(400).json({ message: "Shop context required" });
     }
 
-    const wallet = await ShopWallet.findOne({ shopId }).lean();
+    const wallet = await walletAdapter.findOneLean({ shopId });
     if (!wallet) {
       return res.status(404).json({ message: "Shop wallet not found" });
     }
@@ -118,6 +118,32 @@ async (req, res, next) => {
     res.json({
       message: t(req.lang, "wallet.ledger_ready"),
       data: entries,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getWalletReport =
+async (req, res, next) => {
+  try {
+    const shopId = req.shop?._id || req.user?.shopId;
+    if (!shopId) {
+      return res.status(400).json({ message: "Shop context required" });
+    }
+
+    const data = await walletService.generateReport({
+      shopId,
+      customerId: req.query.customerId || undefined,
+      dateFrom: req.query.dateFrom || undefined,
+      dateTo: req.query.dateTo || undefined,
+      type: req.query.type || undefined,
+      walletType: req.query.walletType || undefined,
+    });
+
+    res.json({
+      message: t(req.lang, "wallet.summary_ready"),
+      data,
     });
   } catch (err) {
     next(err);

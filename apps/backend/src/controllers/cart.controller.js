@@ -2,6 +2,7 @@ const jwt = require("jsonwebtoken");
 const Cart = require("../models/cart.model");
 const Product = require("../models/product.model");
 const { randomToken } = require("../utils/crypto.util");
+const { logSearchEvent } = require("../services/search.service");
 
 function computeTotals(items) {
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -92,6 +93,23 @@ exports.saveCart = async (req, res) => {
     },
     { new: true, upsert: true }
   );
+
+  const searchId = req.headers["x-search-id"] ? String(req.headers["x-search-id"]) : null;
+  const searchQuery = req.headers["x-search-query"] ? String(req.headers["x-search-query"]) : "";
+  if (searchId && normalizedItems.length) {
+    await logSearchEvent({
+      searchId,
+      query: searchQuery,
+      eventType: "ADD_TO_CART",
+      userId,
+      shopId,
+      metadata: {
+        itemCount: normalizedItems.length,
+        quantity: totals.quantity,
+        subtotal: totals.subtotal,
+      },
+    });
+  }
 
   res.json({ data: cart, guestToken });
 };

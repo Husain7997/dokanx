@@ -83,6 +83,26 @@ type AdminUserResponse = {
   } & JsonValue>;
 };
 
+type AdminAgentResponse = {
+  data?: Array<{
+    _id?: string;
+    agentCode?: string;
+    status?: string;
+    clickCount?: number;
+    signupCount?: number;
+    shopConversionCount?: number;
+    totalEarnings?: number;
+    totalShops?: number;
+    referralLink?: string;
+    userId?: {
+      _id?: string;
+      name?: string;
+      email?: string;
+      phone?: string;
+    } & JsonValue;
+  } & JsonValue>;
+};
+
 type AdminShopResponse = {
   data?: Array<{
     _id?: string;
@@ -595,6 +615,17 @@ export function getAdminRecommendationMetrics(params?: { days?: string }) {
 
 export function listAdminUsers() {
   return request<AdminUserResponse>("/admin/users");
+}
+
+export function listAgents() {
+  return request<AdminAgentResponse>("/admin/agents");
+}
+
+export function updateAgentStatus(agentId: string, status: "ACTIVE" | "BANNED" | "PENDING") {
+  return request<{ message?: string; data?: JsonValue }>(`/admin/agents/${agentId}/status`, {
+    method: "PUT",
+    body: JSON.stringify({ status }),
+  });
 }
 
 export function listMerchants() {

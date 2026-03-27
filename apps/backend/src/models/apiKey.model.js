@@ -44,6 +44,15 @@ const schema = new mongoose.Schema(
     keyPreview: {
       type: String,
       default: "",
+      maxlength: 64,
+    },
+    signingSecretCipher: {
+      type: String,
+      default: null,
+    },
+    signingSecretIv: {
+      type: String,
+      default: null,
     },
     permissions: {
       type: [String],
@@ -65,18 +74,22 @@ const schema = new mongoose.Schema(
     rateLimitPerMinute: {
       type: Number,
       default: 60,
+      min: 1,
     },
     rateLimitPerDay: {
       type: Number,
       default: 5000,
+      min: 1,
     },
     usageLimit: {
       type: Number,
       default: null,
+      min: 0,
     },
     usageRemaining: {
       type: Number,
       default: null,
+      min: 0,
     },
     lastUsedAt: {
       type: Date,
@@ -93,6 +106,8 @@ const schema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+schema.index({ appId: 1, shopId: 1, legacy: 1 });
 
 
 

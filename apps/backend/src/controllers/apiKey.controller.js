@@ -1,6 +1,6 @@
 const Developer = require("../models/developer.model");
 const ApiKey = require("../models/apiKey.model");
-const { hashSecret, randomToken } = require("../utils/crypto.util");
+const { encryptSecret, hashSecret, randomToken } = require("../utils/crypto.util");
 const { createAudit } = require("../utils/audit.util");
 
 function buildPreview(rawKey) {
@@ -22,7 +22,9 @@ exports.createKey = async (req, res) => {
 
   const { name, permissions, usageLimit, appId, sandboxMode, ipWhitelist, rateLimitPerMinute, rateLimitPerDay, shopId } = req.body || {};
   const rawKey = `dkx_${randomToken(24)}`;
+  const signingSecret = `sig_${randomToken(24)}`;
   const keyHash = hashSecret(rawKey);
+  const encryptedSigningSecret = encryptSecret(signingSecret);
   const isLegacy = !appId && !shopId;
 
   const key = await ApiKey.create({
@@ -34,6 +36,8 @@ exports.createKey = async (req, res) => {
     name: name || "Default key",
     keyHash,
     keyPreview: buildPreview(rawKey),
+    signingSecretCipher: encryptedSigningSecret.cipher,
+    signingSecretIv: encryptedSigningSecret.iv,
     permissions: Array.isArray(permissions) ? permissions : [],
     shopId: shopId || null,
     sandboxMode: Boolean(sandboxMode),
@@ -48,6 +52,7 @@ exports.createKey = async (req, res) => {
     message: "API key created",
     data: key,
     secret: rawKey,
+    signingSecret,
   });
 
   await createAudit({
