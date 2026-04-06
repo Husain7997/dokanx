@@ -4,6 +4,7 @@ const Order = require("../models/order.model");
 const Product = require("../models/product.model");
 const ShopLocation = require("../models/shopLocation.model");
 const CreditSale = require("../modules/credit-engine/creditSale.model");
+const CustomerComplaint = require("../models/customerComplaint.model");
 const { buildShopRatings, buildShopDistances } = require("../services/search/search.metrics");
 const { createAudit } = require("../utils/audit.util");
 const jwt = require("jsonwebtoken");
@@ -259,7 +260,7 @@ exports.listCustomers = async (req, res) => {
     }
 
     const customers = await User.find(customerFilter)
-      .select("name email phone createdAt globalCustomerId")
+      .select("name email phone createdAt globalCustomerId isBlocked")
       .lean();
 
     const customerIds = customers.map((customer) => customer._id).filter(Boolean);
@@ -328,6 +329,7 @@ exports.listCustomers = async (req, res) => {
         spendByChannel,
         totalDue: due.totalDue,
         creditSales: due.creditSales,
+        isBlocked: Boolean(customer.isBlocked),
       };
     });
 
@@ -500,4 +502,55 @@ if (!user)
   });
 
   res.json({ message: t('common.updated', req.lang), message: "Customer blocked" });
+};
+
+
+exports.blockCustomerForMe = async (req, res) => {
+  const shopId = req.shop?._id || req.user?.shopId;
+  const { userId } = req.params;
+  if (!shopId) return res.status(400).json({ message: "Shop context required" });
+  const user = await User.findById(userId);
+  if (!user) return res.status(404).json({ message: "Customer not found" });
+  user.isBlocked = true;
+  await user.save();
+  res.json({ message: "Customer blocked", data: { _id: user._id, isBlocked: true } });
+};
+
+exports.unblockCustomer = async (req, res) => {
+  const shopId = req.shop?._id || req.user?.shopId;
+  const { userId } = req.params;
+  if (!shopId) return res.status(400).json({ message: "Shop context required" });
+  const user = await User.findById(userId);
+  if (!user) return res.status(404).json({ message: "Customer not found" });
+  user.isBlocked = false;
+  await user.save();
+  res.json({ message: "Customer unblocked", data: { _id: user._id, isBlocked: false } });
+};
+
+exports.listCustomerComplaints = async (req, res) => {
+  const shopId = req.shop?._id || req.user?.shopId;
+  if (!shopId) return res.status(400).json({ message: "Shop context required" });
+  const complaints = await CustomerComplaint.find({ shopId }).sort({ createdAt: -1 }).lean();
+  res.json({ data: complaints });
+};
+
+exports.createCustomerComplaint = async (req, res) => {
+  const shopId = req.shop?._id || req.user?.shopId;
+  const { customerId, globalCustomerId, title, detail, channel } = req.body || {};
+  if (!shopId) return res.status(400).json({ message: "Shop context required" });
+  if (!customerId || !title) return res.status(400).json({ message: "customerId and title required" });
+  const complaint = await CustomerComplaint.create({ shopId, customerId, globalCustomerId: globalCustomerId || "", title, detail: detail || "", channel: channel || "STORE", createdBy: req.user?._id || null });
+  res.status(201).json({ data: complaint });
+};
+
+exports.updateCustomerComplaint = async (req, res) => {
+  const shopId = req.shop?._id || req.user?.shopId;
+  const { complaintId } = req.params;
+  if (!shopId) return res.status(400).json({ message: "Shop context required" });
+  const updates = {};
+  if (req.body?.status !== undefined) updates.status = req.body.status;
+  if (req.body?.detail !== undefined) updates.detail = req.body.detail;
+  const complaint = await CustomerComplaint.findOneAndUpdate({ _id: complaintId, shopId }, updates, { new: true });
+  if (!complaint) return res.status(404).json({ message: "Complaint not found" });
+  res.json({ data: complaint });
 };

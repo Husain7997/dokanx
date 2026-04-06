@@ -152,3 +152,4 @@ const shopSchema = new mongoose.Schema(
 module.exports =
   mongoose.models.Shop ||
   mongoose.model("Shop", shopSchema);
+

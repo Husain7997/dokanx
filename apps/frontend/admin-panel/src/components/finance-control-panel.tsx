@@ -147,8 +147,8 @@ export function FinanceControlPanel() {
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       <Card>
-        <CardTitle>Wallet controls</CardTitle>
-        <CardDescription className="mt-2">Adjust balances, issue refunds, or freeze merchant wallets.</CardDescription>
+        <CardTitle>Wallet governance</CardTitle>
+        <CardDescription className="mt-2">Adjust balances, issue refunds, and freeze or unfreeze merchant wallets with clear audit intent.</CardDescription>
         <div className="mt-4 grid gap-3">
           <Input value={shopId} onChange={(event) => setShopId(event.target.value)} placeholder="Shop ID" />
           <Input value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="Amount" />
@@ -163,8 +163,8 @@ export function FinanceControlPanel() {
       </Card>
 
       <Card>
-        <CardTitle>Commission rules</CardTitle>
-        <CardDescription className="mt-2">Rule count {ruleCount}. Add category, merchant tier, or campaign commission overrides.</CardDescription>
+        <CardTitle>Commission policy</CardTitle>
+        <CardDescription className="mt-2">Rule count {ruleCount}. Keep category, merchant tier, and campaign overrides aligned with platform pricing policy.</CardDescription>
         <div className="mt-4 grid gap-3">
           <Input value={ruleType} onChange={(event) => setRuleType(event.target.value.toUpperCase())} placeholder="CATEGORY / MERCHANT_TIER / CAMPAIGN" />
           <Input value={ruleTarget} onChange={(event) => setRuleTarget(event.target.value)} placeholder="Category, tier, or campaign ID" />
@@ -176,8 +176,8 @@ export function FinanceControlPanel() {
       </Card>
 
       <Card>
-        <CardTitle>Delivery config</CardTitle>
-        <CardDescription className="mt-2">Set grouped radius and charge thresholds for multi-shop delivery.</CardDescription>
+        <CardTitle>Delivery economics</CardTitle>
+        <CardDescription className="mt-2">Set grouped radius and charge thresholds so payout math and carrier assumptions stay predictable.</CardDescription>
         <div className="mt-4 grid gap-3">
           <Input value={deliveryConfig.groupingRadiusKm} onChange={(event) => setDeliveryConfig((current) => ({ ...current, groupingRadiusKm: event.target.value }))} placeholder="Grouping radius km" />
           <Input value={deliveryConfig.sameZoneCharge} onChange={(event) => setDeliveryConfig((current) => ({ ...current, sameZoneCharge: event.target.value }))} placeholder="Same zone charge" />

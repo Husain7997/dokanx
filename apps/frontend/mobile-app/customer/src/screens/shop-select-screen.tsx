@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { listPublicShops } from "../lib/api-client";
+import { DokanXLogo } from "../components/dokanx-logo";
 import { useCartStore } from "../store/cart-store";
 import { DEMO_CUSTOMER_SHOP, useTenantStore } from "../store/tenant-store";
 
@@ -12,6 +13,17 @@ type ShopOption = {
   name: string;
   domain?: string | null;
   slug?: string | null;
+};
+
+const BRAND = {
+  navy: "#0B1E3C",
+  orange: "#FF7A00",
+  screen: "#F4F7FB",
+  surface: "#FFFFFF",
+  border: "#D7DFEA",
+  text: "#0B1E3C",
+  muted: "#5F6F86",
+  tint: "#EEF3FA",
 };
 
 const FALLBACK_SHOPS: ShopOption[] = [
@@ -45,8 +57,8 @@ export function ShopSelectScreen() {
         setError(null);
       } catch (err) {
         if (!active) return;
-        const message = err instanceof Error ? err.message : "Unable to load shops.";
-        setError(`${message} Showing starter shops instead.`);
+        const message = err instanceof Error ? err.message : "Unable to load nearby shops.";
+        setError(`${message} Showing ready-to-browse shops instead.`);
         setShops(FALLBACK_SHOPS);
       } finally {
         if (active) setLoading(false);
@@ -59,14 +71,19 @@ export function ShopSelectScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Choose a shop</Text>
-        <Text style={styles.subtitle}>Select the storefront you want to explore. If live shops are unavailable, starter shops stay available for cart testing.</Text>
-        {loading ? <Text style={styles.infoText}>Loading shops...</Text> : null}
+        <View style={styles.heroCard}>
+          <DokanXLogo variant="full" size="lg" />
+          <Text style={styles.kicker}>Shop selection</Text>
+          <Text style={styles.title}>Pick a storefront before you start browsing.</Text>
+          <Text style={styles.subtitle}>The selected shop sets product availability, cart sync, and checkout context for the rest of the customer journey.</Text>
+        </View>
+        {loading ? <Text style={styles.infoText}>Loading nearby shops...</Text> : null}
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
         {shops.map((shop) => (
           <Pressable key={shop.id} style={styles.card} onPress={() => { clearCart(); setShop(shop); navigation.navigate("Browse" as never); }}>
             <Text style={styles.cardTitle}>{shop.name}</Text>
-            <Text style={styles.cardSubtitle}>{shop.domain || shop.slug || "Shop domain pending"}</Text>
+            <Text style={styles.cardSubtitle}>{shop.domain || shop.slug || "Storefront details updating"}</Text>
+            <Text style={styles.cardHint}>Tap to enter this storefront and reset the cart context cleanly.</Text>
           </Pressable>
         ))}
       </ScrollView>
@@ -75,13 +92,25 @@ export function ShopSelectScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#f8f4ef" },
+  safeArea: { flex: 1, backgroundColor: BRAND.screen },
   container: { padding: 16, gap: 16 },
-  title: { fontSize: 20, fontWeight: "700", color: "#1f2937" },
-  subtitle: { fontSize: 13, color: "#6b7280" },
-  infoText: { fontSize: 12, color: "#6b7280" },
+  heroCard: {
+    borderRadius: 24,
+    padding: 20,
+    gap: 10,
+    backgroundColor: BRAND.surface,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+  },
+  kicker: { fontSize: 12, fontWeight: "800", letterSpacing: 1.2, color: BRAND.orange, textTransform: "uppercase" },
+  title: { fontSize: 24, fontWeight: "700", color: BRAND.text },
+  subtitle: { fontSize: 13, color: BRAND.muted, lineHeight: 20 },
+  infoText: { fontSize: 12, color: BRAND.muted },
   errorText: { fontSize: 12, color: "#b91c1c" },
-  card: { backgroundColor: "#ffffff", borderRadius: 18, padding: 16, borderWidth: 1, borderColor: "#e5e7eb", gap: 6 },
-  cardTitle: { fontSize: 15, fontWeight: "600", color: "#111827" },
-  cardSubtitle: { fontSize: 12, color: "#6b7280" },
+  card: { backgroundColor: BRAND.surface, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: BRAND.border, gap: 6 },
+  cardTitle: { fontSize: 15, fontWeight: "600", color: BRAND.text },
+  cardSubtitle: { fontSize: 12, color: BRAND.muted },
+  cardHint: { fontSize: 12, color: BRAND.text },
 });
+
+

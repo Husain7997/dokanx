@@ -193,7 +193,7 @@ export default function RiskPage() {
                 </div>
               ))
             ) : (
-              <p>No fraud signals reported yet.</p>
+              <p className="text-sm text-muted-foreground">No fraud signals have been reported in the current dataset. New risk patterns will appear here for review.</p>
             )}
           </div>
         </Card>
@@ -310,3 +310,4 @@ export default function RiskPage() {
     </div>
   );
 }
+

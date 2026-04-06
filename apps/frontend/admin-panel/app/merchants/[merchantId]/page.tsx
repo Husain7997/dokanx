@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Badge, Button, Card, CardDescription, CardTitle, DataTable, Grid, Input, SelectDropdown } from "@dokanx/ui";
+import { AnalyticsCards, Badge, Button, Card, CardDescription, CardTitle, DataTable, Grid, Input, SelectDropdown } from "@dokanx/ui";
 
 import { listMerchants, listOrders, listProducts, listSettlements, moderateProduct } from "@/lib/admin-runtime-api";
 
@@ -135,86 +135,79 @@ export default function MerchantDetailPage({ params }: { params: { merchantId: s
     return scopedProducts.filter((product) => (product.moderationStatus || "PENDING") === productStatusFilter);
   }, [productStatusFilter, scopedProducts]);
 
+  const summaryCards = useMemo(
+    () => [
+      { label: "Revenue", value: `${revenueTotal.toFixed(2)} BDT`, meta: "Matched order revenue" },
+      { label: "Orders", value: String(scopedOrders.length), meta: "Tied to this store" },
+      { label: "Products", value: String(scopedProducts.length), meta: "Current catalog items" },
+      { label: "Disputes", value: String(disputesCount), meta: "Orders with disputes" },
+      { label: "Avg order value", value: `${avgOrderValue.toFixed(2)} BDT`, meta: "Basket size" },
+      { label: "Low stock SKUs", value: String(lowStockCount), meta: "Stock at or below 5" },
+      { label: "Settlements", value: String(scopedSettlements.length), meta: "Recorded payout cycles" },
+      { label: "Merchant status", value: merchant?.isBlocked ? "Blocked" : "Active", meta: "Current platform state" },
+    ],
+    [avgOrderValue, disputesCount, lowStockCount, merchant?.isBlocked, revenueTotal, scopedOrders.length, scopedProducts.length, scopedSettlements.length],
+  );
+
   return (
     <div className="grid gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Admin</p>
-          <h1 className="dx-display text-3xl">{merchant?.name || "Merchant"}</h1>
-          <p className="text-sm text-muted-foreground">{merchant?.email || "No email"} • {shopName || "No shop"}</p>
+      <Card className="overflow-hidden border-border/70 bg-card/92">
+        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="p-6 sm:p-8">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Admin merchant detail</p>
+            <h1 className="dx-display mt-2 text-3xl">{merchant?.name || "Merchant"}</h1>
+            <p className="mt-2 text-sm text-muted-foreground">{merchant?.email || "No email"} • {shopName || "No shop attached"}</p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Button asChild variant="secondary" size="sm">
+                <a href="/merchants">Back to merchants</a>
+              </Button>
+              <Button asChild size="sm">
+                <a href={`/merchants/${merchantId}/scorecard`}>Open scorecard</a>
+              </Button>
+            </div>
+          </div>
+          <div className="border-t border-border/60 bg-background/70 p-6 sm:p-8 lg:border-l lg:border-t-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Merchant snapshot</p>
+            <div className="mt-4 grid gap-3">
+              <div className="rounded-2xl border border-border/60 bg-card/90 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-foreground">Platform state</span>
+                  <Badge variant={merchant?.isBlocked ? "danger" : "success"}>{merchant?.isBlocked ? "Blocked" : "Active"}</Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">Store status and moderation exposure for this merchant.</p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-card/90 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-foreground">Settlement records</span>
+                  <Badge variant="neutral">{scopedSettlements.length}</Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">Latest payout records linked to this shop.</p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-card/90 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-foreground">Low stock pressure</span>
+                  <Badge variant={lowStockCount ? "warning" : "success"}>{lowStockCount}</Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">SKUs that likely need replenishment or admin follow-up.</p>
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Badge variant={merchant?.isBlocked ? "danger" : "success"}>{merchant?.isBlocked ? "Blocked" : "Active"}</Badge>
-          <Button asChild variant="secondary" size="sm">
-            <a href="/merchants">Back to merchants</a>
-          </Button>
-          <Button asChild size="sm">
-            <a href={`/merchants/${merchantId}/scorecard`}>Open scorecard</a>
-          </Button>
-        </div>
-      </div>
+      </Card>
 
-      {error ? (
-        <Card>
-          <CardTitle>Merchant details</CardTitle>
-          <CardDescription className="mt-2">{error}</CardDescription>
-        </Card>
-      ) : null}
+      {error ? <Card><CardTitle>Merchant details</CardTitle><CardDescription className="mt-2">{error}</CardDescription></Card> : null}
 
-      <Grid minColumnWidth="220px" className="gap-4">
-        <Card>
-          <CardTitle>Revenue (orders)</CardTitle>
-          <p className="mt-3 text-2xl font-semibold">{revenueTotal.toFixed(2)} BDT</p>
-          <p className="mt-1 text-xs text-muted-foreground">Based on matched orders</p>
-        </Card>
-        <Card>
-          <CardTitle>Orders</CardTitle>
-          <p className="mt-3 text-2xl font-semibold">{scopedOrders.length}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Orders tied to this store</p>
-        </Card>
-        <Card>
-          <CardTitle>Products</CardTitle>
-          <p className="mt-3 text-2xl font-semibold">{scopedProducts.length}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Catalog items</p>
-        </Card>
-        <Card>
-          <CardTitle>Disputes</CardTitle>
-          <p className="mt-3 text-2xl font-semibold">{disputesCount}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Orders with disputes</p>
-        </Card>
-        <Card>
-          <CardTitle>Avg order value</CardTitle>
-          <p className="mt-3 text-2xl font-semibold">{avgOrderValue.toFixed(2)} BDT</p>
-          <p className="mt-1 text-xs text-muted-foreground">Average basket size</p>
-        </Card>
-        <Card>
-          <CardTitle>Low stock SKUs</CardTitle>
-          <p className="mt-3 text-2xl font-semibold">{lowStockCount}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Stock ≤ 5 units</p>
-        </Card>
-      </Grid>
+      <AnalyticsCards items={summaryCards} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardTitle>Store info</CardTitle>
           <CardDescription className="mt-2">Merchant and storefront summary</CardDescription>
           <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
-            <div className="flex flex-wrap justify-between gap-2">
-              <span>Store name</span>
-              <span>{merchant?.shopId?.name || "N/A"}</span>
-            </div>
-            <div className="flex flex-wrap justify-between gap-2">
-              <span>Domain</span>
-              <span>{merchant?.shopId?.domain || merchant?.shopId?.slug || "N/A"}</span>
-            </div>
-            <div className="flex flex-wrap justify-between gap-2">
-              <span>Merchant ID</span>
-              <span>{merchant?._id || "N/A"}</span>
-            </div>
-            <div className="flex flex-wrap justify-between gap-2">
-              <span>Shop ID</span>
-              <span>{merchant?.shopId?._id || "N/A"}</span>
-            </div>
+            <div className="flex flex-wrap justify-between gap-2"><span>Store name</span><span>{merchant?.shopId?.name || "N/A"}</span></div>
+            <div className="flex flex-wrap justify-between gap-2"><span>Domain</span><span>{merchant?.shopId?.domain || merchant?.shopId?.slug || "N/A"}</span></div>
+            <div className="flex flex-wrap justify-between gap-2"><span>Merchant ID</span><span>{merchant?._id || "N/A"}</span></div>
+            <div className="flex flex-wrap justify-between gap-2"><span>Shop ID</span><span>{merchant?.shopId?._id || "N/A"}</span></div>
           </div>
         </Card>
         <Card>
@@ -228,7 +221,7 @@ export default function MerchantDetailPage({ params }: { params: { merchantId: s
                 <Badge variant={settlement.status === "PAID" ? "success" : "neutral"}>{settlement.status || "PENDING"}</Badge>
               </div>
             ))}
-            {!scopedSettlements.length ? <p>No settlements available.</p> : null}
+            {!scopedSettlements.length ? <p>No settlement activity is available for this merchant yet.</p> : null}
           </div>
         </Card>
       </div>
@@ -271,7 +264,7 @@ export default function MerchantDetailPage({ params }: { params: { merchantId: s
             action: order._id ? <a className="text-xs text-primary" href={`/orders?orderId=${order._id}`}>View</a> : "-",
           }))}
         />
-        {!filteredOrders.length ? <p className="mt-3 text-sm text-muted-foreground">No orders for this filter.</p> : null}
+        {!filteredOrders.length ? <p className="mt-3 text-sm text-muted-foreground">No orders match the current merchant filter.</p> : null}
       </Card>
 
       <Card>
@@ -370,10 +363,10 @@ export default function MerchantDetailPage({ params }: { params: { merchantId: s
             ),
           }))}
         />
-        {!filteredProducts.length ? (
-          <p className="mt-3 text-sm text-muted-foreground">No products associated with this shop yet.</p>
-        ) : null}
+        {!filteredProducts.length ? <p className="mt-3 text-sm text-muted-foreground">No products are associated with this shop yet.</p> : null}
       </Card>
     </div>
   );
 }
+
+

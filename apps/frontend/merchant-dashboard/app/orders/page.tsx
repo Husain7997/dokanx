@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@dokanx/auth";
 import {
   Alert,
+  AnalyticsCards,
   Badge,
   Button,
   Card,
@@ -109,6 +110,24 @@ export default function OrdersPage() {
     if (!needle) return orders;
     return orders.filter((order) => String(order._id || "").toLowerCase().includes(needle));
   }, [orders, query]);
+
+  const stats = useMemo(() => {
+    const pending = orders.filter((order) => ["PLACED", "PAYMENT_PENDING", "CONFIRMED"].includes(String(order.status || "").toUpperCase())).length;
+    const shipped = orders.filter((order) => String(order.status || "").toUpperCase() === "SHIPPED").length;
+    const delivered = orders.filter((order) => String(order.status || "").toUpperCase() === "DELIVERED").length;
+    const refunded = orders.filter((order) => String(order.status || "").toUpperCase() === "REFUNDED").length;
+    const gross = orders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
+    return [
+      { label: "Visible orders", value: String(filteredOrders.length), meta: query ? "Filtered result set" : "Current order feed" },
+      { label: "Action queue", value: String(pending), meta: "Pending confirmation or payment" },
+      { label: "Shipped", value: String(shipped), meta: "In transit now" },
+      { label: "Delivered", value: String(delivered), meta: "Completed successfully" },
+      { label: "Refunded", value: String(refunded), meta: "Requires finance review" },
+      { label: "Gross value", value: `${gross} BDT`, meta: "Across loaded orders" },
+      { label: "Selected", value: String(selectedIds.size), meta: "Ready for bulk actions" },
+      { label: "Claims", value: String(claims.length), meta: "Open customer issues" },
+    ];
+  }, [claims.length, filteredOrders.length, orders, query, selectedIds.size]);
 
   async function handleBulkUpdate() {
     const ids = Array.from(selectedIds);
@@ -241,20 +260,54 @@ export default function OrdersPage() {
 
   return (
     <div className="grid gap-6">
-      <div>
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Orders</p>
-        <h1 className="dx-display text-3xl">Order management</h1>
-        <p className="text-sm text-muted-foreground">Update statuses, print invoices, and manage refunds.</p>
-      </div>
+      <Card className="overflow-hidden border-border/70 bg-card/92">
+        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="p-6 sm:p-8">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Orders</p>
+            <h1 className="dx-display mt-2 text-3xl">Order management</h1>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Track fulfillment, run bulk status changes, print invoices, and manage refunds from one operator workspace.</p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <div className="min-w-[240px] flex-1 max-w-md">
+                <SearchInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search order ID" />
+              </div>
+              <Button variant="secondary" onClick={() => setQuery("")}>Clear</Button>
+              <Button variant="secondary" onClick={handleExportCsv}>Export CSV</Button>
+            </div>
+          </div>
+          <div className="border-t border-border/60 bg-background/70 p-6 sm:p-8 lg:border-l lg:border-t-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Operator snapshot</p>
+            <div className="mt-4 grid gap-3">
+              <div className="rounded-2xl border border-border/60 bg-card/90 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-foreground">Bulk selection</span>
+                  <Badge variant={selectedIds.size ? "warning" : "neutral"}>{selectedIds.size}</Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{selectedIds.size ? "Orders are staged for batch update." : "No orders selected yet."}</p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-card/90 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-foreground">Claims queue</span>
+                  <Badge variant={claims.length ? "warning" : "success"}>{claims.length}</Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{claims.length ? "Customer issues need merchant review." : "No open claims at the moment."}</p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-card/90 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-foreground">Invoice QR target</span>
+                  <Badge variant="neutral">{qrTarget === "payment" ? "Payment" : "Invoice"}</Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">Printed invoices will embed the current QR destination.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <AnalyticsCards items={stats} />
 
       <Card>
         <CardTitle>Order filters</CardTitle>
-        <CardDescription className="mt-2">Search by order ID to jump to a record.</CardDescription>
-        <div className="mt-4 flex flex-wrap gap-3">
-          <SearchInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search order ID" />
-          <Button variant="secondary" onClick={() => setQuery("")}>Clear</Button>
-          <Button variant="secondary" onClick={handleExportCsv}>Export CSV</Button>
-        </div>
+        <CardDescription className="mt-2">Tune export shape and narrow the result set before acting.</CardDescription>
         <div className="mt-4 grid gap-2 text-xs text-muted-foreground">
           <p className="font-medium text-foreground">CSV columns</p>
           <div className="flex flex-wrap items-center gap-3">
@@ -286,7 +339,7 @@ export default function OrdersPage() {
 
       <Card>
         <CardTitle>Bulk status update</CardTitle>
-        <CardDescription className="mt-2">Apply a status to selected orders.</CardDescription>
+        <CardDescription className="mt-2">Apply a single status to the current selection and keep retries contained.</CardDescription>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <SelectDropdown
             label="Bulk status"
@@ -392,59 +445,84 @@ export default function OrdersPage() {
 
       <div className="grid gap-4">
         {filteredOrders.map((order) => (
-          <Card key={String(order._id || "")}>
-            <CardTitle>Order #{String(order._id || "").slice(-6)}</CardTitle>
-            <CardDescription className="mt-2">
-              {order.items?.[0]?.product?.name || "Multiple items"} - {order.totalAmount ?? 0} BDT
-            </CardDescription>
-            <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-              <label className="flex items-center gap-2 text-xs">
-                <Checkbox
-                  checked={order._id ? selectedIds.has(order._id) : false}
-                  onCheckedChange={(checked) => {
-                    if (!order._id) return;
-                    setSelectedIds((current) => {
-                      const next = new Set(current);
-                      if (checked) {
-                        next.add(order._id as string);
-                      } else {
-                        next.delete(order._id as string);
-                      }
-                      return next;
-                    });
-                  }}
-                />
-                Select
-              </label>
-              <Badge variant={resolveStatusVariant(order.status)}>
-                {order.status || "PLACED"}
-              </Badge>
-              <span>{order.createdAt ? new Date(order.createdAt).toLocaleString() : "Pending"}</span>
-            </div>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <SelectDropdown
-                label="Status"
-                value={order.status || "PLACED"}
-                onValueChange={(value) => order._id && handleStatusUpdate(order._id, value)}
-                options={statusSelectOptions}
-                disabled={busyId === order._id}
-              />
-              <Button variant="secondary" onClick={() => handlePrintInvoice(order)}>
-                Print invoice
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => order._id && handleStatusUpdate(order._id, "CANCELLED")}
-                disabled={busyId === order._id}
-              >
-                Cancel order
-              </Button>
-              <Button
-                onClick={() => handleRefund(order)}
-                disabled={busyId === order._id}
-              >
-                Refund
-              </Button>
+          <Card key={String(order._id || "")} className="overflow-hidden">
+            <div className="flex flex-col gap-5 p-1 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-3">
+                  <CardTitle>Order #{String(order._id || "").slice(-6)}</CardTitle>
+                  <Badge variant={resolveStatusVariant(order.status)}>
+                    {order.status || "PLACED"}
+                  </Badge>
+                </div>
+                <CardDescription className="mt-2">
+                  {order.items?.[0]?.product?.name || "Multiple items"} • {order.totalAmount ?? 0} BDT
+                </CardDescription>
+                <div className="mt-4 grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
+                  <div className="rounded-2xl border border-border/60 px-4 py-3">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Created</p>
+                    <p className="mt-1 font-medium text-foreground">{order.createdAt ? new Date(order.createdAt).toLocaleString() : "Pending"}</p>
+                  </div>
+                  <div className="rounded-2xl border border-border/60 px-4 py-3">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Customer</p>
+                    <p className="mt-1 font-medium text-foreground">{order.user?.name || order.user?.email || order.contact?.phone || "Guest checkout"}</p>
+                  </div>
+                  <div className="rounded-2xl border border-border/60 px-4 py-3">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Lead item</p>
+                    <p className="mt-1 font-medium text-foreground">{order.items?.[0]?.product?.name || "Order items"}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="min-w-[280px] rounded-2xl border border-border/60 bg-muted/20 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium text-foreground">Action panel</p>
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Checkbox
+                      checked={order._id ? selectedIds.has(order._id) : false}
+                      onCheckedChange={(checked) => {
+                        if (!order._id) return;
+                        setSelectedIds((current) => {
+                          const next = new Set(current);
+                          if (checked) {
+                            next.add(order._id as string);
+                          } else {
+                            next.delete(order._id as string);
+                          }
+                          return next;
+                        });
+                      }}
+                    />
+                    Select
+                  </label>
+                </div>
+                <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                  <span>{order.contact?.phone || order.user?.phone || "No phone saved"}</span>
+                </div>
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <SelectDropdown
+                    label="Status"
+                    value={order.status || "PLACED"}
+                    onValueChange={(value) => order._id && handleStatusUpdate(order._id, value)}
+                    options={statusSelectOptions}
+                    disabled={busyId === order._id}
+                  />
+                  <Button variant="secondary" onClick={() => handlePrintInvoice(order)}>
+                    Print invoice
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => order._id && handleStatusUpdate(order._id, "CANCELLED")}
+                    disabled={busyId === order._id}
+                  >
+                    Cancel order
+                  </Button>
+                  <Button
+                    onClick={() => handleRefund(order)}
+                    disabled={busyId === order._id}
+                  >
+                    Refund
+                  </Button>
+                </div>
+              </div>
             </div>
           </Card>
         ))}

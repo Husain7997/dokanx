@@ -288,7 +288,7 @@ export default function SecurityPage() {
               </Button>
             </div>
           ))}
-          {!blocks.length ? <p>No blocked IPs.</p> : null}
+          {!blocks.length ? <p className="text-sm text-muted-foreground">No IPs are blocked right now. New enforcement actions will appear here automatically.</p> : null}
         </div>
       </Card>
 
@@ -459,7 +459,7 @@ export default function SecurityPage() {
           }))}
         />
         {!ipAuditLogs.length ? (
-          <p className="mt-3 text-sm text-muted-foreground">No IP audit entries found.</p>
+          <p className="mt-3 text-sm text-muted-foreground">No IP block or unblock activity has been recorded in the current audit window.</p>
         ) : null}
       </Card>
     </div>
@@ -541,3 +541,4 @@ function getRiskScore(action: string, highThreshold: number, mediumThreshold: nu
   }
   return { score, label: `${tag} Low`, variant: "neutral" as const };
 }
+

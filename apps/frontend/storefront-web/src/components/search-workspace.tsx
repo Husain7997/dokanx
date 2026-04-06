@@ -165,7 +165,7 @@ export function SearchWorkspace() {
         setProducts(response.products || []);
         setShops(response.shops || []);
         if (!response.products?.length && !response.shops?.length) {
-          setMessage("No products matched your search.");
+          setMessage("No nearby products in this range or shops matched this search yet. Try a broader keyword, category, or nearby market.");
         }
       } catch (error) {
         if (!active) return;
@@ -448,7 +448,7 @@ export function SearchWorkspace() {
       {loading ? <p className="text-sm text-muted-foreground">Loading results...</p> : null}
       {message ? (
         <Card className="border-dashed border-border/60 bg-card/60">
-          <CardTitle>Search results</CardTitle>
+          <CardTitle>Search guidance</CardTitle>
           <CardDescription className="mt-2">{message}</CardDescription>
         </Card>
       ) : null}
@@ -457,7 +457,7 @@ export function SearchWorkspace() {
         <div className="grid gap-4 md:grid-cols-2">
           <Card className="md:col-span-2">
             <CardTitle>Shop filters</CardTitle>
-            <CardDescription className="mt-2">Filter shops by district and market.</CardDescription>
+            <CardDescription className="mt-2">Filter shops by district, market, and delivery radius.</CardDescription>
             <div className="mt-4 flex flex-wrap gap-2">
               <Badge variant={district === "all" ? "success" : "neutral"} onClick={() => setDistrict("all")}>
                 All districts
@@ -507,7 +507,7 @@ export function SearchWorkspace() {
                 <p className="mt-2 text-sm text-muted-foreground">{shop.distanceKm.toFixed(1)} km away</p>
               ) : null}
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                <span>⭐ {shop.rating.toFixed(1)}</span>
+                <span>Rating {shop.rating.toFixed(1)}</span>
                 <span>{shop.isOpen ? "Open" : "Closed"}</span>
                 <span>ETA {shop.etaMinutes} min</span>
               </div>
@@ -525,8 +525,8 @@ export function SearchWorkspace() {
           ))}
           {!shops.length ? (
             <Card className="border-dashed border-border/60 bg-card/60">
-              <CardTitle>No shops found</CardTitle>
-              <CardDescription className="mt-2">Try searching with a different keyword.</CardDescription>
+              <CardTitle>No nearby shops match the current search</CardTitle>
+              <CardDescription className="mt-2">Try a broader keyword, another district, or a wider distance radius.</CardDescription>
             </Card>
           ) : null}
         </div>
@@ -617,7 +617,7 @@ function GeoSearchSummary({
       <Card>
         <CardTitle>Nearby results by distance</CardTitle>
         <CardDescription className="mt-2">
-          Products and shops grouped by proximity to your location.
+          Products and shops grouped by proximity to your current location.
         </CardDescription>
         <div className="mt-6 grid gap-6 md:grid-cols-2">
           <div>
@@ -654,7 +654,7 @@ function GeoSearchSummary({
                         );
                       })
                     ) : (
-                      <p>No products</p>
+                      <p>No nearby products in this range</p>
                     )}
                   </div>
                 </div>
@@ -695,7 +695,7 @@ function GeoSearchSummary({
                         );
                       })
                     ) : (
-                      <p>No shops</p>
+                      <p>No nearby shops in this range</p>
                     )}
                   </div>
                 </div>
@@ -935,3 +935,6 @@ function normalizeBrackets(
     .sort((a, b) => a.maxDistanceKm - b.maxDistanceKm);
   return normalized.length ? normalized : fallback;
 }
+
+
+

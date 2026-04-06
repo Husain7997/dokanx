@@ -107,7 +107,7 @@ export default function SearchAdminPage() {
                 </div>
               ))
             ) : (
-              <p>No trending queries yet.</p>
+              <p className="text-sm text-muted-foreground">Trending search demand will appear here once shoppers build enough query volume.</p>
             )}
           </div>
         </div>
@@ -122,7 +122,7 @@ export default function SearchAdminPage() {
                 </div>
               ))
             ) : (
-              <p>No empty searches logged.</p>
+              <p className="text-sm text-muted-foreground">No-result keywords will appear here once the search layer captures enough missed intent.</p>
             )}
           </div>
         </div>
@@ -168,7 +168,7 @@ export default function SearchAdminPage() {
               </div>
             ))
           ) : (
-            <p>No logs yet.</p>
+            <p className="text-sm text-muted-foreground">Index activity logs will appear here after the next sync or reindex run.</p>
           )}
         </div>
       </div>
@@ -180,3 +180,4 @@ function formatRate(value?: number) {
   if (!value || Number.isNaN(value)) return "0%";
   return `${(value * 100).toFixed(1)}%`;
 }
+

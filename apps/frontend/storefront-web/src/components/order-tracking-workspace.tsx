@@ -18,7 +18,7 @@ type OrderRow = {
 
 export function OrderTrackingWorkspace({ orderId }: OrderTrackingWorkspaceProps) {
   const [order, setOrder] = useState<OrderRow | null>(null);
-  const [message, setMessage] = useState<string | null>("Authenticated order tracking will replace this fallback when the order is accessible.");
+  const [message, setMessage] = useState<string | null>("Live order tracking will appear here as soon as the order is accessible to the current session.");
   const [retrying, setRetrying] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("bkash");
   const [handoffUrl, setHandoffUrl] = useState<string | null>(null);
@@ -61,7 +61,7 @@ export function OrderTrackingWorkspace({ orderId }: OrderTrackingWorkspaceProps)
         provider: paymentMethod,
       });
       setHandoffUrl(payment.paymentUrl || null);
-      setMessage(payment.message || "Payment retry initiated.");
+      setMessage(payment.message || "Payment retry initiated. Continue with the payment link when it appears.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to retry payment.");
     } finally {
@@ -74,14 +74,14 @@ export function OrderTrackingWorkspace({ orderId }: OrderTrackingWorkspaceProps)
       <Card>
         <CardTitle>Order tracking</CardTitle>
         <CardDescription className="mt-2">
-          Live order detail is fetched for the current customer, owner, or admin session.
+          Live order detail is fetched for the current customer, owner, or admin session when access is available.
         </CardDescription>
       </Card>
       <OrderTimeline
         items={[
           {
             title: `Order ${order?._id || orderId}`,
-            description: order ? `${order.status || "PLACED"} / ${order.paymentStatus || "PENDING"}` : "Tracking pending",
+            description: order ? `${order.status || "PLACED"} / ${order.paymentStatus || "PENDING"}` : "Tracking timeline pending",
             time: order?.createdAt || "Now",
           },
           ...timeline,
@@ -90,7 +90,7 @@ export function OrderTrackingWorkspace({ orderId }: OrderTrackingWorkspaceProps)
       {order?.paymentStatus === "FAILED" ? (
         <Card>
           <CardTitle>Retry payment</CardTitle>
-          <CardDescription className="mt-2">Payment failed. You can retry with a supported gateway.</CardDescription>
+          <CardDescription className="mt-2">Payment failed. You can retry now with a supported gateway.</CardDescription>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <select
               className="h-11 rounded-full border border-border bg-background px-4 text-sm"
@@ -119,3 +119,4 @@ export function OrderTrackingWorkspace({ orderId }: OrderTrackingWorkspaceProps)
     </div>
   );
 }
+

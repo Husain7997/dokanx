@@ -169,13 +169,15 @@ export default function OrderDetailPage({ params }: { params: { orderId: string 
 
   return (
     <div className="grid gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Admin</p>
-          <h1 className="dx-display text-3xl">Order #{orderId.slice(-6)}</h1>
-          <p className="text-sm text-muted-foreground">Full drilldown for order operations</p>
+      <div className="rounded-[28px] border border-white/10 bg-[#0B1E3C] px-6 py-6 text-white shadow-[0_24px_60px_rgba(11,30,60,0.24)]">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-3xl space-y-2">
+            <p className="text-xs uppercase tracking-[0.24em] text-[#FFD49F]">Admin Drilldown</p>
+            <h1 className="dx-display text-3xl">Order #{orderId.slice(-6)}</h1>
+            <p className="text-sm text-slate-200">Full operational drilldown for dispute, refund, shipment, and audit review.</p>
+          </div>
+          <Badge variant="secondary" className="border-white/15 bg-white/10 text-white">{order?.status || "UNKNOWN"}</Badge>
         </div>
-        <Badge variant="neutral">{order?.status || "UNKNOWN"}</Badge>
       </div>
 
       {error ? (
@@ -199,7 +201,7 @@ export default function OrderDetailPage({ params }: { params: { orderId: string 
         <Card>
           <CardTitle>Dispute</CardTitle>
           <p className="mt-3 text-2xl font-semibold">{order?.disputeStatus || "NONE"}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{order?.disputeReason || "No dispute reason"}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{order?.disputeReason || "No dispute reason recorded"}</p>
         </Card>
         <Card>
           <CardTitle>Created</CardTitle>
@@ -240,8 +242,8 @@ export default function OrderDetailPage({ params }: { params: { orderId: string 
           </div>
         </Card>
         <Card>
-          <CardTitle>Refund & dispute actions</CardTitle>
-          <CardDescription className="mt-2">Manual overrides for refunds and dispute states.</CardDescription>
+          <CardTitle>Refund and dispute controls</CardTitle>
+          <CardDescription className="mt-2">Apply manual overrides carefully and keep notes aligned with the audit trail.</CardDescription>
           <div className="mt-4 grid gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border/60 px-4 py-3 text-sm text-muted-foreground">
               <span>Refund status</span>
@@ -275,7 +277,7 @@ export default function OrderDetailPage({ params }: { params: { orderId: string 
       </div>
 
       <Card>
-        <CardTitle>Shipments</CardTitle>
+        <CardTitle>Shipment visibility</CardTitle>
         <CardDescription className="mt-2">Shipment tracking and events</CardDescription>
         <DataTable
           columns={[
@@ -292,7 +294,7 @@ export default function OrderDetailPage({ params }: { params: { orderId: string 
             created: shipment.createdAt ? new Date(shipment.createdAt).toLocaleDateString() : "Unknown",
           }))}
         />
-        {!orderShipments.length ? <p className="mt-3 text-sm text-muted-foreground">No shipments yet.</p> : null}
+        {!orderShipments.length ? <p className="mt-3 text-sm text-muted-foreground">No shipments have been recorded for this order yet.</p> : null}
       </Card>
 
       <Card>
@@ -307,7 +309,7 @@ export default function OrderDetailPage({ params }: { params: { orderId: string 
               <span>{String((log.meta as Record<string, unknown>)?.disputeReason || "")}</span>
             </div>
           ))}
-          {!disputeTimeline.length ? <p>No dispute updates yet.</p> : null}
+          {!disputeTimeline.length ? <p>No dispute timeline updates have been recorded yet.</p> : null}
         </div>
       </Card>
 
@@ -323,9 +325,11 @@ export default function OrderDetailPage({ params }: { params: { orderId: string 
               <span>{String((log.meta as Record<string, unknown>)?.reason || "")}</span>
             </div>
           ))}
-          {!refundTimeline.length ? <p>No refund approvals logged yet.</p> : null}
+          {!refundTimeline.length ? <p>No refund approvals have been logged for this order yet.</p> : null}
         </div>
       </Card>
     </div>
   );
 }
+
+

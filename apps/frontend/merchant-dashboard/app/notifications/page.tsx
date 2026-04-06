@@ -44,7 +44,7 @@ const labels = {
     categories: "Categories",
     read: "Read",
     new: "New",
-    noNotifications: "No notifications yet.",
+    noNotifications: "No notifications have landed yet. New order, payment, and inventory updates will appear here.",
     categoryLabels: {
       order: "Order Notifications",
       payment: "Payment Notifications",
@@ -272,3 +272,4 @@ export default function NotificationsPage() {
     </div>
   );
 }
+

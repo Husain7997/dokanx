@@ -59,7 +59,7 @@ export default function MarketingPage() {
               </div>
             ))
           ) : (
-            <div className="rounded-xl bg-accent p-3">No campaigns yet.</div>
+            <div className="rounded-xl bg-accent p-3 text-sm text-muted-foreground">No campaigns have been created yet. Start a new campaign to populate the queue.</div>
           )}
           {status ? <Alert variant="success">{status}</Alert> : null}
         </div>
@@ -67,3 +67,4 @@ export default function MarketingPage() {
     </div>
   );
 }
+

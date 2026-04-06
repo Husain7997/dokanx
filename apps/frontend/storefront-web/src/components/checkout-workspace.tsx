@@ -307,7 +307,7 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
         <Card>
           <CardTitle>Customer and delivery details</CardTitle>
           <CardDescription className="mt-2">
-            Checkout now submits a real customer order with address, delivery mode, and payment mode.
+            Checkout submits a real customer order with address, delivery mode, and payment preference.
           </CardDescription>
           <div className="mt-6 grid gap-4 md:grid-cols-2">
             <label className="grid gap-2 text-sm">
@@ -386,7 +386,7 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
           </div>
           <div className="mt-6 flex flex-wrap gap-3">
             <Button onClick={handleSubmitOrder} disabled={submitting}>
-              {submitting ? "Submitting..." : "Create Order And Prepare Payment"}
+              {submitting ? "Submitting..." : "Place order and prepare payment"}
             </Button>
             <Button variant="secondary" onClick={handleReset}>
               Reset
@@ -399,7 +399,7 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
           ) : null}
           {invalidProductIds.length > 0 ? (
             <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm">
-              Demo cart detected. Backend order creation needs live Mongo product IDs, but found: {invalidProductIds.join(", ")}
+              Demo cart detected. Backend order creation needs live Mongo product IDs, but these placeholder items were found: {invalidProductIds.join(", ")}
             </div>
           ) : null}
           {!invalidProductIds.length && customer.shopId ? (
@@ -409,7 +409,7 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
           ) : null}
           {uniqueShopIds.length > 1 ? (
             <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm">
-              Multi-shop checkout is currently disabled. This cart spans {uniqueShopIds.length} shops.
+              Multi-shop checkout is currently disabled for this session. This cart spans {uniqueShopIds.length} shops.
             </div>
           ) : null}
           {paymentMode === "WALLET" ? (
@@ -467,3 +467,4 @@ export function CheckoutWorkspace({ cart, suggestedShopId = null }: CheckoutWork
     </div>
   );
 }
+

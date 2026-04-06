@@ -227,7 +227,7 @@ export default function Page() {
                 </div>
               ))
             ) : (
-              <p className="text-muted-foreground">No top product snapshots available.</p>
+              <p className="text-sm text-muted-foreground">Top-product signals will appear here after the selected window collects enough order activity.</p>
             )}
           </div>
         </Card>
@@ -244,7 +244,7 @@ export default function Page() {
                 </div>
               ))
             ) : (
-              <p className="text-muted-foreground">No conversion funnel snapshots available.</p>
+              <p className="text-sm text-muted-foreground">Conversion stages will appear here once the selected range includes enough browse-to-order activity.</p>
             )}
           </div>
         </Card>
@@ -281,7 +281,7 @@ export default function Page() {
                 </div>
               ))
             ) : (
-              <p className="text-muted-foreground">No category snapshots available.</p>
+              <p className="text-sm text-muted-foreground">Category performance will appear here after platform sales start contributing to the selected range.</p>
             )}
           </div>
         </Card>
@@ -326,7 +326,7 @@ export default function Page() {
                 </div>
               ))
             ) : (
-              <p className="text-muted-foreground">No recommendation clicks recorded yet.</p>
+              <p className="text-sm text-muted-foreground">Recommendation clicks have not been recorded in this window yet. Fresh traffic will populate this list.</p>
             )}
           </div>
         </Card>
@@ -348,10 +348,11 @@ export default function Page() {
               </div>
             ))
           ) : (
-            <p className="text-muted-foreground">No section-level recommendation telemetry yet.</p>
+            <p className="text-sm text-muted-foreground">Section-level recommendation telemetry will appear once shoppers interact with live recommendation surfaces.</p>
           )}
         </div>
       </Card>
     </div>
   );
 }
+

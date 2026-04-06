@@ -1,0 +1,12 @@
+<svg width="420" height="128" viewBox="0 0 420 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="dokanx-full-gradient" x1="24" y1="16" x2="110" y2="102" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF7A00"/>
+      <stop offset="1" stop-color="#FFA500"/>
+    </linearGradient>
+  </defs>
+  <path d="M26 42V90H66C85 90 98 77 98 58" stroke="url(#dokanx-full-gradient)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M40 42V32C40 22 48 14 58 14C68 14 76 22 76 32V42" stroke="url(#dokanx-full-gradient)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M39 74L55 56L69 69L98 36" stroke="url(#dokanx-full-gradient)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="126" y="91" fill="#0B1E3C" font-family="Arial, Helvetica, sans-serif" font-size="58" font-weight="700">DokanX</text>
+</svg>

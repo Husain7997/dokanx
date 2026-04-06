@@ -4,6 +4,7 @@ const ShopLocation = require("../../models/shopLocation.model");
 const SearchQueryLog = require("../../models/searchQueryLog.model");
 const SearchEvent = require("../../models/searchEvent.model");
 const { searchIndex } = require("../searchIndex.service");
+const { getExplainableRecommendations } = require("../../modules/ai-engine/recommendation.engine");
 
 const {
   DEFAULT_PRODUCT_LIMIT,
@@ -20,6 +21,10 @@ const {
   buildShopRatings,
   buildShopDistances,
 } = require("./search.metrics");
+
+function escapeRegex(query) {
+  return String(query).replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
+}
 
 async function logSearchQuery({ query, entityTypes, filters, resultsCount, userId, shopId, searchId }) {
   const normalized = normalizeQueryKey(query);
@@ -217,23 +222,137 @@ async function searchShopsAdvanced(params) {
 async function searchSuggestions(query, limit = 8) {
   const normalized = normalizeQuery(query);
   if (!normalized) return [];
+
   const indexResults = await searchIndex(normalized);
   const suggestions = [];
   const seen = new Set();
+
+  const addSuggestion = (item) => {
+    const key = String(item.name || item.query || item.label || "").trim().toLowerCase();
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    suggestions.push(item);
+  };
+
   indexResults.forEach((row) => {
     const label = String(row.name || row.text || "").trim();
     if (!label) return;
-    const key = label.toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    suggestions.push({
+    addSuggestion({
       id: row.entityId || row._id,
       name: label,
       entityType: row.entityType || "unknown",
+      score: row.entityType === "product" ? 30 : row.entityType === "shop" ? 20 : 10,
     });
   });
 
   return suggestions.slice(0, limit);
+}
+
+async function searchAISuggestions(query, limit = 8, userId = null, shopId = null, sessionId = null) {
+  const normalized = normalizeQuery(query);
+  if (!normalized) return [];
+
+  const suggestions = [];
+  const seen = new Set();
+
+  const addSuggestion = (item) => {
+    const key = String(item.name || item.query || item.label || "").trim().toLowerCase();
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    suggestions.push(item);
+  };
+
+  const indexResults = await searchIndex(normalized);
+  indexResults.forEach((row) => {
+    const label = String(row.name || row.text || "").trim();
+    if (!label) return;
+    addSuggestion({
+      id: row.entityId || row._id,
+      name: label,
+      entityType: row.entityType || "unknown",
+      score: row.entityType === "product" ? 30 : row.entityType === "shop" ? 20 : 10,
+      source: "search_index",
+    });
+  });
+
+  const recentQueries = await SearchQueryLog.aggregate([
+    {
+      $match: {
+        queryNormalized: { $regex: `^${escapeRegex(normalized)}` },
+      },
+    },
+    {
+      $group: {
+        _id: "$queryNormalized",
+        query: { $first: "$query" },
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { count: -1 } },
+    { $limit: 4 },
+  ]);
+
+  recentQueries.forEach((row) => {
+    if (!row.query) return;
+    addSuggestion({
+      id: `query:${row._id}`,
+      name: row.query,
+      entityType: "query",
+      score: 10 + Number(row.count || 1),
+      source: "search_history",
+    });
+  });
+
+  const directProducts = await searchProductsAdvanced({ q: query, limit: limit * 2, shopId });
+  (directProducts.data || []).forEach((product) => {
+    addSuggestion({
+      id: product._id,
+      name: product.name,
+      entityType: "product",
+      score: Number(product._score || 0),
+      source: "product_search",
+    });
+  });
+
+  if (userId || shopId) {
+    try {
+      const aiRecommendations = await getExplainableRecommendations({
+        userId,
+        location: null,
+        limit: Math.max(limit * 2, 8),
+        shopId,
+        sessionId,
+      });
+      aiRecommendations.forEach((row) => {
+        addSuggestion({
+          id: String(row.product._id),
+          name: row.product.name,
+          entityType: "product",
+          score: row.score + 5,
+          reason: Array.isArray(row.reasons) ? row.reasons.join(" | ") : undefined,
+          source: "ai_recommendation",
+        });
+      });
+    } catch (e) {
+      // Silently ignore AI recommendation failures and keep search results available.
+    }
+  }
+
+  if (!suggestions.length) {
+    const fallbackQueries = await searchTrending({ limit: Math.max(limit, 4) });
+    fallbackQueries.forEach((row) => {
+      addSuggestion({
+        id: `trending:${row.query}`,
+        name: row.query,
+        entityType: "query",
+        score: 5,
+        source: "trending",
+      });
+    });
+  }
+
+  suggestions.sort((a, b) => Number(b.score || 0) - Number(a.score || 0));
+  return suggestions.slice(0, limit).map(({ score, source, reason, ...rest }) => rest);
 }
 
 async function searchTrending({ days = 7, limit = 10 } = {}) {
@@ -305,6 +424,7 @@ module.exports = {
   searchProductsAdvanced,
   searchShopsAdvanced,
   searchSuggestions,
+  searchAISuggestions,
   searchTrending,
   searchNoResults,
   searchConversionRate,

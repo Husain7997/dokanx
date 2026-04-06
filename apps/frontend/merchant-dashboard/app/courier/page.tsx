@@ -98,10 +98,11 @@ export default function CourierPage() {
             </div>
           ))}
           {!carriers.length ? (
-            <p className="text-muted-foreground">No carriers configured yet.</p>
+            <p className="text-sm text-muted-foreground">No carriers are configured yet. Connected courier partners will appear here once setup is complete.</p>
           ) : null}
         </div>
       </Card>
     </div>
   );
 }
+

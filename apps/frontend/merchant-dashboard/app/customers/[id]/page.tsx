@@ -80,7 +80,7 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
                   });
                   const refreshed = await getCustomerDue(customerId);
                   setDue((refreshed.data || null) as Record<string, unknown> | null);
-                  setStatus("Due collected.");
+                  setStatus("Due collection submitted and customer balances reloaded.");
                 } catch (error) {
                   setStatus(error instanceof Error ? error.message : "Unable to collect due.");
                 }
@@ -113,10 +113,10 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
           {orders.map((order, index) => (
             <div key={`${String(order._id || index)}`} className="rounded-2xl border border-border/60 px-4 py-3">
               <p className="font-medium text-foreground">Order {String(order._id || "")}</p>
-              <p>Status {String(order.status || "PENDING")} • {Number(order.totalAmount || 0)} BDT</p>
+              <p>Status {String(order.status || "PENDING")} - {Number(order.totalAmount || 0)} BDT</p>
             </div>
           ))}
-          {!orders.length ? <p>No orders found.</p> : null}
+          {!orders.length ? <p>No orders have been recorded for this customer yet.</p> : null}
         </div>
       </Card>
 
@@ -130,7 +130,7 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
                 <p>{String(payment.type || payment.status || "PAYMENT")}</p>
               </div>
             ))}
-            {!payments.length ? <p>No payments found.</p> : null}
+            {!payments.length ? <p>No payments have been recorded for this customer yet.</p> : null}
           </div>
         </Card>
 
@@ -140,12 +140,12 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
             {claims.map((claim, index) => (
               <div key={`${String(claim._id || index)}`} className="rounded-2xl border border-border/60 px-4 py-3">
                 <p className="font-medium text-foreground">
-                  {String(claim.type || "CLAIM").toUpperCase()} • {String(claim.status || "pending").toUpperCase()}
+                  {String(claim.type || "CLAIM").toUpperCase()} - {String(claim.status || "pending").toUpperCase()}
                 </p>
                 <p>{String(claim.reason || "")}</p>
               </div>
             ))}
-            {!claims.length ? <p>No claims found.</p> : null}
+            {!claims.length ? <p>No claims have been recorded for this customer yet.</p> : null}
           </div>
         </Card>
       </div>
@@ -161,3 +161,4 @@ function MetricCard({ title, value }: { title: string; value: string }) {
     </Card>
   );
 }
+

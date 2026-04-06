@@ -4,9 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@dokanx/auth";
 import {
   Alert,
+  AnalyticsCards,
+  Badge,
   Button,
   InventoryTable,
   OrdersTable,
+  SearchInput,
   SelectDropdown,
   TextInput
 } from "@dokanx/ui";
@@ -47,6 +50,7 @@ export function ProductWorkspace() {
   const [message, setMessage] = useState<string | null>("Owner auth is required before protected catalog writes can succeed.");
   const [submitting, setSubmitting] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [query, setQuery] = useState("");
 
   const shopId = String(auth.user?.shopId || "");
 
@@ -83,15 +87,31 @@ export function ProductWorkspace() {
     });
   }, [selectedProductId, products]);
 
+  const filteredProducts = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return products;
+    return products.filter((item) => {
+      const name = String(item.name || "").toLowerCase();
+      const category = String(item.category || "").toLowerCase();
+      const id = String(item._id || "").toLowerCase();
+      return name.includes(needle) || category.includes(needle) || id.includes(needle);
+    });
+  }, [products, query]);
+
+  const selectedProduct = useMemo(
+    () => products.find((item) => String(item._id || "") === selectedProductId) || null,
+    [products, selectedProductId],
+  );
+
   const inventoryRows = useMemo(
     () =>
-      products.slice(0, 6).map((item, index) => ({
+      filteredProducts.slice(0, 8).map((item, index) => ({
         item: item.name || `Product ${index + 1}`,
         sku: String(item._id || `DX-SKU-${index + 1}`),
         stock: String(item.stock || 0),
         state: Number(item.stock || 0) <= 5 ? "Low" : "Healthy",
       })),
-    [products],
+    [filteredProducts],
   );
 
   const productOptions = useMemo(
@@ -104,6 +124,19 @@ export function ProductWorkspace() {
     ],
     [products],
   );
+
+  const stats = useMemo(() => {
+    const activeProducts = products.length;
+    const lowStock = products.filter((item) => Number(item.stock || 0) <= 5).length;
+    const healthyStock = products.filter((item) => Number(item.stock || 0) > 5).length;
+    const stockValue = products.reduce((sum, item) => sum + Number(item.stock || 0) * Number(item.price || 0), 0);
+    return [
+      { label: "Active products", value: String(activeProducts), meta: "Sellable catalog" },
+      { label: "Low stock", value: String(lowStock), meta: "Needs replenishment" },
+      { label: "Healthy stock", value: String(healthyStock), meta: "Safe inventory" },
+      { label: "Stock value", value: `${stockValue} BDT`, meta: "Approx inventory value" },
+    ];
+  }, [products]);
 
   async function handleCreateProduct() {
     setSubmitting(true);
@@ -199,12 +232,45 @@ export function ProductWorkspace() {
   return (
     <div className="grid gap-6">
       <OwnerSessionPanel title="Owner session for catalog mutations" />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_420px]">
+
+      <WorkspaceCard
+        title="Catalog command workspace"
+        description="Search the catalog, review stock health, and run create or update actions without losing context."
+      >
+        <div className="grid gap-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-xl flex-1">
+              <SearchInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by product name, category, or ID" />
+            </div>
+            <Button variant="secondary" onClick={() => void loadProducts(selectedProductId)} disabled={loadingProducts}>
+              Refresh catalog
+            </Button>
+          </div>
+          <AnalyticsCards items={stats} />
+        </div>
+      </WorkspaceCard>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_380px]">
         <WorkspaceCard
-          title="Catalog write workspace"
-          description="Create, update, archive, and adjust stock from one owner-authenticated workspace."
+          title="Product editor"
+          description="Use one structured workspace for new launches, catalog updates, and retirements."
         >
-          <div className="grid gap-4">
+          <div className="grid gap-5">
+            <div className="rounded-3xl border border-border/60 bg-muted/20 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Selection</p>
+                  <p className="mt-1 text-sm font-medium text-foreground">{selectedProduct?.name || "Creating a new product"}</p>
+                </div>
+                <Badge variant={selectedProduct ? Number(selectedProduct.stock || 0) <= 5 ? "warning" : "success" : "neutral"}>
+                  {selectedProduct ? `${selectedProduct.stock || 0} in stock` : "Draft mode"}
+                </Badge>
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {selectedProduct ? `Category: ${selectedProduct.category || "General"} • Price: ${selectedProduct.price || 0} BDT` : "Choose an existing product or prepare a fresh listing for the shop."}
+              </p>
+            </div>
+
             <SelectDropdown
               label="Existing products"
               value={selectedProductId}
@@ -214,77 +280,62 @@ export function ProductWorkspace() {
             />
 
             <div className="grid gap-4 md:grid-cols-2">
-              <TextInput
-                label="Name"
-                value={draft.name}
-                onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
-              />
-              <TextInput
-                label="Category"
-                value={draft.category}
-                onChange={(event) => setDraft((current) => ({ ...current, category: event.target.value }))}
-              />
-              <TextInput
-                label="Price"
-                value={draft.price}
-                onChange={(event) => setDraft((current) => ({ ...current, price: event.target.value }))}
-              />
-              <TextInput
-                label="Stock"
-                value={draft.stock}
-                onChange={(event) => setDraft((current) => ({ ...current, stock: event.target.value }))}
-              />
+              <TextInput label="Name" value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} />
+              <TextInput label="Category" value={draft.category} onChange={(event) => setDraft((current) => ({ ...current, category: event.target.value }))} />
+              <TextInput label="Price" value={draft.price} onChange={(event) => setDraft((current) => ({ ...current, price: event.target.value }))} />
+              <TextInput label="Stock" value={draft.stock} onChange={(event) => setDraft((current) => ({ ...current, stock: event.target.value }))} />
             </div>
-          </div>
 
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Button onClick={handleCreateProduct} loading={submitting} loadingText="Saving product">
-              Create Product
-            </Button>
-            <Button variant="secondary" onClick={handleUpdateProduct} disabled={submitting || !selectedProductId}>
-              Update Product
-            </Button>
-            <Button variant="ghost" onClick={handleDeleteProduct} disabled={submitting || !selectedProductId}>
-              Archive Product
-            </Button>
-          </div>
-
-          <div className="mt-8 grid gap-4 rounded-3xl border border-border/60 bg-muted/20 p-4 md:grid-cols-[140px_minmax(0,1fr)_auto]">
-            <TextInput
-              label="Stock delta"
-              value={inventoryDelta}
-              onChange={(event) => setInventoryDelta(event.target.value)}
-            />
-            <TextInput
-              label="Adjustment note"
-              value={inventoryNote}
-              onChange={(event) => setInventoryNote(event.target.value)}
-            />
-            <div className="flex items-end">
-              <Button className="w-full" onClick={handleAdjustInventory} disabled={submitting || !selectedProductId}>
-                Adjust Inventory
-              </Button>
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={handleCreateProduct} loading={submitting} loadingText="Saving product">Create product</Button>
+              <Button variant="secondary" onClick={handleUpdateProduct} disabled={submitting || !selectedProductId}>Update product</Button>
+              <Button variant="ghost" onClick={handleDeleteProduct} disabled={submitting || !selectedProductId}>Archive product</Button>
             </div>
-          </div>
 
-          {message ? <Alert variant="info" className="mt-4">{message}</Alert> : null}
+            {message ? <Alert variant="info">{message}</Alert> : null}
+          </div>
         </WorkspaceCard>
 
-        <WorkspaceCard
-          title="Current catalog health"
-          description="Live rows reflect loaded backend products while the side panel stays useful during edits."
-        >
-          <div className="grid gap-6">
-            <InventoryTable rows={inventoryRows} />
+        <div className="grid gap-6">
+          <WorkspaceCard
+            title="Stock adjustment"
+            description="Use small manual corrections without leaving the catalog editor."
+          >
+            <div className="grid gap-4">
+              <TextInput label="Stock delta" value={inventoryDelta} onChange={(event) => setInventoryDelta(event.target.value)} />
+              <TextInput label="Adjustment note" value={inventoryNote} onChange={(event) => setInventoryNote(event.target.value)} />
+              <Button onClick={handleAdjustInventory} disabled={submitting || !selectedProductId}>Adjust inventory</Button>
+            </div>
+          </WorkspaceCard>
+
+          <WorkspaceCard
+            title="Operator cues"
+            description="A compact view for what the team should watch while updating catalog data."
+          >
             <OrdersTable
               rows={[
-                { order: "DX-2091", customer: "Nadia", total: "5400 BDT", status: "Packed" },
-                { order: "DX-2084", customer: "Rafi", total: "2600 BDT", status: "Pending" },
+                { order: "Low stock", customer: `${stats[1]?.value || "0"} products`, total: "Replenishment", status: "Watch" },
+                { order: "Filtered rows", customer: `${filteredProducts.length}`, total: "Visible now", status: query ? "Search" : "All" },
               ]}
             />
-          </div>
-        </WorkspaceCard>
+          </WorkspaceCard>
+        </div>
       </div>
+
+      <WorkspaceCard
+        title="Catalog visibility"
+        description="The list below reflects the current filtered catalog so the team can review stock posture quickly."
+      >
+        <div className="grid gap-4">
+          <InventoryTable rows={inventoryRows} />
+          {!loadingProducts && !filteredProducts.length ? (
+            <div className="rounded-2xl border border-dashed border-border/70 px-4 py-6 text-center">
+              <p className="font-medium text-foreground">No products match this search</p>
+              <p className="mt-1 text-xs text-muted-foreground">Clear the search or create a new product from the editor above.</p>
+            </div>
+          ) : null}
+        </div>
+      </WorkspaceCard>
     </div>
   );
 }

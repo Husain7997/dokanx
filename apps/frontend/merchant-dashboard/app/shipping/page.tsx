@@ -201,7 +201,7 @@ export default function ShippingPage() {
       <div className="space-y-2">
         <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Shipping</p>
         <h1 className="dx-display text-3xl">Merchant Shipping Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Create shipments, print labels, track delivery, and review reports.</p>
+        <p className="text-sm text-muted-foreground">Create shipments, print labels, track delivery, and review dispatch reports from one operator desk.</p>
       </div>
       {error ? <Alert variant="error">{error}</Alert> : null}
 
@@ -233,7 +233,7 @@ export default function ShippingPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardTitle>Create shipment</CardTitle>
-          <CardDescription className="mt-2">Generate labels and assign a carrier for orders.</CardDescription>
+          <CardDescription className="mt-2">Generate labels and assign a carrier for live orders.</CardDescription>
           <div className="mt-4 grid gap-3 md:grid-cols-[1fr_200px_auto]">
             <TextInput value={orderId} onChange={(event) => setOrderId(event.target.value)} placeholder="Order ID" />
             <SelectDropdown
@@ -275,7 +275,7 @@ export default function ShippingPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardTitle>Tracking</CardTitle>
-          <CardDescription className="mt-2">Track a shipment in real-time.</CardDescription>
+          <CardDescription className="mt-2">Track a shipment in real time and review the latest courier movement.</CardDescription>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <TextInput
               value={trackingNumber}
@@ -296,7 +296,7 @@ export default function ShippingPage() {
                     {label}: {count}
                   </Badge>
                 ))
-              : "No shipments yet."}
+               : <span className="text-sm text-muted-foreground">No shipments have been created yet. Status counts will appear here once dispatch operations begin.</span>}
           </div>
         </Card>
         <CourierTrackingPanel
@@ -328,9 +328,12 @@ export default function ShippingPage() {
               <span>{row.createdAt ? new Date(row.createdAt).toLocaleString() : "Pending"}</span>
             </div>
           ))}
-          {!filteredShipments.length ? <p>No shipments in this range.</p> : null}
+          {!filteredShipments.length ? <p className="text-sm text-muted-foreground">No shipments matched this date window. Adjust the range or create a new dispatch to populate this report.</p> : null}
         </div>
       </Card>
     </div>
   );
 }
+
+
+

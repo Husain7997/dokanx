@@ -1,10 +1,22 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { DokanXLogo } from "../components/dokanx-logo";
 import { useAuthStore } from "../store/auth-store";
 import { useTenantStore } from "../store/tenant-store";
+
+const BRAND = {
+  navy: "#0B1E3C",
+  orange: "#FF7A00",
+  screen: "#F4F7FB",
+  surface: "#FFFFFF",
+  border: "#D7DFEA",
+  text: "#0B1E3C",
+  muted: "#5F6F86",
+  tint: "#EEF3FA",
+};
 
 export function AuthScreen() {
   const navigation = useNavigation();
@@ -14,6 +26,15 @@ export function AuthScreen() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
+  const summaryCards = useMemo(
+    () => [
+      { label: "Journey", value: selectedShop ? "Shop ready" : "Pick a shop" },
+      { label: "Access", value: mode === "signin" ? "Return quickly" : "Create account" },
+      { label: "Flow", value: "Browse, cart, pay" },
+    ],
+    [mode, selectedShop],
+  );
 
   async function handleSignIn() {
     const ok = await signIn({ email, password });
@@ -32,17 +53,30 @@ export function AuthScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        <View>
+        <View style={styles.heroCard}>
+          <DokanXLogo variant="full" size="lg" />
+          <Text style={styles.kicker}>Commerce everywhere</Text>
           <Text style={styles.title}>{mode === "signin" ? "Welcome back" : "Create your account"}</Text>
           <Text style={styles.subtitle}>
-            {mode === "signin" ? "Sign in to continue shopping." : "Register to start shopping."}
+            {mode === "signin" ? "Sign in to continue shopping, tracking orders, and using your wallet with DokanX." : "Register once to start browsing, saving preferences, and checking out faster."}
           </Text>
+          <View style={styles.summaryRow}>
+            {summaryCards.map((item) => (
+              <View key={item.label} style={styles.summaryCard}>
+                <Text style={styles.summaryLabel}>{item.label}</Text>
+                <Text style={styles.summaryValue}>{item.value}</Text>
+              </View>
+            ))}
+          </View>
         </View>
         <View style={styles.card}>
+          <Text style={styles.formTitle}>{mode === "signin" ? "Customer sign in" : "Customer registration"}</Text>
+          <Text style={styles.formHint}>{mode === "signin" ? "Use your existing account to restore wallet, dues, and saved checkout preferences." : "Create a customer account so your wallet, claims, and saved delivery details stay connected."}</Text>
           {mode === "signup" ? (
             <TextInput
               style={styles.input}
               placeholder="Full name"
+              placeholderTextColor={BRAND.muted}
               autoCapitalize="words"
               value={name}
               onChangeText={setName}
@@ -51,6 +85,7 @@ export function AuthScreen() {
           <TextInput
             style={styles.input}
             placeholder="Email address"
+            placeholderTextColor={BRAND.muted}
             keyboardType="email-address"
             autoCapitalize="none"
             value={email}
@@ -59,6 +94,7 @@ export function AuthScreen() {
           <TextInput
             style={styles.input}
             placeholder="Password"
+            placeholderTextColor={BRAND.muted}
             secureTextEntry
             value={password}
             onChangeText={setPassword}
@@ -77,7 +113,7 @@ export function AuthScreen() {
             disabled={isLoading}
           >
             <Text style={styles.primaryButtonText}>
-              {isLoading ? (mode === "signin" ? "Signing in..." : "Creating account...") : mode === "signin" ? "Sign in" : "Create account"}
+              {isLoading ? (mode === "signin" ? "Signing you in..." : "Creating your account...") : mode === "signin" ? "Sign in" : "Create account"}
             </Text>
           </Pressable>
           <Pressable
@@ -97,63 +133,124 @@ export function AuthScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#f8f4ef",
+    backgroundColor: BRAND.screen,
   },
   container: {
     flex: 1,
     padding: 20,
     gap: 20,
     justifyContent: "center",
+    backgroundColor: BRAND.screen,
+  },
+  heroCard: {
+    borderRadius: 24,
+    padding: 20,
+    gap: 10,
+    backgroundColor: BRAND.surface,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    shadowColor: BRAND.navy,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 3,
+  },
+  kicker: {
+    marginTop: 8,
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 1.4,
+    color: BRAND.orange,
+    textTransform: "uppercase",
   },
   title: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: "700",
-    color: "#111827",
+    color: BRAND.text,
   },
   subtitle: {
-    marginTop: 6,
     fontSize: 14,
-    color: "#6b7280",
+    color: BRAND.muted,
+    lineHeight: 21,
+  },
+  summaryRow: {
+    marginTop: 8,
+    flexDirection: "row",
+    gap: 10,
+  },
+  summaryCard: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    backgroundColor: BRAND.tint,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    gap: 4,
+  },
+  summaryLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+    color: BRAND.muted,
+    textTransform: "uppercase",
+  },
+  summaryValue: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: BRAND.text,
   },
   card: {
-    backgroundColor: "#ffffff",
-    borderRadius: 20,
+    backgroundColor: BRAND.surface,
+    borderRadius: 24,
     padding: 20,
     gap: 14,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: BRAND.border,
+  },
+  formTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: BRAND.text,
+  },
+  formHint: {
+    fontSize: 13,
+    color: BRAND.muted,
+    lineHeight: 20,
   },
   input: {
-    backgroundColor: "#f9fafb",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    backgroundColor: BRAND.tint,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     fontSize: 14,
-    borderColor: "#e5e7eb",
+    borderColor: BRAND.border,
     borderWidth: 1,
+    color: BRAND.text,
   },
   primaryButton: {
-    backgroundColor: "#111827",
-    borderRadius: 12,
-    paddingVertical: 12,
+    backgroundColor: BRAND.navy,
+    borderRadius: 14,
+    paddingVertical: 13,
     alignItems: "center",
   },
   primaryButtonText: {
     color: "#ffffff",
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   secondaryButton: {
-    borderRadius: 12,
-    paddingVertical: 12,
+    borderRadius: 14,
+    paddingVertical: 13,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#d1d5db",
+    borderColor: BRAND.border,
+    backgroundColor: BRAND.surface,
   },
   secondaryButtonText: {
-    color: "#111827",
+    color: BRAND.text,
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   errorText: {
     color: "#b91c1c",
@@ -169,11 +266,11 @@ const styles = StyleSheet.create({
     borderColor: "#fca5a5",
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: "#fff5f5",
   },
   retryButtonText: {
-    color: "#991b1b",
+    color: "#b91c1c",
     fontSize: 12,
     fontWeight: "700",
   },
 });
+

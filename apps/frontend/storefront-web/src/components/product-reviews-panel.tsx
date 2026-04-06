@@ -126,14 +126,14 @@ export function ProductReviewsPanel({ productId }: { productId: string }) {
   return (
     <div className="grid gap-6">
       <Card>
-        <CardTitle>Ratings breakdown</CardTitle>
+        <CardTitle>Review confidence</CardTitle>
         <CardDescription className="mt-2">
-          {breakdown.average} ★ average from {totalCount || breakdown.total} reviews
+          {breakdown.average} stars average from {totalCount || breakdown.total} reviews
         </CardDescription>
         <div className="mt-6 grid gap-3">
           {breakdown.counts.map((row) => (
             <div key={row.rating} className="flex items-center gap-3 text-sm">
-              <span className="w-12">{row.rating}★</span>
+              <span className="w-12">{row.rating} stars</span>
               <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
                 <div
                   className="h-full rounded-full bg-primary"
@@ -174,21 +174,21 @@ export function ProductReviewsPanel({ productId }: { productId: string }) {
         {reviews.map((review) => (
           <Card key={review.id} className="border-border/60">
             <CardTitle>{review.name}</CardTitle>
-            <CardDescription className="mt-1">{review.rating} ★</CardDescription>
+            <CardDescription className="mt-1">{review.rating} stars</CardDescription>
             <p className="mt-3 text-sm text-muted-foreground">{review.message}</p>
           </Card>
         ))}
         {!loading && !reviews.length ? (
           <Card className="border-border/60">
-            <CardTitle>No reviews yet</CardTitle>
+            <CardTitle>No reviews available yet</CardTitle>
             <CardDescription className="mt-2">
-              Be the first to share feedback for this product.
+              Be the first to share product feedback so other shoppers can decide with more confidence.
             </CardDescription>
           </Card>
         ) : null}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="text-sm text-muted-foreground">
-            Showing {reviews.length} of {totalCount || reviews.length} reviews
+            Showing {reviews.length} of {totalCount || reviews.length} published reviews
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-muted-foreground">Page {page} / {totalPages}</span>
@@ -276,7 +276,7 @@ export function ProductReviewsPanel({ productId }: { productId: string }) {
               onClick={() => setPage((current) => current + 1)}
               disabled={!hasMore || loading || loadingAll}
             >
-            {loading ? "Loading..." : "Load more"}
+            {loading ? "Loading reviews..." : "Load more"}
           </Button>
           </div>
         </div>
@@ -290,3 +290,6 @@ export function ProductReviewsPanel({ productId }: { productId: string }) {
     </div>
   );
 }
+
+
+

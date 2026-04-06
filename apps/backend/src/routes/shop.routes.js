@@ -9,11 +9,17 @@ const {
   listPublicShops,
   listCustomers,
   createCustomer,
+  blockCustomerForMe,
+  unblockCustomer,
+  listCustomerComplaints,
+  createCustomerComplaint,
+  updateCustomerComplaint,
 } = require('../controllers/shop.controller');
 
 const {
   getShopSettings,
   updateShopSettings,
+  getShopPrintCodes,
   listTeamMembers,
   listTeamActivity,
   addTeamMember,
@@ -66,6 +72,41 @@ router.post(
   createCustomer
 );
 
+router.patch(
+  "/me/customers/:userId/block",
+  protect,
+  allowRoles("OWNER", "STAFF", "ADMIN"),
+  blockCustomerForMe
+);
+
+router.patch(
+  "/me/customers/:userId/unblock",
+  protect,
+  allowRoles("OWNER", "STAFF", "ADMIN"),
+  unblockCustomer
+);
+
+router.get(
+  "/me/customer-complaints",
+  protect,
+  allowRoles("OWNER", "STAFF", "ADMIN"),
+  listCustomerComplaints
+);
+
+router.post(
+  "/me/customer-complaints",
+  protect,
+  allowRoles("OWNER", "STAFF", "ADMIN"),
+  createCustomerComplaint
+);
+
+router.patch(
+  "/me/customer-complaints/:complaintId",
+  protect,
+  allowRoles("OWNER", "STAFF", "ADMIN"),
+  updateCustomerComplaint
+);
+
 router.get(
   "/me/reviews",
   protect,
@@ -85,6 +126,13 @@ router.put(
   protect,
   allowRoles("OWNER", "STAFF", "ADMIN"),
   updateShopSettings
+);
+
+router.get(
+  "/me/print-codes",
+  protect,
+  allowRoles("OWNER", "STAFF", "ADMIN"),
+  getShopPrintCodes
 );
 
 router.get(

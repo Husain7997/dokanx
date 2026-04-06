@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import {
@@ -315,4 +315,5 @@ const styles = StyleSheet.create({
   inlineActionButtonText: { color: "#ffffff", fontSize: 11, fontWeight: "700" },
   helperText: { fontSize: 12, color: "#6b7280" },
 });
+
 

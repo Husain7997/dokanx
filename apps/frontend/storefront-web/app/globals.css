@@ -10,28 +10,29 @@
 }
 
 [data-theme="storefront-theme"] {
-  --background: 30 50% 98%;
-  --foreground: 222 35% 12%;
+  --background: 216 45% 98%;
+  --foreground: 219 69% 14%;
   --card: 0 0% 100%;
-  --card-foreground: 222 35% 12%;
-  --primary: 18 84% 52%;
-  --primary-foreground: 36 33% 97%;
-  --secondary: 210 34% 18%;
-  --secondary-foreground: 36 33% 97%;
-  --muted: 28 30% 94%;
-  --muted-foreground: 218 16% 40%;
-  --accent: 26 45% 95%;
-  --accent-foreground: 222 35% 12%;
-  --border: 24 20% 86%;
-  --input: 24 20% 86%;
-  --ring: 18 84% 52%;
+  --card-foreground: 219 69% 14%;
+  --primary: 219 69% 14%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 214 33% 22%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 216 34% 95%;
+  --muted-foreground: 216 16% 44%;
+  --accent: 29 100% 50%;
+  --accent-foreground: 0 0% 100%;
+  --border: 216 25% 87%;
+  --input: 216 25% 87%;
+  --ring: 29 100% 50%;
 }
 
 body {
   font-family: var(--font-sans);
-  background: radial-gradient(circle at 15% 20%, hsl(24 86% 93%), transparent 55%),
-    radial-gradient(circle at 85% 10%, hsl(210 70% 94%), transparent 40%),
-    hsl(var(--background));
+  background:
+    radial-gradient(circle at 15% 20%, rgba(255, 122, 0, 0.14), transparent 28%),
+    radial-gradient(circle at 85% 10%, rgba(255, 165, 0, 0.1), transparent 24%),
+    linear-gradient(180deg, #fbfdff 0%, #f4f7fb 58%, #eef3fa 100%);
   color: hsl(var(--foreground));
   text-rendering: optimizeLegibility;
 }
@@ -54,9 +55,9 @@ h3,
   position: absolute;
   inset: -40% -20%;
   background:
-    radial-gradient(circle at 20% 20%, hsl(18 80% 70% / 0.15), transparent 45%),
-    radial-gradient(circle at 80% 30%, hsl(210 60% 65% / 0.12), transparent 40%),
-    radial-gradient(circle at 60% 80%, hsl(40 80% 75% / 0.12), transparent 50%);
+    radial-gradient(circle at 20% 20%, rgba(255, 122, 0, 0.15), transparent 42%),
+    radial-gradient(circle at 80% 30%, rgba(255, 165, 0, 0.12), transparent 36%),
+    radial-gradient(circle at 60% 80%, rgba(11, 30, 60, 0.08), transparent 48%);
   animation: shellGlow 18s ease-in-out infinite;
   pointer-events: none;
 }
@@ -67,12 +68,12 @@ h3,
 }
 
 .dx-shell-sidebar {
-  background: hsl(var(--card) / 0.75);
+  background: hsl(var(--card) / 0.78);
   backdrop-filter: blur(14px);
 }
 
 .dx-shell-topbar {
-  background: hsl(var(--background) / 0.7);
+  background: hsl(var(--background) / 0.74);
   backdrop-filter: blur(12px);
 }
 
@@ -83,7 +84,7 @@ h3,
 
 .dx-shell-link:hover {
   border-color: hsl(var(--border));
-  background: hsl(var(--accent));
+  background: rgba(255, 122, 0, 0.08);
   transform: translateX(2px);
 }
 

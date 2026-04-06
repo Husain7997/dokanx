@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import {
@@ -13,6 +13,7 @@ import {
 } from "../lib/api-client";
 import { useMerchantAuthStore } from "../store/auth-store";
 import { getMerchantPalette, MerchantLanguage, MerchantThemeMode, useMerchantUiStore, useResolvedMerchantTheme } from "../store/ui-store";
+import { DokanXLogo } from "../components/dokanx-logo";
 import { MerchantTopNav } from "./merchant-top-nav";
 
 type TeamMember = {
@@ -69,6 +70,8 @@ type SettingsForm = {
   settlementRoutingNumber: string;
   settlementBranchName: string;
   preferredBankGateway: string;
+  logoUrl: string;
+  bannerUrls: string[];
   storefrontDomain: string;
   addressLine1: string;
   addressLine2: string;
@@ -93,6 +96,8 @@ const defaultForm: SettingsForm = {
   settlementRoutingNumber: "",
   settlementBranchName: "",
   preferredBankGateway: "BKASH",
+  logoUrl: "",
+  bannerUrls: [],
   storefrontDomain: "",
   addressLine1: "",
   addressLine2: "",
@@ -102,6 +107,7 @@ const defaultForm: SettingsForm = {
     posScannerEnabled: true,
     cameraScannerEnabled: true,
     bluetoothScannerEnabled: true,
+    scannerFeedbackEnabled: true,
     productSearchEnabled: true,
     discountToolsEnabled: true,
     pricingSafetyEnabled: true,
@@ -132,24 +138,25 @@ const defaultForm: SettingsForm = {
 const TEAM_PERMISSION_OPTIONS = ["POS", "ORDERS", "PRODUCTS", "CUSTOMERS", "WALLET", "FINANCE"] as const;
 
 const FEATURE_LABELS: Array<{ key: keyof SettingsForm["merchantFeatures"]; title: string; note: string; titleBn: string; noteBn: string }> = [
-  { key: "posScannerEnabled", title: "POS scanner tools", note: "Scanner-related tools appear in POS.", titleBn: "????? ????????? ???", noteBn: "????????? ????????? ??? ?????? ???? ????" },
-  { key: "cameraScannerEnabled", title: "In-app camera scan", note: "Use phone camera inside POS.", titleBn: "??????? ???? ???????? ???????", noteBn: "??????? ????? ????? ???????? ??????? ????" },
-  { key: "bluetoothScannerEnabled", title: "Bluetooth scanner input", note: "Use barcode scanner as keyboard wedge.", titleBn: "??????? ????????? ?????", noteBn: "?????? ??????????? ??????? ????? ?????? ??????? ????" },
-  { key: "productSearchEnabled", title: "Product search", note: "Show quick search in POS and Products.", titleBn: "???? ?????", noteBn: "????? ? ????? ????? ????? ?????" },
-  { key: "discountToolsEnabled", title: "Discount tools", note: "Enable per-item and bulk discount controls.", titleBn: "????????? ???", noteBn: "????? ???? ? bulk discount ???????? ???? ????" },
-  { key: "pricingSafetyEnabled", title: "Pricing safety alerts", note: "Show profit-risk color signals.", titleBn: "???????? ????? ?????????", noteBn: "???-?????? ????? ???????? ?????" },
-  { key: "splitPaymentEnabled", title: "Split payment", note: "Allow cash + wallet + online mixed payments.", titleBn: "??????? ???????", noteBn: "????? + ?????? + ?????? ????? ??????? ???? ????" },
+  { key: "posScannerEnabled", title: "POS scanner tools", note: "Scanner-related tools appear in POS.", titleBn: "POS scanner tools", noteBn: "Scanner-related tools appear in POS." },
+  { key: "cameraScannerEnabled", title: "In-app camera scan", note: "Use phone camera inside POS.", titleBn: "In-app camera scan", noteBn: "Use phone camera inside POS." },
+  { key: "bluetoothScannerEnabled", title: "Bluetooth scanner input", note: "Use barcode scanner as keyboard wedge.", titleBn: "Bluetooth scanner input", noteBn: "Use barcode scanner as keyboard wedge." },
+  { key: "scannerFeedbackEnabled", title: "Scanner feedback", note: "Vibrate after a product is added from scan.", titleBn: "Scanner feedback", noteBn: "Vibrate after a product is added from scan." },
+  { key: "productSearchEnabled", title: "Product search", note: "Show quick search in POS and Products.", titleBn: "Product search", noteBn: "Show quick search in POS and Products." },
+  { key: "discountToolsEnabled", title: "Discount tools", note: "Enable per-item and bulk discount controls.", titleBn: "Discount tools", noteBn: "Enable per-item and bulk discount controls." },
+  { key: "pricingSafetyEnabled", title: "Pricing safety alerts", note: "Show profit-risk color signals.", titleBn: "Pricing safety alerts", noteBn: "Show profit-risk color signals." },
+  { key: "splitPaymentEnabled", title: "Split payment", note: "Allow cash + wallet + online mixed payments.", titleBn: "Split payment", noteBn: "Allow cash + wallet + online mixed payments." },
 ];
 
 const THEME_OPTIONS: Array<{ value: MerchantThemeMode; label: string; labelBn: string }> = [
-  { value: "system", label: "System", labelBn: "???????" },
-  { value: "light", label: "Light", labelBn: "????" },
-  { value: "dark", label: "Dark", labelBn: "?????" },
+  { value: "system", label: "System", labelBn: "System" },
+  { value: "light", label: "Light", labelBn: "Light" },
+  { value: "dark", label: "Dark", labelBn: "Dark" },
 ];
 
 const LANGUAGE_OPTIONS: Array<{ value: MerchantLanguage; label: string; labelBn: string }> = [
-  { value: "en", label: "English", labelBn: "??????" },
-  { value: "bn", label: "Bangla", labelBn: "?????" },
+  { value: "en", label: "English", labelBn: "English" },
+  { value: "bn", label: "Bangla", labelBn: "Bangla" },
 ];
 
 export function MerchantSettingsScreen() {
@@ -166,37 +173,56 @@ export function MerchantSettingsScreen() {
   const [form, setForm] = useState<SettingsForm>(defaultForm);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [teamActivity, setTeamActivity] = useState<TeamActivityEntry[]>([]);
+  const [showAllTeamActivity, setShowAllTeamActivity] = useState(false);
   const [teamInvite, setTeamInvite] = useState<TeamInviteForm>({ name: "", email: "", phone: "", role: "STAFF", permissions: ["POS", "ORDERS"] });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isManagingTeam, setIsManagingTeam] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [bannerDraft, setBannerDraft] = useState("");
+  const scrollRef = useRef<ScrollView | null>(null);
+  const [sectionOffsets, setSectionOffsets] = useState<Record<string, number>>({});
+
+  const registerSection = (key: string) => (event: any) => {
+    const nextY = event?.nativeEvent?.layout?.y;
+    if (typeof nextY === "number") {
+      setSectionOffsets((current) => ({ ...current, [key]: nextY }));
+    }
+  };
+
+  const jumpToSection = (key: string, label: string) => {
+    const nextY = sectionOffsets[key];
+    if (typeof nextY === "number") {
+      scrollRef.current?.scrollTo({ y: Math.max(0, nextY - 12), animated: true });
+      setStatus(language === "bn" ? `${label} ?????? ????? ??????` : `${label} section opened.`);
+    }
+  };
 
   const copy = language === "bn"
     ? {
-        title: "????? ??????",
-        subtitle: "????????? ????????",
-        settingsUnavailable: "?????? ????? ?????? ??",
-        businessIdentity: "??????? ?????",
-        operations: "???????",
-        uiPreferences: "??? ? ????",
-        featureSwitches: "????? ????",
-        pricingSafetyBands: "???????? ????? ???????",
-        marginHelper: "??????? ????????????? ???? ??????????? ???????? ???? margin % ????? ???",
-        session: "????",
-        role: "??????",
-        shopId: "?? ????",
-        loading: "?????",
-        syncing: "????????? ???? ????? ?????",
-        ready: "????",
-        save: "?????? ??? ????",
-        saving: "??? ?????...",
-        reload: "????????? ???? ?????",
-        signOut: "???? ???",
-        saved: "????? ??????, ????? ????, ?? UI preference ??? ??????",
-        redAlert: "??????????? ???? ??? ?????????",
-        redAlertNote: "??????????? cost price-?? ???? ???? ??? ???????? ??????",
+        title: "Store settings",
+        subtitle: "Merchant profile",
+        settingsUnavailable: "Settings unavailable",
+        businessIdentity: "Business identity",
+        operations: "Operations",
+        uiPreferences: "Theme and language",
+        featureSwitches: "Feature switches",
+        pricingSafetyBands: "Pricing safety bands",
+        marginHelper: "Margin % is measured from final selling price against cost price.",
+        session: "Session",
+        role: "Role",
+        shopId: "Shop ID",
+        loading: "Loading",
+        syncing: "Syncing with backend",
+        ready: "Ready",
+        save: "Save settings",
+        saving: "Saving...",
+        reload: "Reload",
+        signOut: "Sign out",
+        saved: "Settings, team, and UI preferences saved.",
+        redAlert: "Red alert below cost",
+        redAlertNote: "Show a red warning when final price goes below cost price.",
       }
     : {
         title: "Store settings",
@@ -216,11 +242,11 @@ export function MerchantSettingsScreen() {
         ready: "Ready",
         save: "Save settings",
         saving: "Saving...",
-        reload: "Reload from backend",
+        reload: "Reload",
         signOut: "Sign out",
-        saved: "Store settings, feature switches, and UI preferences saved.",
+        saved: "Settings, team, and UI preferences saved.",
         redAlert: "Red alert below cost",
-        redAlertNote: "Show red signal whenever sale goes below cost price.",
+        redAlertNote: "Show a red warning when final price goes below cost price.",
       };
 
   const loadSettings = useCallback(async () => {
@@ -254,6 +280,8 @@ export function MerchantSettingsScreen() {
         settlementRoutingNumber: String(response.data?.settlementRoutingNumber || ""),
         settlementBranchName: String(response.data?.settlementBranchName || ""),
         preferredBankGateway: String(response.data?.preferredBankGateway || "BKASH"),
+        logoUrl: String((response.data as any)?.logoUrl || ""),
+        bannerUrls: Array.isArray((response.data as any)?.bannerUrls) ? (response.data as any).bannerUrls.map((entry: unknown) => String(entry || "")).filter(Boolean) : [],
         storefrontDomain: String(response.data?.storefrontDomain || ""),
         addressLine1: String(response.data?.addressLine1 || ""),
         addressLine2: String(response.data?.addressLine2 || ""),
@@ -326,6 +354,19 @@ export function MerchantSettingsScreen() {
         [field]: !current.merchantFeatures[field],
       },
     }));
+  }
+
+  const suggestedDomains = [form.storefrontDomain, `${String(form.name || "store").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "store"}.dokanx.shop`, `${String(form.name || "store").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "store"}-${String(form.city || "bd").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "bd"}.dokanx.shop`].filter(Boolean).filter((value, index, array) => array.indexOf(value) === index);
+
+  function addBannerUrl() {
+    const next = bannerDraft.trim();
+    if (!next) return;
+    setForm((current) => ({ ...current, bannerUrls: current.bannerUrls.includes(next) ? current.bannerUrls : [...current.bannerUrls, next] }));
+    setBannerDraft("");
+  }
+
+  function removeBannerUrl(url: string) {
+    setForm((current) => ({ ...current, bannerUrls: current.bannerUrls.filter((item) => item !== url) }));
   }
 
   function updateSafetyField(field: keyof SettingsForm["pricingSafety"], value: string | boolean) {
@@ -424,6 +465,10 @@ export function MerchantSettingsScreen() {
     }
   }
 
+  const activeFeatureCount = Object.values(form.merchantFeatures).filter(Boolean).length;
+  const teamCount = teamMembers.length;
+  const bannerCount = form.bannerUrls.length;
+
   async function handleSave() {
     if (!accessToken) {
       setError("Merchant session missing. Please sign in again.");
@@ -447,19 +492,58 @@ export function MerchantSettingsScreen() {
 
   return (
     <View style={[styles.safeArea, { backgroundColor: palette.screen }] }>
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.container}>
         <MerchantTopNav active="Settings" />
-        <View style={[styles.hero, { backgroundColor: palette.surface, borderColor: palette.border }] }>
-          <Text style={[styles.title, { color: palette.text }]}>{copy.title}</Text>
-          <Text style={[styles.subtitle, { color: palette.muted }]}>{profile?.name || profile?.email || copy.subtitle}</Text>
+        <View style={[styles.hero, { backgroundColor: palette.text, borderColor: palette.border }] }>
+          <View style={styles.heroTop}>
+            <View style={styles.heroBrandWrap}>
+              <DokanXLogo variant="icon" size="sm" />
+              <View style={styles.heroBrandCopy}>
+                <Text style={[styles.heroEyebrow, { color: "#fef3c7" }]}>{language === "bn" ? "DokanX কন্ট্রোল" : "DokanX Control"}</Text>
+                <Text style={[styles.title, { color: palette.screen }]}>{copy.title}</Text>
+              </View>
+            </View>
+            <Pressable style={[styles.heroAction, { borderColor: "rgba(255,255,255,0.14)", backgroundColor: "rgba(255,255,255,0.08)" }]} onPress={() => void loadSettings()}>
+              <Text style={[styles.heroActionText, { color: palette.screen }]}>{copy.reload}</Text>
+            </Pressable>
+          </View>
+          <Text style={[styles.subtitle, { color: "#dbe7fb" }]}>{profile?.name || profile?.email || copy.subtitle}</Text>
+          <Text style={[styles.heroSupport, { color: "#e5eefc" }]}>{language === "bn" ? "ব্র্যান্ডিং, অপারেশন, টিম অ্যাক্সেস, KYC এবং স্টোরফ্রন্ট এক জায়গা থেকে নিয়ন্ত্রণ করুন।" : "Manage branding, operations, team access, KYC, and storefront control from one merchant workspace."}</Text>
+          <View style={styles.heroMetrics}>
+            <View style={styles.heroMetricCard}>
+              <Text style={styles.heroMetricLabel}>{language === "bn" ? "????? ??" : "Features on"}</Text>
+              <Text style={styles.heroMetricValue}>{activeFeatureCount}</Text>
+            </View>
+            <View style={styles.heroMetricCard}>
+              <Text style={styles.heroMetricLabel}>{language === "bn" ? "??? ?????" : "Team members"}</Text>
+              <Text style={styles.heroMetricValue}>{teamCount}</Text>
+            </View>
+            <View style={styles.heroMetricCard}>
+              <Text style={styles.heroMetricLabel}>{language === "bn" ? "???????" : "Banners"}</Text>
+              <Text style={styles.heroMetricValue}>{bannerCount}</Text>
+            </View>
+          </View>
         </View>
 
         {error ? <View style={styles.alertError}><Text style={styles.alertTitle}>{copy.settingsUnavailable}</Text><Text style={styles.alertBody}>{error}</Text></View> : null}
         {status ? <View style={styles.alertInfo}><Text style={styles.alertBody}>{status}</Text></View> : null}
 
+        <View style={[styles.summaryCard, { backgroundColor: palette.card, borderColor: palette.border }] }>
+          <Text style={[styles.summaryTitle, { color: palette.text }]}>{language === "bn" ? "সেটিংস নেভিগেশন" : "Settings navigation"}</Text>
+          <Text style={[styles.helperText, { color: palette.muted }]}>{language === "bn" ? "নিচের বাটনে চাপলে সরাসরি সেই অংশে যাবে।" : "Tap a chip below to jump to that section quickly."}</Text>
+          <View style={styles.summaryChips}>
+            <Pressable style={[styles.summaryChip, { backgroundColor: palette.surfaceAlt, borderColor: palette.border }]} onPress={() => jumpToSection("ui", copy.uiPreferences)}><Text style={[styles.summaryChipText, { color: palette.text }]}>{copy.uiPreferences}</Text></Pressable>
+            <Pressable style={[styles.summaryChip, { backgroundColor: palette.surfaceAlt, borderColor: palette.border }]} onPress={() => jumpToSection("business", copy.businessIdentity)}><Text style={[styles.summaryChipText, { color: palette.text }]}>{copy.businessIdentity}</Text></Pressable>
+            <Pressable style={[styles.summaryChip, { backgroundColor: palette.surfaceAlt, borderColor: palette.border }]} onPress={() => jumpToSection("operations", copy.operations)}><Text style={[styles.summaryChipText, { color: palette.text }]}>{copy.operations}</Text></Pressable>
+            <Pressable style={[styles.summaryChip, { backgroundColor: palette.surfaceAlt, borderColor: palette.border }]} onPress={() => jumpToSection("features", copy.featureSwitches)}><Text style={[styles.summaryChipText, { color: palette.text }]}>{copy.featureSwitches}</Text></Pressable>
+            <Pressable style={[styles.summaryChip, { backgroundColor: palette.surfaceAlt, borderColor: palette.border }]} onPress={() => jumpToSection("kyc", "KYC")}><Text style={[styles.summaryChipText, { color: palette.text }]}>KYC</Text></Pressable>
+            <Pressable style={[styles.summaryChip, { backgroundColor: palette.surfaceAlt, borderColor: palette.border }]} onPress={() => jumpToSection("session", copy.session)}><Text style={[styles.summaryChipText, { color: palette.text }]}>{copy.session}</Text></Pressable>
+          </View>
+        </View>
+
         <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }] }>
           <Text style={[styles.cardTitle, { color: palette.text }]}>{copy.uiPreferences}</Text>
-          <Text style={[styles.helperText, { color: palette.muted }]}>{language === "bn" ? "???? ???? ??????? ?? ?? ???? ????????? ?????" : "Control app colors and labels from here."}</Text>
+          <Text style={[styles.helperText, { color: palette.muted }]}>{language === "bn" ? "???? ???? ??????? ??, ???? ?? ????? ????????? ?????" : "Control app colors, language, and visible labels from here."}</Text>
           <View style={styles.optionRow}>
             {THEME_OPTIONS.map((option) => {
               const active = themeMode === option.value;
@@ -479,6 +563,32 @@ export function MerchantSettingsScreen() {
                 </Pressable>
               );
             })}
+          </View>
+        </View>
+
+        <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }] }>
+          <Text style={[styles.cardTitle, { color: palette.text }]}>{language === "bn" ? "??????????? ? ???????????" : "Branding and storefront"}</Text>
+          <Text style={[styles.helperText, { color: palette.muted }]}>{language === "bn" ? "????, ??????? ?? ??????????? ?????? ?? ????? ???? ????????? ?????" : "Control your logo, banners, and storefront domain from one place."}</Text>
+          <TextInput style={[styles.input, { borderColor: palette.border, backgroundColor: palette.surfaceAlt, color: palette.text }]} value={form.logoUrl} onChangeText={(value) => updateField("logoUrl", value)} placeholder={language === "bn" ? "???? ???? URL" : "Logo image URL"} placeholderTextColor={palette.muted} autoCapitalize="none" />
+          <TextInput style={[styles.input, { borderColor: palette.border, backgroundColor: palette.surfaceAlt, color: palette.text }]} value={bannerDraft} onChangeText={setBannerDraft} placeholder={language === "bn" ? "??????? ???? URL ??? ????" : "Add banner image URL"} placeholderTextColor={palette.muted} autoCapitalize="none" />
+          <Pressable style={[styles.secondaryButton, { backgroundColor: palette.surface, borderColor: palette.border }]} onPress={() => addBannerUrl()}>
+            <Text style={[styles.secondaryButtonText, { color: palette.text }]}>{language === "bn" ? "??????? ??? ????" : "Add banner"}</Text>
+          </Pressable>
+          {form.bannerUrls.map((bannerUrl) => (
+            <View key={bannerUrl} style={[styles.teamCard, { borderColor: palette.border, backgroundColor: palette.surfaceAlt }]}>
+              <Text style={[styles.helperText, { color: palette.text }]} numberOfLines={1}>{bannerUrl}</Text>
+              <Pressable style={[styles.deleteButton, { alignSelf: "flex-start" }]} onPress={() => removeBannerUrl(bannerUrl)}>
+                <Text style={styles.deleteButtonText}>{language === "bn" ? "?????" : "Delete"}</Text>
+              </Pressable>
+            </View>
+          ))}
+          <TextInput style={[styles.input, { borderColor: palette.border, backgroundColor: palette.surfaceAlt, color: palette.text }]} value={form.storefrontDomain} onChangeText={(value) => updateField("storefrontDomain", value)} placeholder={language === "bn" ? "?????? ?????? ?? ?????????" : "Custom domain or subdomain"} placeholderTextColor={palette.muted} autoCapitalize="none" />
+          <View style={styles.permissionsWrap}>
+            {suggestedDomains.map((domain) => (
+              <Pressable key={domain} style={[styles.permissionChip, { borderColor: palette.border, backgroundColor: form.storefrontDomain === domain ? palette.accent : palette.surfaceAlt }]} onPress={() => updateField("storefrontDomain", domain)}>
+                <Text style={[styles.permissionChipText, { color: form.storefrontDomain === domain ? palette.accentText : palette.text }]}>{domain}</Text>
+              </Pressable>
+            ))}
           </View>
         </View>
 
@@ -537,7 +647,7 @@ export function MerchantSettingsScreen() {
 
         <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }] }>
           <Text style={[styles.cardTitle, { color: palette.text }]}>KYC and approval</Text>
-          <Text style={[styles.helperText, { color: palette.muted }]}>Submit merchant identity and business documents for admin approval.</Text>
+          <Text style={[styles.helperText, { color: palette.muted }]}>Submit merchant identity and business documents for admin review and approval.</Text>
           <Text style={[styles.row, { color: palette.text }]}>Status: {form.kyc.status}</Text>
           {form.kyc.submittedAt ? <Text style={[styles.row, { color: palette.text }]}>Submitted: {form.kyc.submittedAt.slice(0, 10)}</Text> : null}
           {form.kyc.approvedAt ? <Text style={[styles.row, { color: palette.text }]}>Approved: {form.kyc.approvedAt.slice(0, 10)}</Text> : null}
@@ -557,7 +667,7 @@ export function MerchantSettingsScreen() {
         {(profile?.role === "OWNER" || profile?.role === "ADMIN") ? (
           <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }] }>
             <Text style={[styles.cardTitle, { color: palette.text }]}>Team and access</Text>
-            <Text style={[styles.helperText, { color: palette.muted }]}>Invite staff, assign role, and control workflow access.</Text>
+            <Text style={[styles.helperText, { color: palette.muted }]}>Invite staff, assign roles, and control workflow access.</Text>
             <TextInput style={[styles.input, { borderColor: palette.border, backgroundColor: palette.surfaceAlt, color: palette.text }]} value={teamInvite.name} onChangeText={(value) => setTeamInvite((current) => ({ ...current, name: value }))} placeholder="Staff name" placeholderTextColor={palette.muted} />
             <TextInput style={[styles.input, { borderColor: palette.border, backgroundColor: palette.surfaceAlt, color: palette.text }]} value={teamInvite.email} onChangeText={(value) => setTeamInvite((current) => ({ ...current, email: value }))} placeholder="Staff email" placeholderTextColor={palette.muted} autoCapitalize="none" keyboardType="email-address" />
             <TextInput style={[styles.input, { borderColor: palette.border, backgroundColor: palette.surfaceAlt, color: palette.text }]} value={teamInvite.phone} onChangeText={(value) => setTeamInvite((current) => ({ ...current, phone: value }))} placeholder="Staff phone" placeholderTextColor={palette.muted} keyboardType="phone-pad" />
@@ -610,15 +720,21 @@ export function MerchantSettingsScreen() {
                   <Text style={[styles.secondaryButtonText, { color: palette.text }]}>Resend invite</Text>
                 </Pressable>
               </View>
-            ))}
-            <Text style={[styles.cardTitle, { color: palette.text }]}>Recent team activity</Text>
-            {teamActivity.length ? teamActivity.map((entry) => (
+            ))}            <View style={styles.teamHeader}>
+              <Text style={[styles.cardTitle, { color: palette.text }]}>Recent team activity</Text>
+              {teamActivity.length > 3 ? (
+                <Pressable style={[styles.summaryChip, { borderColor: palette.border, backgroundColor: palette.surfaceAlt }]} onPress={() => setShowAllTeamActivity((current) => !current)}>
+                  <Text style={[styles.summaryChipText, { color: palette.text }]}>{showAllTeamActivity ? "Show latest" : "Show all"}</Text>
+                </Pressable>
+              ) : null}
+            </View>
+            {teamActivity.length ? (showAllTeamActivity ? teamActivity : teamActivity.slice(0, 3)).map((entry) => (
               <View key={entry.id} style={[styles.teamCard, { borderColor: palette.border, backgroundColor: palette.surface }] }>
-                <Text style={[styles.toggleTitle, { color: palette.text }]}>{entry.actorName} � {entry.actorRole}</Text>
-                <Text style={[styles.toggleNote, { color: palette.muted }]}>{entry.action} � {entry.targetType}</Text>
+                <Text style={[styles.toggleTitle, { color: palette.text }]}>{entry.actorName} | {entry.actorRole}</Text>
+                <Text style={[styles.toggleNote, { color: palette.muted }]}>{entry.action} | {entry.targetType}</Text>
                 <Text style={[styles.toggleNote, { color: palette.muted }]}>{entry.createdAt ? entry.createdAt.slice(0, 16).replace("T", " ") : "Recent"}</Text>
               </View>
-            )) : <Text style={[styles.helperText, { color: palette.muted }]}>No recent staff activity yet.</Text>}
+            )) : <Text style={[styles.helperText, { color: palette.muted }]}>No recent staff activity has been recorded yet.</Text>}
           </View>
         ) : null}
 
@@ -646,17 +762,33 @@ export function MerchantSettingsScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   container: { padding: 16, gap: 12, paddingBottom: 110 },
-  hero: { borderRadius: 18, padding: 16, gap: 6, borderWidth: 1 },
-  title: { fontSize: 22, fontWeight: "700" },
+  hero: { borderRadius: 24, padding: 18, gap: 10, borderWidth: 1 },
+  heroTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
+  heroBrandWrap: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
+  heroBrandCopy: { flex: 1, gap: 3 },
+  heroEyebrow: { fontSize: 11, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase" },
+  heroAction: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1 },
+  heroActionText: { fontSize: 12, fontWeight: "700" },
+  heroSupport: { fontSize: 12, lineHeight: 18 },
+  heroMetrics: { flexDirection: "row", gap: 8 },
+  heroMetricCard: { flex: 1, borderRadius: 16, padding: 12, backgroundColor: "rgba(255,255,255,0.08)", gap: 4 },
+  heroMetricLabel: { color: "#bfd2f2", fontSize: 11, fontWeight: "600" },
+  heroMetricValue: { color: "#ffffff", fontSize: 17, fontWeight: "800" },
+  title: { fontSize: 22, fontWeight: "800" },
   subtitle: { fontSize: 12 },
+  summaryCard: { borderRadius: 18, padding: 14, borderWidth: 1, gap: 10 },
+  summaryTitle: { fontSize: 14, fontWeight: "800" },
+  summaryChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  summaryChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 8 },
+  summaryChipText: { fontSize: 11, fontWeight: "700" },
   alertError: { backgroundColor: "#fef2f2", borderColor: "#fecaca", borderWidth: 1, borderRadius: 14, padding: 14, gap: 6 },
   alertInfo: { backgroundColor: "#eff6ff", borderColor: "#bfdbfe", borderWidth: 1, borderRadius: 14, padding: 14 },
   alertTitle: { fontSize: 13, fontWeight: "700", color: "#991b1b" },
   alertBody: { fontSize: 12, color: "#374151" },
   card: { borderRadius: 16, padding: 14, borderWidth: 1, gap: 10 },
-  cardTitle: { fontSize: 15, fontWeight: "600" },
-  input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
-  helperText: { fontSize: 11 },
+  cardTitle: { fontSize: 15, fontWeight: "700" },
+  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 },
+  helperText: { fontSize: 11, lineHeight: 16 },
   optionRow: { flexDirection: "row", gap: 8 },
   segment: { flex: 1, borderWidth: 1, borderRadius: 12, paddingVertical: 10, alignItems: "center" },
   segmentText: { fontSize: 12, fontWeight: "700" },
@@ -665,6 +797,9 @@ const styles = StyleSheet.create({
   toggleTitle: { fontSize: 13, fontWeight: "700" },
   toggleNote: { fontSize: 11 },
   togglePill: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  sectionHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
+  sortPill: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  sortPillText: { fontSize: 11, fontWeight: "700" },
   permissionsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   permissionChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 8 },
   permissionChipText: { fontSize: 11, fontWeight: "700" },
@@ -673,11 +808,43 @@ const styles = StyleSheet.create({
   teamMeta: { flex: 1, gap: 3 },
   togglePillText: { fontSize: 11, fontWeight: "700" },
   row: { fontSize: 13 },
-  primaryButton: { borderRadius: 12, paddingVertical: 12, alignItems: "center" },
+  primaryButton: { borderRadius: 14, paddingVertical: 12, alignItems: "center" },
   primaryButtonText: { fontSize: 14, fontWeight: "700" },
-  secondaryButton: { borderRadius: 12, paddingVertical: 12, alignItems: "center", borderWidth: 1 },
+  secondaryButton: { borderRadius: 14, paddingVertical: 12, alignItems: "center", borderWidth: 1 },
   secondaryButtonText: { fontSize: 14, fontWeight: "700" },
-  signOutButton: { borderRadius: 12, paddingVertical: 12, alignItems: "center", borderWidth: 1 },
+  deleteButton: { alignSelf: "flex-start", borderRadius: 10, backgroundColor: "#fee2e2", paddingHorizontal: 10, paddingVertical: 8 },
+  deleteButtonText: { fontSize: 12, fontWeight: "700", color: "#991b1b" },
+  signOutButton: { borderRadius: 14, paddingVertical: 12, alignItems: "center", borderWidth: 1 },
   signOutText: { fontSize: 14, fontWeight: "700" },
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

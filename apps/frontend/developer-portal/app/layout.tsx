@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { AppProviders } from "@/providers/app-providers";
 import { developerNavigation } from "@/config/navigation";
+import { Logo } from "@dokanx/ui/components/ui/logo";
 
 import "./globals.css";
 
@@ -34,20 +35,22 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <div className="dx-portal min-h-screen">
             <div className="dx-portal-inner mx-auto flex min-h-screen max-w-6xl flex-col gap-10 px-6 py-10">
               <header className="flex flex-col gap-4 rounded-3xl border border-white/40 bg-white/70 p-6">
-                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Developer Portal</p>
-                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-center gap-4">
+                  <Logo variant="icon" size="sm" />
                   <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Developer Portal</p>
                     <h1 className="dx-display text-3xl">Build on DokanX</h1>
                     <p className="text-sm text-muted-foreground">
                       API references, sandbox tools, and integration guides.
                     </p>
                   </div>
-                  <nav className="flex flex-wrap gap-2">
-                    {developerNavigation.map((item) => (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className="rounded-full border border-white/60 bg-white/70 px-4 py-2 text-xs font-semibold"
+                </div>
+                <nav className="flex flex-wrap gap-2">
+                  {developerNavigation.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className="rounded-full border border-white/60 bg-white/70 px-4 py-2 text-xs font-semibold"
                       >
                         {item.label}
                       </Link>

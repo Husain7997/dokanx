@@ -1,8 +1,11 @@
 const bcrypt = require("bcryptjs");
 const { randomUUID } = require("crypto");
+const QRCode = require("qrcode");
+const bwipjs = require("bwip-js");
 
 const Shop = require("../models/shop.model");
 const User = require("../models/user.model");
+const AuditLog = require("../models/audit.model");
 
 const DEFAULT_MERCHANT_FEATURES = {
   posScannerEnabled: true,
@@ -84,6 +87,11 @@ function buildSettingsPayload(shop) {
     logoUrl: shop.logoUrl || "",
     brandPrimaryColor: shop.brandPrimaryColor || "",
     brandAccentColor: shop.brandAccentColor || "",
+    receiptHeader: shop.receiptHeader || "",
+    receiptFooter: shop.receiptFooter || "",
+    receiptPrintPreset: shop.receiptPrintPreset || "THERMAL_58",
+    labelPrintPreset: shop.labelPrintPreset || "LABEL_40_30",
+    labelTemplate: shop.labelTemplate || "STANDARD",
     storefrontDomain: shop.storefrontDomain || "",
     addressLine1: shop.addressLine1 || "",
     addressLine2: shop.addressLine2 || "",
@@ -117,6 +125,54 @@ exports.getShopSettings = async (req, res) => {
   res.json({ data: buildSettingsPayload(shop) });
 };
 
+exports.getShopQrCode = async (req, res) => {
+  const { data, size } = req.query || {};
+  const target = String(data || "").trim();
+  if (!target) {
+    return res.status(400).json({ message: "data query is required" });
+  }
+
+  try {
+    const width = Math.min(1024, Math.max(160, Number(size || 240)));
+    const dataUrl = await QRCode.toDataURL(target, { margin: 1, width });
+    return res.json({ data: { dataUrl, target, width } });
+  } catch (error) {
+    return res.status(500).json({ message: "Unable to generate QR code" });
+  }
+};
+
+exports.getShopPrintCodes = async (req, res) => {
+  const target = String(req.query?.data || "").trim();
+  const barcodeText = String(req.query?.barcode || "").trim();
+  if (!target && !barcodeText) {
+    return res.status(400).json({ message: "data or barcode query is required" });
+  }
+
+  try {
+    const width = Math.min(1024, Math.max(160, Number(req.query?.size || 240)));
+    const data = {};
+    if (target) {
+      data.qrDataUrl = await QRCode.toDataURL(target, { margin: 1, width });
+      data.target = target;
+    }
+    if (barcodeText) {
+      const barcodeBuffer = await bwipjs.toBuffer({
+        bcid: "code128",
+        text: barcodeText,
+        scale: 3,
+        height: 10,
+        includetext: false,
+        backgroundcolor: "FFFFFF",
+      });
+      data.barcodeDataUrl = `data:image/png;base64,${barcodeBuffer.toString("base64")}`;
+      data.barcode = barcodeText;
+    }
+    return res.json({ data });
+  } catch (error) {
+    return res.status(500).json({ message: "Unable to generate print codes" });
+  }
+};
+
 exports.updateShopSettings = async (req, res) => {
   const shop = await resolveShop(req);
   if (!shop) return res.status(404).json({ message: "Shop not found" });
@@ -138,6 +194,11 @@ exports.updateShopSettings = async (req, res) => {
     logoUrl,
     brandPrimaryColor,
     brandAccentColor,
+    receiptHeader,
+    receiptFooter,
+    receiptPrintPreset,
+    labelPrintPreset,
+    labelTemplate,
     storefrontDomain,
     addressLine1,
     addressLine2,
@@ -167,6 +228,11 @@ exports.updateShopSettings = async (req, res) => {
   shop.logoUrl = logoUrl ?? shop.logoUrl;
   shop.brandPrimaryColor = brandPrimaryColor ?? shop.brandPrimaryColor;
   shop.brandAccentColor = brandAccentColor ?? shop.brandAccentColor;
+  shop.receiptHeader = receiptHeader ?? shop.receiptHeader;
+  shop.receiptFooter = receiptFooter ?? shop.receiptFooter;
+  shop.receiptPrintPreset = receiptPrintPreset ?? shop.receiptPrintPreset;
+  shop.labelPrintPreset = labelPrintPreset ?? shop.labelPrintPreset;
+  shop.labelTemplate = labelTemplate ?? shop.labelTemplate;
   shop.storefrontDomain = storefrontDomain ?? shop.storefrontDomain;
   shop.addressLine1 = addressLine1 ?? shop.addressLine1;
   shop.addressLine2 = addressLine2 ?? shop.addressLine2;
@@ -326,4 +392,5 @@ exports.updateTeamMember = async (req, res) => {
     data: member,
   });
 };
+
 

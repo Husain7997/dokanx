@@ -69,7 +69,7 @@ export const useMerchantAuthStore = create<AuthState>((set, get) => ({
         await get().refreshProfile();
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to restore merchant session";
+      const message = error instanceof Error ? error.message : "Unable to restore your merchant session right now.";
       set({ accessToken: null, profile: null, isHydrated: true, error: message });
     }
   },
@@ -119,7 +119,7 @@ export const useMerchantAuthStore = create<AuthState>((set, get) => ({
           : null,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to load merchant profile";
+      const message = error instanceof Error ? error.message : "Unable to load your merchant profile right now.";
       await clearToken();
       set({ accessToken: null, profile: null, error: message });
     }
@@ -127,3 +127,4 @@ export const useMerchantAuthStore = create<AuthState>((set, get) => ({
 }));
 
 registerUnauthorizedHandler(() => useMerchantAuthStore.getState().signOut());
+

@@ -252,7 +252,7 @@ export default function LogisticsPage() {
                 </div>
               );
             })}
-            {!carriers.length ? <p>No couriers configured yet.</p> : null}
+            {!carriers.length ? <p className="text-sm text-muted-foreground">No couriers are configured yet. Connected carrier integrations will appear here once onboarding is complete.</p> : null}
           </div>
         </Card>
 
@@ -271,7 +271,7 @@ export default function LogisticsPage() {
                 </div>
               </div>
             ))}
-            {!carrierBreakdown.length ? <p>No shipment volume yet.</p> : null}
+            {!carrierBreakdown.length ? <p className="text-sm text-muted-foreground">Courier performance will appear here once shipments begin routing through live carriers.</p> : null}
           </div>
         </Card>
       </div>
@@ -299,7 +299,7 @@ export default function LogisticsPage() {
             <div className="rounded-2xl border border-border/60 px-4 py-3">
               <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Average delivery</p>
               <p className="mt-2 text-xl font-semibold text-foreground">
-                {deliveryStats.avgDeliveryDays ? `${deliveryStats.avgDeliveryDays.toFixed(1)} days` : "No data yet"}
+                {deliveryStats.avgDeliveryDays ? `${deliveryStats.avgDeliveryDays.toFixed(1)} days` : "Awaiting delivery history"}
               </p>
             </div>
             <div className="rounded-2xl border border-border/60 px-4 py-3">
@@ -311,7 +311,7 @@ export default function LogisticsPage() {
             <div className="rounded-2xl border border-border/60 px-4 py-3">
               <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Success rate</p>
               <p className="mt-2 text-lg font-semibold text-foreground">
-                {deliveryStats.total ? `${deliveryStats.successRate.toFixed(1)}%` : "No data yet"}
+                {deliveryStats.total ? `${deliveryStats.successRate.toFixed(1)}%` : "Awaiting delivery history"}
               </p>
             </div>
           </div>
@@ -337,12 +337,12 @@ export default function LogisticsPage() {
               tracking: shipment.trackingNumber || "Pending",
               carrier: shipment.carrier || "Unknown",
               status: shipment.status || "CREATED",
-              latestEvent: latestEvent?.message || latestEvent?.status || "No event yet",
+              latestEvent: latestEvent?.message || latestEvent?.status || "Awaiting the first carrier update",
             };
           })}
         />
         {!filteredShipments.length ? (
-          <p className="mt-3 text-sm text-muted-foreground">No shipments match the current filters.</p>
+          <p className="mt-3 text-sm text-muted-foreground">No shipments match the current filters. Broaden the search or wait for new carrier activity.</p>
         ) : null}
       </Card>
     </div>
@@ -373,3 +373,4 @@ function downloadCsv(csv: string, filename: string) {
   document.body.removeChild(link);
   window.URL.revokeObjectURL(url);
 }
+

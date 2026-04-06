@@ -1,19 +1,20 @@
 ﻿import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { DokanXLogo } from "../components/dokanx-logo";
 import { useMerchantNavigation } from "../navigation/merchant-navigation";
 import { getMerchantPalette, useMerchantUiStore, useResolvedMerchantTheme } from "../store/ui-store";
 
 const ITEMS = [
   { label: "Dashboard", labelBn: "ড্যাশবোর্ড", screen: "MerchantDashboard" },
   { label: "AI", labelBn: "এআই", screen: "MerchantAi" },
-  { label: "POS", labelBn: "পজ", screen: "MerchantPos" },
+  { label: "POS", labelBn: "পিওএস", screen: "MerchantPos" },
   { label: "Orders", labelBn: "অর্ডার", screen: "MerchantOrders" },
   { label: "Wallet", labelBn: "ওয়ালেট", screen: "MerchantWallet" },
   { label: "Finance", labelBn: "ফিন্যান্স", screen: "MerchantFinance" },
   { label: "Credit", labelBn: "ক্রেডিট", screen: "MerchantCredit" },
   { label: "Customers", labelBn: "কাস্টমার", screen: "MerchantCustomers" },
-  { label: "Products", labelBn: "পণ্য", screen: "MerchantProducts" },
+  { label: "Products", labelBn: "প্রোডাক্ট", screen: "MerchantProducts" },
   { label: "Alerts", labelBn: "এলার্ট", screen: "MerchantNotifications" },
   { label: "Marketing", labelBn: "মার্কেটিং", screen: "MerchantMarketing" },
   { label: "Settings", labelBn: "সেটিংস", screen: "MerchantSettings" },
@@ -28,8 +29,8 @@ export function MerchantTopNav({ active }: { active: string }) {
   const labels = language === "bn"
     ? {
         title: "মার্চেন্ট টুলস",
-        helper: collapsed ? "আরও জায়গার জন্য টুলস লুকানো আছে" : "স্ক্রিন বদলাতে একটি টুল চাপুন",
-        toggleShow: "দেখান",
+        helper: collapsed ? "আরও জায়গার জন্য টুলস লুকানো আছে" : "যে টুল লাগবে সেটিতে ট্যাপ করুন",
+        toggleShow: "খুলুন",
         toggleHide: "লুকান",
       }
     : {
@@ -42,9 +43,14 @@ export function MerchantTopNav({ active }: { active: string }) {
   return (
     <View style={[styles.wrapper, { backgroundColor: palette.surface, borderColor: palette.border }] }>
       <View style={styles.headerRow}>
-        <View style={styles.headerTextWrap}>
-          <Text style={[styles.label, { color: palette.accentText }]}>{labels.title}</Text>
-          <Text style={[styles.helper, { color: palette.muted }]}>{labels.helper}</Text>
+        <View style={styles.headerBrandWrap}>
+          <View style={[styles.logoBadge, { borderColor: palette.border, backgroundColor: palette.surfaceAlt }]}>
+            <DokanXLogo variant="icon" size="sm" />
+          </View>
+          <View style={styles.headerTextWrap}>
+            <Text style={[styles.label, { color: palette.accent }]}>{labels.title}</Text>
+            <Text style={[styles.helper, { color: palette.muted }]}>{labels.helper}</Text>
+          </View>
         </View>
         <Pressable
           style={[styles.toggleButton, { borderColor: palette.border, backgroundColor: palette.surfaceAlt }]}
@@ -92,6 +98,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
+  headerBrandWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  logoBadge: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 2,
+  },
   headerTextWrap: {
     flex: 1,
     gap: 4,
@@ -104,15 +121,16 @@ const styles = StyleSheet.create({
   },
   helper: {
     fontSize: 11,
+    lineHeight: 16,
   },
   toggleButton: {
+    borderWidth: 1,
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderWidth: 1,
   },
   toggleButtonText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "700",
   },
   grid: {
@@ -121,16 +139,16 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   pill: {
-    minWidth: "31%",
-    flexGrow: 1,
+    minWidth: "23%",
+    borderWidth: 1,
+    borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   text: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "700",
-    textAlign: "center",
   },
 });

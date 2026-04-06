@@ -194,15 +194,29 @@ export default function OrdersPage() {
 
   return (
     <div className="grid gap-6">
-      <div>
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Admin</p>
-        <h1 className="dx-display text-3xl">Fraud Detection</h1>
-        <p className="text-sm text-muted-foreground">
-          Payment fraud, fake order risk, suspicious users, and merchant abuse in one review queue.
-        </p>
+      <div className="rounded-[28px] border border-white/10 bg-[#0B1E3C] px-6 py-6 text-white shadow-[0_24px_60px_rgba(11,30,60,0.24)]">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-3xl space-y-2">
+            <p className="text-xs uppercase tracking-[0.24em] text-[#FFD49F]">DokanX Admin</p>
+            <h1 className="dx-display text-3xl">Fraud Detection</h1>
+            <p className="text-sm text-slate-200">
+              Review payment fraud, fake order risk, suspicious users, and merchant abuse from one investigation queue.
+            </p>
+          </div>
+          <Badge variant="secondary" className="border-white/15 bg-white/10 text-white">
+            {allCases.length} cases
+          </Badge>
+        </div>
       </div>
 
       <AnalyticsCards items={cards} />
+
+      <Card>
+        <CardTitle>Fraud operations map</CardTitle>
+        <CardDescription className="mt-2">
+          Start with live alerts and analytics, then move into the review console to approve, investigate, or rescore flagged activity.
+        </CardDescription>
+      </Card>
 
       {loading ? <Alert variant="info">Loading fraud controls...</Alert> : null}
 
@@ -255,7 +269,7 @@ export default function OrdersPage() {
                 ) : null}
               </div>
             ))}
-            {!claims.length ? <p>No warranty claims found.</p> : null}
+            {!claims.length ? <p>No warranty claims are waiting in this queue right now.</p> : null}
           </div>
         </Card>
 
@@ -282,7 +296,7 @@ export default function OrdersPage() {
                 </p>
               </button>
             ))}
-            {!loading && !(alerts.length || overview?.alerts?.length) ? <p>No active fraud alerts.</p> : null}
+            {!loading && !(alerts.length || overview?.alerts?.length) ? <p>No active fraud alerts are open right now.</p> : null}
           </div>
         </Card>
 
@@ -303,7 +317,7 @@ export default function OrdersPage() {
                     {signal.code} {signal.count}
                   </Badge>
                 ))}
-                {!overview?.analytics?.topSignals?.length ? <span>No signal data yet.</span> : null}
+                {!overview?.analytics?.topSignals?.length ? <span>No signal data has been generated yet.</span> : null}
               </div>
             </div>
             <div className="rounded-2xl border border-border/60 px-4 py-3">
@@ -403,7 +417,7 @@ export default function OrdersPage() {
                       {signal.label} +{signal.weight ?? 0}
                     </Badge>
                   ))}
-                  {!selectedCase.signals?.length ? <span>No fraud signals listed.</span> : null}
+                  {!selectedCase.signals?.length ? <span>No fraud signals are listed for this case yet.</span> : null}
                 </div>
               </div>
 
@@ -449,7 +463,7 @@ export default function OrdersPage() {
               </div>
             </div>
           ) : (
-            <p className="mt-4 text-sm text-muted-foreground">Select a fraud case to review.</p>
+            <p className="mt-4 text-sm text-muted-foreground">Select a fraud case to begin detailed review.</p>
           )}
         </Card>
       </div>
@@ -615,3 +629,6 @@ function toOptionalString(...values: unknown[]): string | undefined {
 function firstString(...values: unknown[]): string {
   return toOptionalString(...values) || "";
 }
+
+
+

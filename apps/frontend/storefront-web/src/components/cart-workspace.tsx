@@ -155,7 +155,7 @@ export function CartWorkspace({ initialCart, initialProducts }: CartWorkspacePro
   async function persistCart(nextItems: RuntimeCartItem[], successMessage: string) {
     const nextShopId = String(nextItems[0]?.shopId || activeShopId || "");
     if (!nextShopId) {
-      setMessage("No shop context available for cart persistence.");
+      setMessage("No shop context is available for this cart yet. Select a product from a live shop to start a persisted cart session.");
       return;
     }
 
@@ -345,9 +345,9 @@ export function CartWorkspace({ initialCart, initialProducts }: CartWorkspacePro
         <div className="mt-6 grid gap-4">
           {groupedByShop.length > 1 ? (
             <div className="rounded-3xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm">
-              <p className="font-semibold">Grouped delivery view</p>
+              <p className="font-semibold">Grouped checkout</p>
               <p className="mt-1 text-muted-foreground">
-                {groupedByShop.length} shops → 1 delivery flow once the backend groups eligible routes.
+                {groupedByShop.length} shops can stay inside one checkout summary when grouped delivery is available for this route.
               </p>
             </div>
           ) : null}
@@ -376,7 +376,7 @@ export function CartWorkspace({ initialCart, initialProducts }: CartWorkspacePro
             ))
           ) : (
             <div className="rounded-3xl border border-dashed border-border/70 p-6 text-sm text-muted-foreground">
-              Cart is empty. Add one of the live products above to start a persisted cart session.
+              Your cart is empty right now. Add a live product to start a synced checkout session.
             </div>
           )}
         </div>
@@ -406,7 +406,7 @@ export function CartWorkspace({ initialCart, initialProducts }: CartWorkspacePro
           {groupedByShop.map((group) => (
             <div key={group.shopId} className="rounded-2xl border border-border/60 p-3 text-sm">
               <p className="font-medium">Shop {group.shopId === "unscoped" ? "Unknown" : group.shopId.slice(-6)}</p>
-              <p className="text-xs text-muted-foreground">{group.items.length} lines • {group.subtotal} BDT</p>
+              <p className="text-xs text-muted-foreground">{group.items.length} lines - {group.subtotal} BDT</p>
             </div>
           ))}
         </div>
@@ -432,3 +432,5 @@ export function CartWorkspace({ initialCart, initialProducts }: CartWorkspacePro
     </div>
   );
 }
+
+

@@ -7,7 +7,7 @@ const iosSourceDir = path.join(__dirname, "ios");
 const hasIosProject = fs.existsSync(iosSourceDir);
 
 module.exports = {
-  reactNativePath: "../../../node_modules/react-native",
+  reactNativePath: "../../../../node_modules/react-native",
   platforms: {
     android: {
       projectConfig: android.projectConfig,
@@ -47,6 +47,12 @@ module.exports = {
         android: null,
       },
     },
+    "react-native-vision-camera": {
+      platforms: {
+        android: null,
+      },
+    },
   },
   assets: ["./src/assets"],
 };
+

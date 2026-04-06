@@ -1,4 +1,4 @@
-﻿const mongoose = require("mongoose");
+const mongoose = require("mongoose");
 
 const productProtectionSchema = new mongoose.Schema(
   {
@@ -54,6 +54,14 @@ const productSchema = new mongoose.Schema(
     imageUrl: {
       type: String,
       default: "",
+    },
+    productionDate: {
+      type: Date,
+      default: null,
+    },
+    expiryDate: {
+      type: Date,
+      default: null,
     },
     price: {
       type: Number,

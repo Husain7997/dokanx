@@ -20,7 +20,10 @@ disableConsoleInProduction();
 initializeSentry(CUSTOMER_APP_NAME, CUSTOMER_APP_VERSION);
 
 function getBootTimestamp() {
-  const value = Number(globalThis.__DOKANX_CUSTOMER_BOOT_TS || Date.now());
+  const bootGlobal = globalThis as typeof globalThis & {
+    __DOKANX_CUSTOMER_BOOT_TS?: number;
+  };
+  const value = Number(bootGlobal.__DOKANX_CUSTOMER_BOOT_TS || Date.now());
   return Number.isFinite(value) ? value : Date.now();
 }
 
@@ -158,3 +161,5 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
+
+

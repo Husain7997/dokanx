@@ -1,7 +1,8 @@
-﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { getMerchantCreditCustomersRequest, payMerchantCreditDueRequest } from "../lib/api-client";
+import { DokanXLogo } from "../components/dokanx-logo";
 import { useMerchantAuthStore } from "../store/auth-store";
 import { MerchantTopNav } from "./merchant-top-nav";
 
@@ -171,11 +172,11 @@ export function MerchantCreditScreen() {
     <View style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
         <MerchantTopNav active="Credit" />
-        <View style={styles.headerRow}>
-          <Text style={styles.title}>Credit</Text>
+        <View style={styles.heroCard}><View style={styles.heroTop}><View style={styles.heroBrandWrap}><DokanXLogo variant="icon" size="sm" /><View style={styles.heroBrandCopy}><Text style={styles.heroEyebrow}>Credit operations</Text>
+          <Text style={styles.title}>Credit</Text></View></View>
           <Pressable style={styles.refreshButton} onPress={() => void loadCredit()}><Text style={styles.refreshButtonText}>{isLoading ? "Refreshing..." : "Refresh"}</Text></Pressable>
         </View>
-        <Text style={styles.helperText}>Customer dues and repayment history are live. Online repayment stays pending until webhook confirmation.</Text>
+        <Text style={styles.helperText}>Customer dues, risk signals, and repayment history are live. Online repayment stays pending until webhook confirmation.</Text></View>
 
         <View style={styles.summaryRow}>
           <View style={styles.summaryCard}><Text style={styles.summaryLabel}>Total due</Text><Text style={styles.summaryValue}>{formatMoney(totals.outstanding)}</Text><Text style={styles.summaryMeta}>Across all customers</Text></View>
@@ -184,18 +185,18 @@ export function MerchantCreditScreen() {
         </View>
 
         <View style={styles.queueCard}>
-          <Text style={styles.queueTitle}>Collection queue</Text>
-          <Text style={styles.queueHint}>Highest due customers are shown first for faster collection follow-up.</Text>
+          <Text style={styles.queueTitle}>Priority collection queue</Text>
+          <Text style={styles.queueHint}>Customers with the highest due appear first so collection follow-up can start quickly.</Text>
           {collectionQueue.map((customer) => (
             <View key={`queue-${customer.customerId}`} style={styles.queueRow}>
               <View style={styles.queueMeta}>
                 <Text style={styles.queueName}>Customer {customer.customerId.slice(-6)}</Text>
-                <Text style={styles.queueSub}>{customer.riskLevel} risk · limit {formatMoney(customer.creditLimit)}</Text>
+                <Text style={styles.queueSub}>{customer.riskLevel} risk - limit {formatMoney(customer.creditLimit)}</Text>
               </View>
               <Text style={styles.queueDue}>{formatMoney(customer.outstandingBalance)}</Text>
             </View>
           ))}
-          {!collectionQueue.length ? <Text style={styles.historyMeta}>No active collection queue right now.</Text> : null}
+          {!collectionQueue.length ? <Text style={styles.historyMeta}>No customers currently need urgent collection follow-up.</Text> : null}
         </View>
 
         <TextInput style={styles.searchInput} value={searchQuery} onChangeText={setSearchQuery} placeholder="Search customer / risk / status" placeholderTextColor="#6b7280" />
@@ -214,7 +215,7 @@ export function MerchantCreditScreen() {
                 <Text style={[styles.riskBadge, { backgroundColor: getRiskTone(customer.riskLevel).bg, color: getRiskTone(customer.riskLevel).fg }]}>{customer.riskLevel} RISK</Text>
               </View>
               <Text style={styles.riskNote}>{customer.riskNote}</Text>
-              {lastPayment ? <Text style={styles.lastPayment}>Last payment: {formatMoney(lastPayment.amount)} · {lastPayment.status}</Text> : <Text style={styles.lastPayment}>No repayment history yet.</Text>}
+              {lastPayment ? <Text style={styles.lastPayment}>Last payment: {formatMoney(lastPayment.amount)} - {lastPayment.status}</Text> : <Text style={styles.lastPayment}>No repayment history has been recorded for this customer yet.</Text>}
               <View style={styles.recommendationCard}>
                 <Text style={styles.recommendationLabel}>Decision support</Text>
                 <Text style={styles.recommendationValue}>{customer.recommendation}</Text>
@@ -247,15 +248,15 @@ export function MerchantCreditScreen() {
               {customer.paymentHistory.slice(0, 6).map((entry) => (
                 <View key={entry.id} style={styles.historyRow}>
                   <Text style={styles.historyText}>{entry.type} {formatMoney(entry.amount)}</Text>
-                  <Text style={styles.historyMeta}>{entry.status} | {entry.reference}</Text>
+                  <Text style={styles.historyMeta}>{entry.status} - {entry.reference}</Text>
                 </View>
               ))}
-              {!customer.paymentHistory.length ? <Text style={styles.historyMeta}>No repayment history yet.</Text> : null}
+              {!customer.paymentHistory.length ? <Text style={styles.historyMeta}>No repayment history has been recorded for this customer yet.</Text> : null}
             </View>
           );
         })}
 
-        {!filteredCustomers.length && !error ? <Text style={styles.emptyText}>No live credit customers returned for the current search.</Text> : null}
+        {!filteredCustomers.length && !error ? <Text style={styles.emptyText}>No live credit accounts match the current search or filter.</Text> : null}
       </ScrollView>
     </View>
   );
@@ -265,10 +266,19 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#f8f4ef" },
   container: { padding: 16, gap: 12, paddingBottom: 118 },
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  title: { fontSize: 20, fontWeight: "700", color: "#111827" },
+  heroCard: { backgroundColor: "#111827", borderRadius: 18, padding: 16, gap: 10 },
+  heroTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
+  heroBrandWrap: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
+  heroBrandCopy: { flex: 1, gap: 3 },
+  heroEyebrow: { fontSize: 11, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase", color: "#bfd2f2" },
+  heroMetrics: { flexDirection: "row", gap: 8 },
+  heroMetricCard: { flex: 1, borderRadius: 16, padding: 12, backgroundColor: "rgba(255,255,255,0.08)", gap: 4 },
+  heroMetricLabel: { color: "#bfd2f2", fontSize: 11, fontWeight: "600" },
+  heroMetricValue: { color: "#ffffff", fontSize: 17, fontWeight: "800" },
+  title: { fontSize: 20, fontWeight: "700", color: "#ffffff" },
   refreshButton: { backgroundColor: "#fff7ed", borderRadius: 10, borderWidth: 1, borderColor: "#fed7aa", paddingHorizontal: 12, paddingVertical: 8 },
   refreshButtonText: { fontSize: 12, fontWeight: "600", color: "#9a3412" },
-  helperText: { fontSize: 12, color: "#6b7280" },
+  helperText: { fontSize: 12, color: "#cbd5e1" },
   summaryRow: { flexDirection: "row", gap: 8 },
   summaryCard: { flex: 1, backgroundColor: "#ffffff", borderRadius: 16, padding: 12, borderWidth: 1, borderColor: "#e5e7eb", gap: 4 },
   summaryLabel: { fontSize: 11, color: "#6b7280", textTransform: "uppercase" },
@@ -314,3 +324,10 @@ const styles = StyleSheet.create({
   historyMeta: { fontSize: 11, color: "#9ca3af" },
   emptyText: { fontSize: 12, color: "#6b7280", textAlign: "center", paddingVertical: 20 },
 });
+
+
+
+
+
+
+

@@ -12,11 +12,11 @@ type MobileEnvironment = {
 
 const ENV_PRESETS: Record<MobileEnvironmentName, Omit<MobileEnvironment, "name" | "appVersion">> = {
   dev: {
-    apiBaseUrl: "http://localhost:5001",
-    socketUrl: "ws://localhost:5001",
+    apiBaseUrl: "http://127.0.0.1:5001",
+    socketUrl: "ws://127.0.0.1:5001",
     mapApiKey: "DEV_MAP_KEY",
     sentryDsn: "",
-    versionCheckUrl: "http://localhost:5001/api/public/mobile/version",
+    versionCheckUrl: "http://127.0.0.1:5001/api/public/mobile/version",
   },
   staging: {
     apiBaseUrl: "https://staging-api.dokanx.com",
@@ -35,14 +35,8 @@ const ENV_PRESETS: Record<MobileEnvironmentName, Omit<MobileEnvironment, "name" 
 };
 
 function normalizeEnvName(value?: string | null): MobileEnvironmentName {
-  if (value === "prod" || value === "production") {
-    return "prod";
-  }
-
-  if (value === "staging") {
-    return "staging";
-  }
-
+  if (value === "prod" || value === "production") return "prod";
+  if (value === "staging") return "staging";
   return "dev";
 }
 
@@ -64,4 +58,3 @@ export function getCurrentEnvironment(appVersion = "1.0.0"): MobileEnvironment {
     appVersion,
   };
 }
-

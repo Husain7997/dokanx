@@ -128,7 +128,7 @@ export function AdminFinanceOverview() {
             <span>Payout {latest.payout} BDT</span>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">No settlement data yet.</p>
+          <p className="text-sm text-muted-foreground">No settlement data is available yet.</p>
         )}
       </div>
 
@@ -176,3 +176,4 @@ function downloadCsv(csv: string, filename: string) {
   document.body.removeChild(link);
   window.URL.revokeObjectURL(url);
 }
+

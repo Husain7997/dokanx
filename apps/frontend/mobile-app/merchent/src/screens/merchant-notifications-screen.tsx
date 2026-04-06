@@ -82,7 +82,7 @@ export function MerchantNotificationsScreen() {
       await markMerchantNotificationReadRequest(accessToken, id);
       setNotifications((current) => current.map((item) => item._id === id ? { ...item, isRead: true } : item));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to update notification.");
+      setError(err instanceof Error ? err.message : "Unable to update this notification right now.");
     }
   }
 
@@ -92,7 +92,7 @@ export function MerchantNotificationsScreen() {
       await markAllMerchantNotificationsReadRequest(accessToken);
       setNotifications((current) => current.map((item) => ({ ...item, isRead: true })));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to update notifications.");
+      setError(err instanceof Error ? err.message : "Unable to update these notifications right now.");
     }
   }
 
@@ -110,7 +110,7 @@ export function MerchantNotificationsScreen() {
     try {
       await updateMerchantNotificationSettingsRequest(accessToken, next);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to save settings.");
+      setError(err instanceof Error ? err.message : "Unable to save notification settings right now.");
       setSettings(settings);
     } finally {
       setSaving(false);
@@ -131,8 +131,8 @@ export function MerchantNotificationsScreen() {
         <MerchantTopNav active="Notifications" />
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.title}>Notifications</Text>
-            <Text style={styles.subtitle}>{loading ? "Loading..." : `Unread ${unreadCount}`}</Text>
+            <Text style={styles.title}>Notification operations</Text>
+            <Text style={styles.subtitle}>{loading ? "Loading inbox..." : `Unread ${unreadCount}`}</Text>
           </View>
           <Pressable style={styles.refreshButton} onPress={() => void load()}>
             <Text style={styles.refreshButtonText}>Refresh</Text>
@@ -148,7 +148,7 @@ export function MerchantNotificationsScreen() {
         </View>
 
         <Pressable style={styles.secondaryButton} onPress={() => void handleMarkAllRead()}>
-          <Text style={styles.secondaryButtonText}>Mark all read</Text>
+          <Text style={styles.secondaryButtonText}>Mark all as read</Text>
         </Pressable>
 
         {error ? <View style={styles.alertError}><Text style={styles.alertTitle}>Notifications unavailable</Text><Text style={styles.alertBody}>{error}</Text></View> : null}
@@ -168,11 +168,11 @@ export function MerchantNotificationsScreen() {
               ) : null}
             </View>
           ))}
-          {!filteredNotifications.length && !loading ? <Text style={styles.helperText}>No notifications match the current filter.</Text> : null}
+          {!filteredNotifications.length && !loading ? <Text style={styles.helperText}>No notifications match the current filter or inbox state.</Text> : null}
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Channels</Text>
+          <Text style={styles.sectionTitle}>Delivery channels</Text>
           {Object.entries(settings.channels).map(([key, value]) => (
             <Pressable key={key} style={styles.toggleRow} onPress={() => void handleToggle("channels", key)}>
               <Text style={styles.toggleLabel}>{key}</Text>
@@ -182,7 +182,7 @@ export function MerchantNotificationsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Categories</Text>
+          <Text style={styles.sectionTitle}>Alert categories</Text>
           {Object.entries(settings.categories).map(([key, value]) => (
             <Pressable key={key} style={styles.toggleRow} onPress={() => void handleToggle("categories", key)}>
               <Text style={styles.toggleLabel}>{key}</Text>
@@ -228,4 +228,6 @@ const styles = StyleSheet.create({
   toggleLabel: { fontSize: 12, color: "#111827", textTransform: "capitalize" },
   toggleValue: { fontSize: 12, fontWeight: "700", color: "#9a3412" },
 });
+
+
 

@@ -5,14 +5,14 @@ apply plugin: 'com.facebook.react'
 def appRoot = new File(projectDir, '../..').canonicalFile
 def appsRoot = new File(projectDir, '../../../../..').canonicalFile
 def repoRoot = new File(projectDir, '../../../../../..').canonicalFile
-ext.REACT_NATIVE_NODE_MODULES_DIR = new File(appsRoot, 'node_modules/react-native').canonicalPath
+ext.REACT_NATIVE_NODE_MODULES_DIR = new File(repoRoot, 'node_modules/react-native').canonicalPath
 
 react {
     debuggableVariants = ['debug']
     entryFile = file('../../index.js')
     root = appRoot
-    reactNativeDir = new File(appsRoot, 'node_modules/react-native').canonicalFile
-    codegenDir = new File(appsRoot, 'node_modules/@react-native/codegen').canonicalFile
+    reactNativeDir = new File(repoRoot, 'node_modules/react-native').canonicalFile
+    codegenDir = new File(repoRoot, 'node_modules/@react-native/codegen').canonicalFile
     cliFile = new File(repoRoot, 'apps/frontend/mobile-app/shared/react-native-bundle-cli.js').canonicalFile
     hermesCommand = new File(repoRoot, 'node_modules/hermes-compiler/hermesc/%OS-BIN%/hermesc').path
     nodeExecutableAndArgs = ['node', '--max-old-space-size=4096']
@@ -79,6 +79,11 @@ android {
 
 dependencies {
     implementation('com.facebook.react:react-android')
+    implementation 'androidx.camera:camera-core:1.4.2'
+    implementation 'androidx.camera:camera-camera2:1.4.2'
+    implementation 'androidx.camera:camera-lifecycle:1.4.2'
+    implementation 'androidx.camera:camera-view:1.4.2'
+    implementation 'com.google.mlkit:barcode-scanning:17.3.0'
 
     if (hermesEnabled.toBoolean()) {
         implementation('com.facebook.react:hermes-android')

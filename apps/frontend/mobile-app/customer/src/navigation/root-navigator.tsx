@@ -1,8 +1,28 @@
-import {createNativeStackNavigator} from "@react-navigation/native-stack";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
-import {HomeScreen} from "../screens/home-screen";
+import { HomeScreen } from "../screens/home-screen";
 
-const Stack = createNativeStackNavigator();
+export type RootStackParamList = {
+  Home: undefined;
+  Auth: undefined;
+  ShopSelect: undefined;
+  Browse: undefined;
+  MapDiscovery: undefined;
+  SearchResults: undefined;
+  LiveChat: undefined;
+  Cart: undefined;
+  Checkout: undefined;
+  OrderTracking:
+    | {
+        orderId?: string;
+        watchPayment?: boolean;
+        paymentUrl?: string;
+        paymentProvider?: string;
+      }
+    | undefined;
+};
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export function RootNavigator() {
   return (

@@ -1,8 +1,9 @@
-﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { getMerchantWalletLedgerRequest, getMerchantWalletSummaryRequest } from "../lib/api-client";
+import { getMerchantWalletLedgerRequest, getMerchantWalletSummaryRequest, topupMerchantWalletRequest } from "../lib/api-client";
 import { useMerchantAuthStore } from "../store/auth-store";
+import { DokanXLogo } from "../components/dokanx-logo";
 import { MerchantTopNav } from "./merchant-top-nav";
 
 type LedgerRow = {
@@ -25,9 +26,7 @@ function groupLabel(value: string) {
 }
 
 function getEntryTone(amount: number) {
-  return amount >= 0
-    ? { bg: "#dcfce7", fg: "#166534", sign: "+" }
-    : { bg: "#fee2e2", fg: "#991b1b", sign: "-" };
+  return amount >= 0 ? { bg: "#dcfce7", fg: "#166534", sign: "+" } : { bg: "#fee2e2", fg: "#991b1b", sign: "-" };
 }
 
 function formatMoney(value: number) {
@@ -44,8 +43,12 @@ export function MerchantWalletScreen() {
   const [filter, setFilter] = useState<typeof FILTERS[number]>("ALL");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [topupAmount, setTopupAmount] = useState("");
+  const [topupSource, setTopupSource] = useState<"BANK" | "BKASH" | "NAGAD">("BANK");
+  const [topupReference, setTopupReference] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
 
   const loadWallet = useCallback(async () => {
     if (!accessToken) {
@@ -81,7 +84,7 @@ export function MerchantWalletScreen() {
         createdAt: String(row.createdAt || ""),
       })).filter((row) => row.id));
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Unable to load wallet data.");
+      setError(loadError instanceof Error ? loadError.message : "Unable to load wallet data right now.");
       setBalance(0);
       setAvailableBalance(0);
       setCashBalance(0);
@@ -95,6 +98,28 @@ export function MerchantWalletScreen() {
   useEffect(() => {
     void loadWallet();
   }, [loadWallet]);
+
+  async function handleTopup() {
+    if (!accessToken) return;
+    if (Number(topupAmount || 0) <= 0) {
+      setError("Add money amount must be greater than zero.");
+      return;
+    }
+    try {
+      await topupMerchantWalletRequest(accessToken, {
+        amount: Number(topupAmount || 0),
+        referenceId: `${topupSource.toLowerCase()}-${topupReference.trim() || Date.now()}`,
+        reference: topupReference.trim() || topupSource,
+      });
+      setStatus("Wallet top-up submitted and reloaded from backend.");
+      setTopupAmount("");
+      setTopupReference("");
+      setError(null);
+      await loadWallet();
+    } catch (topupError) {
+      setError(topupError instanceof Error ? topupError.message : "Unable to add money right now. Please try again in a moment.");
+    }
+  }
 
   const summary = useMemo(() => ledger.reduce((acc, entry) => {
     if (entry.amount >= 0) acc.income += entry.amount;
@@ -122,9 +147,23 @@ export function MerchantWalletScreen() {
       <ScrollView contentContainerStyle={styles.container}>
         <MerchantTopNav active="Wallet" />
         <View style={styles.hero}>
-          <Text style={styles.heroLabel}>Wallet balance</Text>
-          <Text style={styles.heroValue}>{formatMoney(balance)}</Text>
-          <Text style={styles.heroHint}>Available {formatMoney(availableBalance)}</Text>
+          <View style={styles.heroTop}>
+            <View style={styles.heroBrandWrap}>
+              <DokanXLogo variant="icon" size="sm" />
+              <View style={styles.heroBrandCopy}>
+                <Text style={styles.heroLabel}>Wallet operations</Text>
+                <Text style={styles.heroValue}>{formatMoney(balance)}</Text>
+              </View>
+            </View>
+            <Pressable style={styles.heroRefreshButton} onPress={() => void loadWallet()}>
+              <Text style={styles.heroRefreshText}>{isLoading ? "Refreshing..." : "Refresh"}</Text>
+            </Pressable>
+          </View>
+          <Text style={styles.heroHint}>Available {formatMoney(availableBalance)} with live cash, bank, and credit visibility across the active ledger.</Text>
+          <View style={styles.heroMetrics}>
+            <View style={styles.heroMetricCard}><Text style={styles.heroMetricLabel}>Cash</Text><Text style={styles.heroMetricValue}>{formatMoney(cashBalance)}</Text></View>
+            <View style={styles.heroMetricCard}><Text style={styles.heroMetricLabel}>Credit</Text><Text style={styles.heroMetricValue}>{formatMoney(creditBalance)}</Text></View>
+          </View>
         </View>
 
         <View style={styles.summaryRow}>
@@ -143,7 +182,27 @@ export function MerchantWalletScreen() {
             <View style={styles.daybookMetric}><Text style={styles.summaryLabel}>Cash flow</Text><Text style={styles.summaryValue}>{bookSummary.cash >= 0 ? "+" : "-"}{formatMoney(bookSummary.cash)}</Text></View>
             <View style={styles.daybookMetric}><Text style={styles.summaryLabel}>Bank flow</Text><Text style={styles.summaryValue}>{bookSummary.bank >= 0 ? "+" : "-"}{formatMoney(bookSummary.bank)}</Text></View>
           </View>
-          <Text style={styles.daybookHint}>এই view থেকে cashbook এবং bankbook আলাদা করে দেখা যায়।</Text>
+          <Text style={styles.daybookHint}>Use this split to understand cashbook versus bankbook movement before settlements and payouts.</Text>
+        </View>
+
+        {error ? <View style={styles.alertError}><Text style={styles.alertTitle}>Wallet unavailable</Text><Text style={styles.alertBody}>{error}</Text></View> : null}
+        {status ? <View style={styles.alertInfo}><Text style={styles.alertBody}>{status}</Text></View> : null}
+
+        <View style={styles.filterCard}>
+          <Text style={styles.filterTitle}>Add money</Text>
+          <Text style={styles.daybookHint}>Record incoming balance from a bank transfer or settlement, then reload the wallet from backend.</Text>
+          <View style={styles.filterRow}>
+            {["BANK", "BKASH", "NAGAD"].map((item) => (
+              <Pressable key={item} style={[styles.filterPill, topupSource === item ? styles.filterPillActive : null]} onPress={() => setTopupSource(item as "BANK" | "BKASH" | "NAGAD")}>
+                <Text style={[styles.filterText, topupSource === item ? styles.filterTextActive : null]}>{item}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <TextInput style={styles.input} value={topupAmount} onChangeText={setTopupAmount} placeholder="Amount to add" placeholderTextColor="#6b7280" keyboardType="numeric" />
+          <TextInput style={styles.input} value={topupReference} onChangeText={setTopupReference} placeholder="Bank transaction ID / settlement ref" placeholderTextColor="#6b7280" autoCapitalize="none" />
+          <Pressable style={styles.refreshButton} onPress={() => void handleTopup()}>
+            <Text style={styles.refreshButtonText}>Add money</Text>
+          </Pressable>
         </View>
 
         <View style={styles.filterCard}>
@@ -161,8 +220,6 @@ export function MerchantWalletScreen() {
             <Text style={styles.refreshButtonText}>{isLoading ? "Refreshing..." : "Apply filters"}</Text>
           </Pressable>
         </View>
-
-        {error ? <View style={styles.alertError}><Text style={styles.alertTitle}>Wallet unavailable</Text><Text style={styles.alertBody}>{error}</Text></View> : null}
 
         {Object.entries(groupedLedger).map(([group, entries]) => (
           <View key={group} style={styles.groupSection}>
@@ -186,7 +243,7 @@ export function MerchantWalletScreen() {
           </View>
         ))}
 
-        {!ledger.length && !error ? <Text style={styles.emptyText}>No wallet ledger rows returned for the current filters.</Text> : null}
+        {!ledger.length && !error ? <Text style={styles.emptyText}>No wallet ledger rows were returned for the current filters.</Text> : null}
       </ScrollView>
     </View>
   );
@@ -195,7 +252,16 @@ export function MerchantWalletScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#f8f4ef" },
   container: { padding: 16, gap: 12, paddingBottom: 118 },
-  hero: { backgroundColor: "#111827", borderRadius: 18, padding: 18, gap: 6 },
+  hero: { backgroundColor: "#0B1E3C", borderRadius: 24, padding: 18, gap: 10, borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" },
+  heroTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
+  heroBrandWrap: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
+  heroBrandCopy: { flex: 1, gap: 3 },
+  heroRefreshButton: { borderRadius: 999, borderWidth: 1, borderColor: "rgba(255,255,255,0.14)", backgroundColor: "rgba(255,255,255,0.08)", paddingHorizontal: 12, paddingVertical: 8 },
+  heroRefreshText: { fontSize: 12, fontWeight: "700", color: "#ffffff" },
+  heroMetrics: { flexDirection: "row", gap: 8 },
+  heroMetricCard: { flex: 1, borderRadius: 14, padding: 12, backgroundColor: "rgba(255,255,255,0.08)", gap: 4 },
+  heroMetricLabel: { color: "#bfd2f2", fontSize: 11, fontWeight: "600" },
+  heroMetricValue: { color: "#ffffff", fontSize: 15, fontWeight: "800" },
   heroLabel: { fontSize: 12, color: "#d1d5db", textTransform: "uppercase" },
   heroValue: { fontSize: 24, fontWeight: "700", color: "#ffffff" },
   heroHint: { fontSize: 12, color: "#d1d5db" },
@@ -218,6 +284,7 @@ const styles = StyleSheet.create({
   refreshButton: { borderRadius: 10, borderWidth: 1, borderColor: "#fed7aa", paddingHorizontal: 12, paddingVertical: 10, backgroundColor: "#fff7ed", alignSelf: "flex-start" },
   refreshButtonText: { fontSize: 12, fontWeight: "600", color: "#9a3412" },
   alertError: { backgroundColor: "#fef2f2", borderColor: "#fecaca", borderWidth: 1, borderRadius: 14, padding: 14, gap: 6 },
+  alertInfo: { backgroundColor: "#eff6ff", borderColor: "#bfdbfe", borderWidth: 1, borderRadius: 14, padding: 14, gap: 6 },
   alertTitle: { fontSize: 13, fontWeight: "700", color: "#991b1b" },
   alertBody: { fontSize: 12, color: "#374151" },
   groupSection: { gap: 8 },
@@ -232,5 +299,8 @@ const styles = StyleSheet.create({
   amount: { fontSize: 13, fontWeight: "700", paddingHorizontal: 10, paddingVertical: 8, borderRadius: 999, overflow: "hidden", alignSelf: "flex-start" },
   emptyText: { fontSize: 12, color: "#6b7280", textAlign: "center", paddingVertical: 20 },
 });
+
+
+
 
 

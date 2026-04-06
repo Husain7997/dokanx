@@ -47,7 +47,7 @@ export default function PaymentsPage() {
       { label: "Total attempts", value: String(total), meta: "Recent payments" },
       { label: "Success", value: String(success), meta: "Completed" },
       { label: "Pending", value: String(pending), meta: "Awaiting confirmation" },
-      { label: "Failed", value: String(failed), meta: "Needs retry" },
+      { label: "Failed", value: String(failed), meta: "Needs operator review" },
     ];
   }, [payments]);
 
@@ -56,7 +56,7 @@ export default function PaymentsPage() {
       <AnalyticsCards items={cards} />
       <Card>
         <CardTitle>Payment logs</CardTitle>
-        <CardDescription className="mt-2">Monitor payment attempts and settlement signals.</CardDescription>
+        <CardDescription className="mt-2">Monitor payment attempts, gateway outcomes, and settlement signals from one review surface.</CardDescription>
         <div className="mt-4 flex flex-wrap gap-2">
           {["ALL", "SUCCESS", "PENDING", "FAILED"].map((value) => (
             <button
@@ -80,10 +80,12 @@ export default function PaymentsPage() {
             </div>
           ))}
           {!payments.length && !error ? (
-            <p>No payment attempts yet.</p>
+            <p className="text-sm text-muted-foreground">No payment attempts have been recorded in this filter yet. New checkout activity will appear here as customers submit payments.</p>
           ) : null}
         </div>
       </Card>
     </div>
   );
 }
+
+

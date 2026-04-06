@@ -1,25 +1,13 @@
+import React, { useEffect } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { MerchantAiScreen } from "../screens/merchant-ai-screen";
-import { MerchantAuthScreen } from "../screens/merchant-auth-screen";
-import { MerchantCreditScreen } from "../screens/merchant-credit-screen";
-import { MerchantCustomersScreen } from "../screens/merchant-customers-screen";
-import { MerchantDashboardScreen } from "../screens/merchant-dashboard-screen";
-import { MerchantFinanceScreen } from "../screens/merchant-finance-screen";
-import { MerchantMarketingScreen } from "../screens/merchant-marketing-screen";
-import { MerchantNotificationsScreen } from "../screens/merchant-notifications-screen";
-import { MerchantOrdersScreen } from "../screens/merchant-orders-screen";
-import { MerchantPosScreen } from "../screens/merchant-pos-screen";
-import { MerchantProductsScreen } from "../screens/merchant-products-screen";
-import { MerchantSettingsScreen } from "../screens/merchant-settings-screen";
-import { MerchantWalletScreen } from "../screens/merchant-wallet-screen";
 import { MerchantNavigationProvider, MerchantScreenName, useMerchantNavigation } from "./merchant-navigation";
 import { useMerchantAuthStore } from "../store/auth-store";
-import { getMerchantPalette, useMerchantUiStore, useResolvedMerchantTheme } from "../store/ui-store";
+import { useMerchantPosStore } from "../store/pos-store";
 
 const DOCK_TRANSLATIONS = {
   en: { Home: "Home", POS: "POS", Orders: "Orders", Wallet: "Wallet", Finance: "Finance" },
-  bn: { Home: "হোম", POS: "পজ", Orders: "অর্ডার", Wallet: "ওয়ালেট", Finance: "ফিন্যান্স" },
+  bn: { Home: "???", POS: "??", Orders: "??????", Wallet: "??????", Finance: "?????????" },
 } as const;
 
 const DOCK_ITEMS: Array<{ key: keyof typeof DOCK_TRANSLATIONS.en; screen: MerchantScreenName }> = [
@@ -35,47 +23,45 @@ function MerchantScreenRenderer() {
 
   switch (currentScreen) {
     case "MerchantAi":
-      return <MerchantAiScreen />;
+      return React.createElement(require("../screens/merchant-ai-screen").MerchantAiScreen);
     case "MerchantPos":
-      return <MerchantPosScreen />;
+      return React.createElement(require("../screens/merchant-pos-screen").MerchantPosScreen);
     case "MerchantOrders":
-      return <MerchantOrdersScreen />;
+      return React.createElement(require("../screens/merchant-orders-screen").MerchantOrdersScreen);
     case "MerchantWallet":
-      return <MerchantWalletScreen />;
+      return React.createElement(require("../screens/merchant-wallet-screen").MerchantWalletScreen);
     case "MerchantFinance":
-      return <MerchantFinanceScreen />;
+      return React.createElement(require("../screens/merchant-finance-screen").MerchantFinanceScreen);
     case "MerchantCredit":
-      return <MerchantCreditScreen />;
+      return React.createElement(require("../screens/merchant-credit-screen").MerchantCreditScreen);
     case "MerchantCustomers":
-      return <MerchantCustomersScreen />;
+      return React.createElement(require("../screens/merchant-customers-screen").MerchantCustomersScreen);
     case "MerchantProducts":
-      return <MerchantProductsScreen />;
+      return React.createElement(require("../screens/merchant-products-screen").MerchantProductsScreen);
     case "MerchantNotifications":
-      return <MerchantNotificationsScreen />;
+      return React.createElement(require("../screens/merchant-notifications-screen").MerchantNotificationsScreen);
     case "MerchantMarketing":
-      return <MerchantMarketingScreen />;
+      return React.createElement(require("../screens/merchant-marketing-screen").MerchantMarketingScreen);
     case "MerchantSettings":
-      return <MerchantSettingsScreen />;
+      return React.createElement(require("../screens/merchant-settings-screen").MerchantSettingsScreen);
     case "MerchantDashboard":
     default:
-      return <MerchantDashboardScreen />;
+      return React.createElement(require("../screens/merchant-dashboard-screen").MerchantDashboardScreen);
   }
 }
 
 function MerchantBottomDock() {
   const { currentScreen, navigate } = useMerchantNavigation();
-  const language = useMerchantUiStore((state) => state.language);
-  const palette = getMerchantPalette(useResolvedMerchantTheme());
-  const labels = DOCK_TRANSLATIONS[language];
+  const labels = DOCK_TRANSLATIONS.en;
 
   return (
     <View pointerEvents="box-none" style={styles.dockWrap}>
-      <View style={[styles.dock, { backgroundColor: palette.dock, borderColor: palette.border }] }>
+      <View style={styles.dock}>
         {DOCK_ITEMS.map((item) => {
           const active = currentScreen === item.screen;
           return (
-            <Pressable key={item.key} style={[styles.dockItem, active ? { backgroundColor: palette.accent } : null]} onPress={() => navigate(item.screen)}>
-              <Text style={[styles.dockText, { color: active ? palette.accentText : palette.dockText }]}>{labels[item.key]}</Text>
+            <Pressable key={item.key} style={[styles.dockItem, active ? styles.dockItemActive : null]} onPress={() => navigate(item.screen)}>
+              <Text style={[styles.dockText, active ? styles.dockTextActive : null]}>{labels[item.key]}</Text>
             </Pressable>
           );
         })}
@@ -85,36 +71,40 @@ function MerchantBottomDock() {
 }
 
 function MerchantShell() {
-  const palette = getMerchantPalette(useResolvedMerchantTheme());
+  const { currentScreen } = useMerchantNavigation();
+  const scannerActive = useMerchantPosStore((state) => state.scannerActive);
+  const hideDock = currentScreen === "MerchantPos" && scannerActive;
 
   return (
-    <View style={[styles.shell, { backgroundColor: palette.screen }]}>
+    <View style={styles.shell}>
       <MerchantScreenRenderer />
-      <MerchantBottomDock />
+      {hideDock ? null : <MerchantBottomDock />}
     </View>
   );
 }
 
 export function RootNavigator() {
+  const hydrate = useMerchantAuthStore((state) => state.hydrate);
   const accessToken = useMerchantAuthStore((state) => state.accessToken);
   const isHydrated = useMerchantAuthStore((state) => state.isHydrated);
-  const isUiHydrated = useMerchantUiStore((state) => state.isHydrated);
 
-  if (!isHydrated || !isUiHydrated || !accessToken) {
-    return <MerchantAuthScreen />;
+  useEffect(() => {
+    void hydrate();
+  }, [hydrate]);
+
+  if (!isHydrated || !accessToken) {
+    return React.createElement(require("../screens/merchant-auth-screen").MerchantAuthScreen);
   }
 
-  const initialScreen: MerchantScreenName = "MerchantDashboard";
-
   return (
-    <MerchantNavigationProvider initialScreen={initialScreen}>
+    <MerchantNavigationProvider initialScreen="MerchantDashboard">
       <MerchantShell />
     </MerchantNavigationProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  shell: { flex: 1 },
+  shell: { flex: 1, backgroundColor: "#f4f7fb" },
   dockWrap: {
     position: "absolute",
     left: 0,
@@ -132,6 +122,8 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 8,
     borderWidth: 1,
+    borderColor: "#d7dfea",
+    backgroundColor: "rgba(11,30,60,0.96)",
   },
   dockItem: {
     flex: 1,
@@ -140,8 +132,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 6,
   },
+  dockItemActive: { backgroundColor: "#ff7a00" },
   dockText: {
     fontSize: 11,
     fontWeight: "700",
+    color: "#f8fafc",
   },
+  dockTextActive: { color: "#ffffff" },
 });

@@ -80,31 +80,31 @@ export function useResolvedMerchantTheme() {
 export function getMerchantPalette(theme: "light" | "dark") {
   if (theme === "dark") {
     return {
-      screen: "#0b1220",
-      surface: "#111827",
-      surfaceAlt: "#172033",
-      border: "#243041",
-      text: "#f9fafb",
-      muted: "#9ca3af",
-      accent: "#fbbf24",
-      accentText: "#111827",
-      dock: "rgba(15,23,42,0.98)",
-      dockText: "#f9fafb",
-      card: "#111827",
+      screen: "#08162D",
+      surface: "#0B1E3C",
+      surfaceAlt: "#132A4E",
+      border: "#25436D",
+      text: "#F8FAFC",
+      muted: "#B8C4D6",
+      accent: "#FF7A00",
+      accentText: "#FFFFFF",
+      dock: "rgba(8,22,45,0.98)",
+      dockText: "#F8FAFC",
+      card: "#102444",
     };
   }
 
   return {
-    screen: "#f8f4ef",
-    surface: "#fffaf3",
-    surfaceAlt: "#ffffff",
-    border: "#eadfce",
-    text: "#111827",
-    muted: "#6b7280",
-    accent: "#fbbf24",
-    accentText: "#111827",
-    dock: "rgba(17,24,39,0.96)",
-    dockText: "#f9fafb",
-    card: "#ffffff",
+    screen: "#F4F7FB",
+    surface: "#FFFFFF",
+    surfaceAlt: "#EEF3FA",
+    border: "#D7DFEA",
+    text: "#0B1E3C",
+    muted: "#5F6F86",
+    accent: "#FF7A00",
+    accentText: "#FFFFFF",
+    dock: "rgba(11,30,60,0.96)",
+    dockText: "#F8FAFC",
+    card: "#FFFFFF",
   };
 }

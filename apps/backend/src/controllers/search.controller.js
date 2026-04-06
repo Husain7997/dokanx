@@ -5,6 +5,7 @@ const {
   searchProductsAdvanced,
   searchShopsAdvanced,
   searchSuggestions,
+  searchAISuggestions,
   searchTrending,
   searchNoResults,
   searchConversionRate,
@@ -141,20 +142,29 @@ exports.reindexDelta = async (_req, res) => {
 exports.searchSuggestions = async (req, res) => {
   const { q, limit } = req.query;
   if (!q) return res.json({ data: [], count: 0 });
+  const parsedLimit = Number(limit || 8);
+  const shopId = req.traffic?.type === "direct" ? req.traffic.scopeShopId || undefined : undefined;
   if (req.traffic?.type === "direct") {
     const scoped = await searchProductsAdvanced({
       q,
-      limit,
-      shopId: req.traffic.scopeShopId || undefined,
+      limit: parsedLimit,
+      shopId,
     });
-    const suggestions = (scoped.data || []).slice(0, Number(limit || 8)).map((item) => ({
+    const suggestions = (scoped.data || []).slice(0, parsedLimit).map((item) => ({
       id: item._id,
       name: item.name,
       entityType: "product",
     }));
     return res.json({ data: suggestions, count: suggestions.length });
   }
-  const suggestions = await searchSuggestions(String(q), Number(limit || 8));
+
+  const suggestions = await searchAISuggestions(
+    String(q),
+    parsedLimit,
+    req.user?._id || null,
+    shopId || null,
+    req.headers["x-session-id"] || req.headers["x-device-id"] || req.ip,
+  );
   res.json({ data: suggestions, count: suggestions.length });
 };
 

@@ -3,12 +3,14 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  AnalyticsCards,
   Badge,
   Button,
   Card,
   CardDescription,
   CardTitle,
   Grid,
+  Logo,
   SearchInput,
   SelectDropdown,
   ShopCard,
@@ -195,15 +197,19 @@ export function CustomerHomeWorkspace({
     [selectedCategory, selectedDistrict, selectedMarket, selectedShop, selectedThana, shops]
   );
 
-  const recommendationFeed = useMemo(() => {
-    const locationBoost = geoLocation ? "Location tuned" : "Behavior tuned";
-    return [
+  const heroStats = useMemo(
+    () => [
+      { label: "Nearby shops", value: String(filteredShops.length), meta: geoLocation ? "Location-aware discovery" : "Filtered by manual selectors" },
+      { label: "Cart subtotal", value: `${cartSummary.subtotal} BDT`, meta: `${cartSummary.itemCount} lines in cart` },
+      { label: "Open due", value: `${profileSummary?.totalDue || 0} BDT`, meta: "Across connected shops" },
       { label: "Past orders", value: String(profileSummary?.orders || 0), meta: "Used for repeat-buy ranking" },
-      { label: "Search intent", value: String(suggestions.length), meta: "Live search signals" },
-      { label: "Nearby shops", value: String(filteredShops.length), meta: locationBoost },
-      { label: "Claims", value: String(profileSummary?.claims || 0), meta: "Trust layer history" },
-    ];
-  }, [filteredShops.length, geoLocation, profileSummary?.claims, profileSummary?.orders, suggestions.length]);
+      { label: "Live suggestions", value: String(suggestions.length), meta: "Search intent signals" },
+      { label: "Claims", value: String(profileSummary?.claims || 0), meta: "Trust and support history" },
+      { label: "Traffic mode", value: traffic?.isMarketplaceEnabled === false ? "Direct" : "Marketplace", meta: "Controls discovery scope" },
+      { label: "Grouped shops", value: String(cartSummary.shops.length), meta: "Eligible for bundled checkout" },
+    ],
+    [cartSummary.itemCount, cartSummary.shops.length, cartSummary.subtotal, filteredShops.length, geoLocation, profileSummary?.claims, profileSummary?.orders, profileSummary?.totalDue, suggestions.length, traffic?.isMarketplaceEnabled]
+  );
 
   const walletWidgets = [
     { label: "Wallet balance", value: `${profileSummary?.totalIncome || 0} BDT`, meta: "Customer wallet credits" },
@@ -215,42 +221,91 @@ export function CustomerHomeWorkspace({
     },
   ];
 
+  const recommendationFeed = useMemo(() => {
+    const locationBoost = geoLocation ? "Location tuned" : "Behavior tuned";
+    return [
+      { label: "Past orders", value: String(profileSummary?.orders || 0), meta: "Used for repeat-buy ranking" },
+      { label: "Search intent", value: String(suggestions.length), meta: "Live search signals" },
+      { label: "Nearby shops", value: String(filteredShops.length), meta: locationBoost },
+      { label: "Claims", value: String(profileSummary?.claims || 0), meta: "Trust layer history" },
+    ];
+  }, [filteredShops.length, geoLocation, profileSummary?.claims, profileSummary?.orders, suggestions.length]);
+
   return (
     <div className="grid gap-6">
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.9fr)]">
-        <Card className="relative overflow-hidden">
-          <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-r from-amber-300/30 via-orange-400/15 to-transparent" />
-          <CardTitle className="text-2xl">DokanX Super App</CardTitle>
-          <CardDescription className="mt-2">
-            Search, shop discovery, cart grouping, wallet, due, and trust workflows in one customer surface.
-          </CardDescription>
-          <div className="mt-6 grid gap-4">
-            <SmartSearchBar query={query} setQuery={setQuery} suggestions={suggestions} />
-            <LocationSelector
-              districts={districts}
-              thanas={thanas}
-              markets={markets}
-              categories={categories}
-              shopNames={shopNames}
-              selectedDistrict={selectedDistrict}
-              setSelectedDistrict={setSelectedDistrict}
-              selectedThana={selectedThana}
-              setSelectedThana={setSelectedThana}
-              selectedMarket={selectedMarket}
-              setSelectedMarket={setSelectedMarket}
-              selectedCategory={selectedCategory}
-              setSelectedCategory={setSelectedCategory}
-              selectedShop={selectedShop}
-              setSelectedShop={setSelectedShop}
-            />
+      <Card className="overflow-hidden border-border/70 bg-card/92">
+        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="p-6 sm:p-8">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <Logo variant="full" size="lg" className="max-w-full" />
+                <p className="mt-4 text-xs uppercase tracking-[0.28em] text-muted-foreground">Customer super app</p>
+              </div>
+              <div className="rounded-3xl border border-border/70 bg-[linear-gradient(135deg,rgba(255,122,0,0.12),rgba(255,165,0,0.18))] p-2">
+                <Logo variant="icon" size="md" />
+              </div>
+            </div>
+            <h1 className="dx-display mt-6 text-3xl sm:text-4xl">Shop nearby stores with one calmer flow.</h1>
+            <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:text-base">Search products, compare nearby shops, keep one grouped cart, track dues, and move through checkout without bouncing between disconnected screens.</p>
+            <div className="mt-5 grid gap-4">
+              <SmartSearchBar query={query} setQuery={setQuery} suggestions={suggestions} />
+              <LocationSelector
+                districts={districts}
+                thanas={thanas}
+                markets={markets}
+                categories={categories}
+                shopNames={shopNames}
+                selectedDistrict={selectedDistrict}
+                setSelectedDistrict={setSelectedDistrict}
+                selectedThana={selectedThana}
+                setSelectedThana={setSelectedThana}
+                selectedMarket={selectedMarket}
+                setSelectedMarket={setSelectedMarket}
+                selectedCategory={selectedCategory}
+                setSelectedCategory={setSelectedCategory}
+                selectedShop={selectedShop}
+                setSelectedShop={setSelectedShop}
+              />
+            </div>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Button asChild>
+                <Link href="/products">Browse products</Link>
+              </Button>
+              <Button asChild variant="secondary">
+                <Link href="/account">Open account</Link>
+              </Button>
+            </div>
           </div>
-        </Card>
-
-        <div className="grid gap-4">
-          <MetricStrip title="Wallet + Due" items={walletWidgets} />
-          <MetricStrip title="Smart recommendation inputs" items={recommendationFeed} />
+          <div className="border-t border-border/60 bg-background/70 p-6 sm:p-8 lg:border-l lg:border-t-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Why this page is useful</p>
+            <div className="mt-4 grid gap-3">
+              <div className="rounded-2xl border border-border/60 bg-card/90 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-foreground">Discovery</span>
+                  <Badge variant="success">Nearby</Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">District, thana, market, category, and shop filters work together instead of fragmenting the search flow.</p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-card/90 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-foreground">Checkout</span>
+                  <Badge variant="neutral">Grouped</Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">The cart keeps one summary view even when products come from multiple shops in one delivery radius.</p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-card/90 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-foreground">Trust</span>
+                  <Badge variant="warning">Claims + dues</Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">Wallet, due, and claim status stay visible so the customer journey feels more predictable.</p>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </Card>
+
+      <AnalyticsCards items={heroStats} />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         {traffic?.isMarketplaceEnabled !== false ? (
@@ -263,13 +318,18 @@ export function CustomerHomeWorkspace({
             </CardDescription>
           </Card>
         )}
-        <GroupedCommerceCard cartSummary={cartSummary} />
+        <div className="grid gap-4">
+          <MetricStrip title="Wallet + due" items={walletWidgets} />
+          <MetricStrip title="Smart recommendation inputs" items={recommendationFeed} />
+          <GroupedCommerceCard cartSummary={cartSummary} />
+        </div>
       </div>
+
       <div className="sticky bottom-4 z-20 flex justify-center lg:hidden">
         <div className="flex w-full max-w-md items-center justify-between rounded-full border border-border/70 bg-background/95 px-4 py-3 shadow-lg backdrop-blur">
           <div className="text-sm">
             <p className="font-semibold">{cartSummary.shops.length} shops</p>
-            <p className="text-xs text-muted-foreground">{cartSummary.itemCount} lines • {cartSummary.subtotal} BDT</p>
+            <p className="text-xs text-muted-foreground">{cartSummary.itemCount} lines � {cartSummary.subtotal} BDT</p>
           </div>
           <div className="flex gap-2">
             <Button asChild size="sm" variant="secondary">
@@ -440,7 +500,7 @@ function GroupedCommerceCard({
       <div className="mt-4 grid gap-3 text-sm">
         <div className="rounded-2xl border border-border/60 p-4">
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Cart grouping</p>
-          <p className="mt-2 text-lg font-semibold">{cartSummary.shops.length} shops → 1 delivery</p>
+          <p className="mt-2 text-lg font-semibold">{cartSummary.shops.length} shops to 1 delivery</p>
           <p className="mt-1 text-xs text-muted-foreground">
             {cartSummary.itemCount} lines | {cartSummary.quantity} items | {cartSummary.subtotal} BDT subtotal
           </p>
@@ -552,7 +612,7 @@ function MapDiscoveryPreview({ shops }: { shops: ShopDirectoryItem[] }) {
       </div>
       <div className="mt-4">
         <Button asChild variant="secondary">
-          <Link href="/map">Open Full Map</Link>
+          <Link href="/map">Open full map</Link>
         </Button>
       </div>
     </Card>

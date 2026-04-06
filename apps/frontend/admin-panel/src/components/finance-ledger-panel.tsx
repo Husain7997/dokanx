@@ -324,7 +324,7 @@ export function FinanceLedgerPanel() {
             }))}
           />
           {!settlements.length ? (
-            <p className="mt-3 text-sm text-muted-foreground">No settlements yet.</p>
+            <p className="mt-3 text-sm text-muted-foreground">No settlement activity has been recorded yet.</p>
           ) : null}
         </div>
         <div className="grid gap-3 text-sm text-muted-foreground">
@@ -411,3 +411,4 @@ function inferPreset(fromDate: string, toDate: string) {
 
   return null;
 }
+

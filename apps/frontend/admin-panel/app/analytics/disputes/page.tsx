@@ -186,7 +186,7 @@ export default function DisputesAnalyticsPage() {
             {disputeDaily.length ? (
               <ChartJsLineChart data={dailyChart} height={240} />
             ) : (
-              <p className="text-sm text-muted-foreground">No dispute data to chart yet.</p>
+              <p className="text-sm text-muted-foreground">Dispute trend data will appear here once customer issues start entering the review pipeline.</p>
             )}
           </div>
         </Card>
@@ -197,7 +197,7 @@ export default function DisputesAnalyticsPage() {
             {disputeReasonSummary.length ? (
               <ChartJsBarChart data={reasonChart} height={240} />
             ) : (
-              <p className="text-sm text-muted-foreground">No dispute reasons to chart yet.</p>
+              <p className="text-sm text-muted-foreground">Reason analysis will appear here once disputes accumulate enough signal to classify.</p>
             )}
           </div>
           <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
@@ -228,3 +228,4 @@ function buildDailySeries(rows: OrderRow[], days: number) {
   });
   return Array.from(buckets.entries()).map(([label, value]) => ({ label, value }));
 }
+

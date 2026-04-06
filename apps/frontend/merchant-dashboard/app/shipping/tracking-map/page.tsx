@@ -249,7 +249,7 @@ export default function ShippingTrackingMapPage() {
       <div>
         <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Shipping</p>
         <h1 className="dx-display text-3xl">Tracking Map</h1>
-        <p className="text-sm text-muted-foreground">Geo event visualization for a shipment.</p>
+        <p className="text-sm text-muted-foreground">Geo event visualization for a shipment route and courier checkpoint history.</p>
       </div>
       {error ? (
         <Card>
@@ -285,7 +285,7 @@ export default function ShippingTrackingMapPage() {
             <div ref={mapContainerRef} className="h-full w-full" />
             {!geoPoints.length ? (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
-                No geo events available for this shipment.
+                No geo events are available for this shipment yet.
               </div>
             ) : null}
           </div>
@@ -306,15 +306,17 @@ export default function ShippingTrackingMapPage() {
                 {event.location ? <p className="mt-2 text-xs text-muted-foreground">{event.location}</p> : null}
                 {event.geo?.lat && event.geo?.lng ? (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Lat {event.geo.lat.toFixed(4)} • Lng {event.geo.lng.toFixed(4)}
+                    Lat {event.geo.lat.toFixed(4)} - Lng {event.geo.lng.toFixed(4)}
                   </p>
                 ) : null}
               </div>
             ))}
-            {!events.length ? <p>No tracking events yet.</p> : null}
+            {!events.length ? <p>No tracking events have been recorded yet.</p> : null}
           </div>
         </Card>
       </div>
     </div>
   );
 }
+
+

@@ -45,7 +45,7 @@ const labels = {
     categories: "Categories",
     read: "Read",
     new: "New",
-    noNotifications: "No notifications yet.",
+    noNotifications: "No notifications have landed yet.",
     categoryLabels: {
       order: "Order Notifications",
       payment: "Payment Notifications",
@@ -402,3 +402,4 @@ function downloadCsv(csv: string, filename: string) {
   document.body.removeChild(link);
   window.URL.revokeObjectURL(url);
 }
+

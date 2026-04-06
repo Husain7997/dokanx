@@ -4,9 +4,22 @@ import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { listPublicShops, saveCartRequest, searchProducts } from "../lib/api-client";
+import { DokanXLogo } from "../components/dokanx-logo";
 import { useAuthStore } from "../store/auth-store";
 import { useCartStore } from "../store/cart-store";
 import { useTenantStore } from "../store/tenant-store";
+
+const BRAND = {
+  navy: "#0B1E3C",
+  navySoft: "#17325F",
+  orange: "#FF7A00",
+  bg: "#F4F7FB",
+  surface: "#FFFFFF",
+  surfaceMuted: "#EEF3F9",
+  border: "#D7DFEA",
+  text: "#122033",
+  textMuted: "#5F6F86",
+};
 
 const DEMO_RESULTS = [
   { id: "demo-bread", name: "Brown Bread", price: 60 },
@@ -26,7 +39,7 @@ export function SearchResultsScreen() {
   const setShop = useTenantStore((state) => state.setShop);
   const [results, setResults] = useState<Array<{ id: string; name: string; price: number }>>([]);
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState<string | null>("Loading product results...");
+  const [status, setStatus] = useState<string | null>("Loading live product results...");
 
   useEffect(() => {
     let active = true;
@@ -55,7 +68,7 @@ export function SearchResultsScreen() {
         if (!shopId) {
           if (!active) return;
           setResults(DEMO_RESULTS);
-          setStatus("Live shop not ready, showing starter search results.");
+          setStatus("Live shop sync is still warming up, so we are showing ready-to-browse search results.");
           return;
         }
 
@@ -73,12 +86,12 @@ export function SearchResultsScreen() {
           setStatus(`Showing products from ${shopName || "the selected shop"}.`);
         } else {
           setResults(DEMO_RESULTS);
-          setStatus("No live products found, showing starter results.");
+          setStatus("No live products matched yet, so we are showing ready-to-browse fallback results.");
         }
       } catch {
         if (!active) return;
         setResults(DEMO_RESULTS);
-        setStatus("Search sync delayed, showing starter results.");
+        setStatus("Search sync is delayed, so we are showing ready-to-browse results for now.");
       } finally {
         if (active) setLoading(false);
       }
@@ -91,24 +104,58 @@ export function SearchResultsScreen() {
   }, [selectedShop?.id, selectedShop?.name, setShop]);
 
   const visibleResults = useMemo(() => (results.length ? results : DEMO_RESULTS), [results]);
+  const cartCount = useMemo(() => items.reduce((count, item) => count + Math.max(1, Number(item.quantity || 1)), 0), [items]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.heroRow}>
-          <View>
-            <Text style={styles.title}>Search results</Text>
-            {status ? <Text style={styles.cardSubtitle}>{status}</Text> : null}
+        <View style={styles.hero}>
+          <DokanXLogo variant="full" size="sm" />
+          <Text style={styles.heroEyebrow}>Search Results</Text>
+          <Text style={styles.heroTitle}>Keep comparing items and move the best pick straight into the cart.</Text>
+          <Text style={styles.heroDescription}>{status || "Browse the available results from your active shop."}</Text>
+          <View style={styles.heroStats}>
+            <View style={styles.heroStatCard}>
+              <Text style={styles.heroStatLabel}>Results</Text>
+              <Text style={styles.heroStatValue}>{visibleResults.length}</Text>
+            </View>
+            <View style={styles.heroStatCard}>
+              <Text style={styles.heroStatLabel}>Shop</Text>
+              <Text style={styles.heroStatValueSmall}>{selectedShop?.name || "Auto selecting"}</Text>
+            </View>
+            <Pressable style={styles.cartButton} onPress={() => navigation.navigate("Cart" as never)}>
+              <Text style={styles.cartButtonLabel}>Cart</Text>
+              <Text style={styles.cartButtonValue}>{cartCount} lines</Text>
+            </Pressable>
           </View>
-          <Pressable style={styles.cartButton} onPress={() => navigation.navigate("Cart" as never)}>
-            <Text style={styles.cartButtonText}>Cart ({items.length})</Text>
-          </Pressable>
         </View>
-        {loading ? <Text style={styles.cardSubtitle}>Loading results...</Text> : null}
-        {visibleResults.map((item) => (
-          <View key={item.id} style={styles.card}>
-            <Text style={styles.cardTitle}>{item.name}</Text>
-            <Text style={styles.cardSubtitle}>{item.price} BDT</Text>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Search status</Text>
+          <Text style={styles.cardDescription}>We show live catalog results when available and keep browse-ready backup items visible while the shop feed warms up.</Text>
+          {loading ? <Text style={styles.loadingText}>Loading search results...</Text> : <Text style={styles.cardNote}>Results are ready to review.</Text>}
+        </View>
+        {visibleResults.map((item, index) => (
+          <View key={item.id} style={styles.resultCard}>
+            <View style={styles.resultHeader}>
+              <View style={styles.resultCopy}>
+                <Text style={styles.resultTitle}>{item.name}</Text>
+                <Text style={styles.resultSubtitle}>{selectedShop?.name || "Selected shop"}</Text>
+              </View>
+              <View style={styles.pricePill}>
+                <Text style={styles.priceText}>{item.price} BDT</Text>
+              </View>
+            </View>
+            <View style={styles.resultMetrics}>
+              <View style={styles.metricChip}>
+                <Text style={styles.metricChipLabel}>Rank</Text>
+                <Text style={styles.metricChipValue}>#{index + 1}</Text>
+              </View>
+              <View style={styles.metricChip}>
+                <Text style={styles.metricChipLabel}>Cart ready</Text>
+                <Text style={styles.metricChipValue}>Instant</Text>
+              </View>
+            </View>
             <Pressable
               style={styles.actionButton}
               onPress={() => {
@@ -175,34 +222,96 @@ export function SearchResultsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#f8f4ef" },
+  safeArea: { flex: 1, backgroundColor: BRAND.bg },
   container: { padding: 16, gap: 16 },
-  heroRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12 },
-  title: { fontSize: 20, fontWeight: "700", color: "#1f2937" },
-  card: {
-    backgroundColor: "#ffffff",
+  hero: {
+    backgroundColor: BRAND.navy,
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: BRAND.navySoft,
+    gap: 10,
+  },
+  heroEyebrow: { color: "#C4D2E8", fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.8 },
+  heroTitle: { color: "#FFFFFF", fontSize: 24, lineHeight: 30, fontWeight: "800" },
+  heroDescription: { color: "#D7E2F1", fontSize: 14, lineHeight: 21 },
+  heroStats: { flexDirection: "row", gap: 10, flexWrap: "wrap", marginTop: 6 },
+  heroStatCard: {
+    flexGrow: 1,
+    minWidth: 96,
+    backgroundColor: "rgba(255,255,255,0.08)",
     borderRadius: 18,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    gap: 4,
+  },
+  heroStatLabel: { color: "#C4D2E8", fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.6 },
+  heroStatValue: { color: "#FFFFFF", fontSize: 18, fontWeight: "800" },
+  heroStatValueSmall: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
+  cartButton: {
+    minWidth: 96,
+    borderRadius: 18,
+    padding: 12,
+    backgroundColor: "#FFFFFF",
+    gap: 4,
+  },
+  cartButtonLabel: { color: BRAND.textMuted, fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.6 },
+  cartButtonValue: { color: BRAND.navy, fontSize: 15, fontWeight: "800" },
+  card: {
+    backgroundColor: BRAND.surface,
+    borderRadius: 22,
     padding: 16,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
-    gap: 8,
+    borderColor: BRAND.border,
+    gap: 10,
   },
-  cardTitle: { fontSize: 15, fontWeight: "600", color: "#111827" },
-  cardSubtitle: { fontSize: 12, color: "#6b7280" },
-  cartButton: {
+  cardTitle: { fontSize: 18, fontWeight: "800", color: BRAND.text },
+  cardDescription: { fontSize: 13, lineHeight: 20, color: BRAND.textMuted },
+  cardNote: { fontSize: 12, color: BRAND.navy, fontWeight: "700" },
+  loadingText: { fontSize: 12, color: BRAND.orange, fontWeight: "700" },
+  resultCard: {
+    backgroundColor: BRAND.surface,
+    borderRadius: 22,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    gap: 12,
+  },
+  resultHeader: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
+  resultCopy: { flex: 1, gap: 4 },
+  resultTitle: { fontSize: 16, fontWeight: "800", color: BRAND.text },
+  resultSubtitle: { fontSize: 12, color: BRAND.textMuted },
+  pricePill: {
     alignSelf: "flex-start",
+    borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: "#111827",
+    backgroundColor: BRAND.surfaceMuted,
+    borderWidth: 1,
+    borderColor: BRAND.border,
   },
-  cartButtonText: { color: "#ffffff", fontSize: 12, fontWeight: "600" },
+  priceText: { color: BRAND.navy, fontSize: 12, fontWeight: "800" },
+  resultMetrics: { flexDirection: "row", gap: 8 },
+  metricChip: {
+    flex: 1,
+    borderRadius: 14,
+    padding: 10,
+    backgroundColor: "#F7F9FC",
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    gap: 3,
+  },
+  metricChipLabel: { color: BRAND.textMuted, fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
+  metricChipValue: { color: BRAND.text, fontSize: 12, fontWeight: "800" },
   actionButton: {
     alignSelf: "flex-start",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
-    backgroundColor: "#111827",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: BRAND.navy,
   },
-  actionText: { color: "#ffffff", fontSize: 12, fontWeight: "600" },
+  actionText: { color: "#FFFFFF", fontSize: 12, fontWeight: "800" },
 });
+
+

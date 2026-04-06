@@ -16,6 +16,7 @@ import {
   searchProducts,
   searchSuggestions,
 } from "../lib/api-client";
+import { DokanXLogo } from "../components/dokanx-logo";
 import { useAuthStore } from "../store/auth-store";
 import { useCartStore } from "../store/cart-store";
 import { useTenantStore } from "../store/tenant-store";
@@ -35,6 +36,18 @@ type LocationRow = {
   address?: string;
   shopId?: string;
   coordinates?: { coordinates?: number[] };
+};
+
+const BRAND = {
+  navy: "#0B1E3C",
+  navySoft: "#17325F",
+  orange: "#FF7A00",
+  bg: "#F4F7FB",
+  surface: "#FFFFFF",
+  surfaceMuted: "#EEF3F9",
+  border: "#D7DFEA",
+  text: "#122033",
+  textMuted: "#5F6F86",
 };
 
 export function HomeScreen() {
@@ -86,9 +99,7 @@ export function HomeScreen() {
           })) || [];
         const nextShops = list.filter((shop) => shop.id);
         setShops(nextShops);
-        if (!selectedShop && nextShops[0]) {
-          setShop(nextShops[0]);
-        }
+        if (!selectedShop && nextShops[0]) setShop(nextShops[0]);
         setLocations((locationsResponse.data || []) as LocationRow[]);
       } catch {
         if (!active) return;
@@ -135,8 +146,7 @@ export function HomeScreen() {
         ]);
         if (!active) return;
         const recommendationRows =
-          ((recommendationResponse?.data as { recommended_products?: Array<Record<string, unknown>> } | undefined)
-            ?.recommended_products || [])
+          ((recommendationResponse?.data as { recommended_products?: Array<Record<string, unknown>> } | undefined)?.recommended_products || [])
             .map((item) => ({
               id: String(item._id || item.id || ""),
               name: String(item.name || ""),
@@ -176,9 +186,7 @@ export function HomeScreen() {
         if (!globalCustomerId) return;
         const overview = await getCustomerOverviewRequest(accessToken, globalCustomerId).catch(() => null);
         if (!active) return;
-        const data = overview?.data as
-          | { walletSummary?: { totalDue?: number; totalIncome?: number }; orders?: unknown[]; claims?: unknown[] }
-          | undefined;
+        const data = overview?.data as { walletSummary?: { totalDue?: number; totalIncome?: number }; orders?: unknown[]; claims?: unknown[] } | undefined;
         setSummary({
           totalDue: Number(data?.walletSummary?.totalDue || 0),
           walletIncome: Number(data?.walletSummary?.totalIncome || 0),
@@ -194,7 +202,6 @@ export function HomeScreen() {
       active = false;
     };
   }, [accessToken]);
-
   useEffect(() => {
     let active = true;
     if (!searchQuery.trim()) {
@@ -264,54 +271,55 @@ export function HomeScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.heroCard}>
-          <View style={styles.heroRow}>
-            <View style={styles.heroCopy}>
-              <Text style={styles.heroTitle}>DokanX Marketplace</Text>
-              <Text style={styles.heroSubtitle}>{selectedShop?.name || "Select a nearby shop and start adding to cart."}</Text>
-            </View>
-            <Pressable style={styles.heroOutlineButton} onPress={() => navigation.navigate("Cart" as never)}>
-              <Text style={styles.heroOutlineText}>Cart {cartCount}</Text>
+          <DokanXLogo variant="full" size="sm" />
+          <Text style={styles.heroEyebrow}>Marketplace Home</Text>
+          <Text style={styles.heroTitle}>Pick a nearby shop, scan the best deals, and move straight into checkout.</Text>
+          <Text style={styles.heroSubtitle}>{selectedShop?.name || "Select a nearby shop and start adding to cart."}</Text>
+          <View style={styles.heroActions}>
+            <Pressable style={styles.heroPrimaryButton} onPress={() => navigation.navigate("Cart" as never)}>
+              <Text style={styles.heroPrimaryText}>Cart {cartCount}</Text>
+            </Pressable>
+            <Pressable style={styles.heroSecondaryButton} onPress={() => setShowMapPreview((current) => !current)}>
+              <Text style={styles.heroSecondaryText}>{showMapPreview ? "Hide Map" : "Show Map"}</Text>
             </Pressable>
           </View>
-
-          <View style={styles.topNavRow}>
-            <Pressable style={styles.topNavCard} onPress={() => navigation.navigate("Cart" as never)}>
-              <Text style={styles.topNavLabel}>Cart</Text>
-              <Text style={styles.topNavValue}>{cartCount} items</Text>
-            </Pressable>
-            <Pressable style={styles.topNavCard} onPress={() => setShowMapPreview((current) => !current)}>
-              <Text style={styles.topNavLabel}>Map</Text>
-              <Text style={styles.topNavValue}>{showMapPreview ? "Hide" : "Open"}</Text>
-            </Pressable>
-            <View style={styles.topNavCard}>
-              <Text style={styles.topNavLabel}>Wallet</Text>
-              <Text style={styles.topNavValue}>{walletBalance || summary.walletIncome} BDT</Text>
+          <View style={styles.statRow}>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Wallet</Text>
+              <Text style={styles.statValue}>{walletBalance || summary.walletIncome} BDT</Text>
             </View>
-            <View style={styles.topNavCard}>
-              <Text style={styles.topNavLabel}>Baki</Text>
-              <Text style={styles.topNavValue}>{Number(creditSnapshot?.totalDue || summary.totalDue)} BDT</Text>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Due</Text>
+              <Text style={styles.statValue}>{Number(creditSnapshot?.totalDue || summary.totalDue)} BDT</Text>
             </View>
-          </View>
-        </View>
-
-        <View style={styles.metricRow}>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>Wallet</Text>
-            <Text style={styles.metricValue}>{walletBalance || summary.walletIncome} BDT</Text>
-          </View>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>Due</Text>
-            <Text style={styles.metricValue}>{Number(creditSnapshot?.totalDue || summary.totalDue)} BDT</Text>
-          </View>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>Claims</Text>
-            <Text style={styles.metricValue}>{summary.claims}</Text>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Claims</Text>
+              <Text style={styles.statValue}>{summary.claims}</Text>
+            </View>
           </View>
         </View>
 
         <View style={styles.card}>
+          <Text style={styles.cardTitle}>Search and quick jump</Text>
+          <Text style={styles.cardDescription}>Search products, brands, and shops from the active district and market context.</Text>
+          <TextInput style={styles.input} placeholder="Search products, shops, brands" value={searchQuery} onChangeText={setSearchQuery} />
+          {suggestions.length ? (
+            <View style={styles.suggestionList}>
+              {suggestions.map((item) => (
+                <Pressable key={item} style={styles.suggestionRow} onPress={() => {
+                  setSearchQuery(item);
+                  navigation.navigate("SearchResults" as never);
+                }}>
+                  <Text style={styles.suggestionText}>{item}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
+        </View>
+
+        <View style={styles.card}>
           <Text style={styles.cardTitle}>Location selector</Text>
-          <Text style={styles.cardSubtitle}>Bangladesh • {selectedDistrict === "all" ? "Select district" : selectedDistrict} • {selectedMarket === "all" ? "Market" : selectedMarket}</Text>
+          <Text style={styles.cardDescription}>Bangladesh • {selectedDistrict === "all" ? "Select district" : selectedDistrict} • {selectedMarket === "all" ? "Market" : selectedMarket}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
             <Pressable style={[styles.chip, selectedDistrict === "all" ? styles.chipActive : null]} onPress={() => setSelectedDistrict("all")}>
               <Text style={[styles.chipText, selectedDistrict === "all" ? styles.chipTextActive : null]}>All districts</Text>
@@ -349,30 +357,47 @@ export function HomeScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Wallet activity</Text>
-          <Text style={styles.cardSubtitle}>Recent customer wallet payments and debits</Text>
-          {walletTransactions.length ? walletTransactions.map((item) => (
-            <View key={item.id} style={styles.productRow}>
-              <View>
-                <Text style={styles.productTitle}>{item.orderId ? `Order ${item.orderId}` : "Wallet transaction"}</Text>
-                <Text style={styles.productSubtitle}>{item.note || "Customer wallet"}</Text>
-              </View>
-              <Text style={styles.dealPrice}>{item.amount} BDT</Text>
+          <Text style={styles.cardTitle}>Customer finances</Text>
+          <View style={styles.financeGrid}>
+            <View style={styles.financeCard}>
+              <Text style={styles.financeLabel}>Orders</Text>
+              <Text style={styles.financeValue}>{summary.orders}</Text>
             </View>
-          )) : <Text style={styles.cardSubtitle}>No wallet activity yet.</Text>}
+            <View style={styles.financeCard}>
+              <Text style={styles.financeLabel}>Wallet income</Text>
+              <Text style={styles.financeValue}>{summary.walletIncome} BDT</Text>
+            </View>
+            <View style={styles.financeCard}>
+              <Text style={styles.financeLabel}>Current due</Text>
+              <Text style={styles.financeValue}>{Number(creditSnapshot?.totalDue || summary.totalDue)} BDT</Text>
+            </View>
+          </View>
+        </View>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Wallet activity</Text>
+          <Text style={styles.cardDescription}>Recent customer wallet payments and debits.</Text>
+          {walletTransactions.length ? walletTransactions.map((item) => (
+            <View key={item.id} style={styles.listRow}>
+              <View style={styles.listCopy}>
+                <Text style={styles.listTitle}>{item.orderId ? `Order ${item.orderId}` : "Wallet transaction"}</Text>
+                <Text style={styles.listSubtitle}>{item.note || "Customer wallet"}</Text>
+              </View>
+              <Text style={styles.listValue}>{item.amount} BDT</Text>
+            </View>
+          )) : <Text style={styles.cardNote}>Wallet activity will appear here after your first top-up or checkout.</Text>}
         </View>
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Pay Later (Baki)</Text>
-          <Text style={styles.cardSubtitle}>Shop-wise due balance and repayment history</Text>
+          <Text style={styles.cardDescription}>Shop-wise due balance and quick repayment actions.</Text>
           {(creditSnapshot?.sales || []).length ? (
             (creditSnapshot?.sales || []).slice(0, 4).map((item, index) => (
               <View key={`${String(item._id || index)}`} style={styles.creditSaleCard}>
-                <View>
-                  <Text style={styles.productTitle}>Shop {String(item.shopId || "").slice(-6)}</Text>
-                  <Text style={styles.productSubtitle}>Outstanding due</Text>
+                <View style={styles.listCopy}>
+                  <Text style={styles.listTitle}>Shop {String(item.shopId || "").slice(-6)}</Text>
+                  <Text style={styles.listSubtitle}>Outstanding due</Text>
                 </View>
-                <Text style={styles.dealPrice}>{Number(item.outstandingAmount || 0)} BDT</Text>
+                <Text style={styles.listValue}>{Number(item.outstandingAmount || 0)} BDT</Text>
                 <View style={styles.walletActionRow}>
                   <Pressable
                     style={styles.walletActionButton}
@@ -430,73 +455,17 @@ export function HomeScreen() {
                 </View>
               </View>
             ))
-          ) : <Text style={styles.cardSubtitle}>No due balance right now.</Text>}
-          {(creditSnapshot?.paymentHistory || []).slice(0, 3).map((item, index) => (
-            <View key={`${String(item._id || index)}`} style={styles.productRow}>
-              <View>
-                <Text style={styles.productTitle}>Repayment</Text>
-                <Text style={styles.productSubtitle}>{String(item.reference || item.type || "Credit payment")}</Text>
-              </View>
-              <Text style={styles.dealPrice}>{Number(item.amount || 0)} BDT</Text>
-            </View>
-          ))}
+          ) : <Text style={styles.cardNote}>No due balance is active right now.</Text>}
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Search</Text>
-          <TextInput style={styles.input} placeholder="Search products, shops, brands" value={searchQuery} onChangeText={setSearchQuery} />
-          {suggestions.length ? (
-            <View style={styles.suggestionList}>
-              {suggestions.map((item) => (
-                <Pressable key={item} style={styles.suggestionRow} onPress={() => {
-                  setSearchQuery(item);
-                  navigation.navigate("SearchResults" as never);
-                }}>
-                  <Text style={styles.suggestionText}>{item}</Text>
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Categories</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-            {["Groceries", "Electronics", "Fashion", "Medicine", "Restaurants", "Hardware", "Books"].map((item) => (
-              <View key={item} style={styles.categoryPill}>
-                <Text style={styles.categoryText}>{item}</Text>
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-
-        <View style={styles.bannerRow}>
-          {["Flash Sale", "New Stores", "Electronics Fest"].map((item) => (
-            <View key={item} style={styles.bannerCard}>
-              <Text style={styles.bannerTitle}>{item}</Text>
-              <Text style={styles.bannerSubtitle}>Limited time offers</Text>
-            </View>
-          ))}
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Flash deals</Text>
-          <Text style={styles.cardSubtitle}>Ends in 02:45:12</Text>
-          {(trendingProducts.length ? trendingProducts : products).slice(0, 3).map((item) => (
-            <View key={item.id} style={styles.dealRow}>
-              <Text style={styles.dealTitle}>{item.name}</Text>
-              <Text style={styles.dealPrice}>{item.price} BDT</Text>
-            </View>
-          ))}
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Recommended for you</Text>
+          <Text style={styles.cardTitle}>Picked for you</Text>
+          <Text style={styles.cardDescription}>AI suggestions and popular picks from the active shop.</Text>
           {(recommendedProducts.length ? recommendedProducts : products).slice(0, 4).map((item) => (
-            <View key={item.id} style={styles.productRow}>
-              <View>
-                <Text style={styles.productTitle}>{item.name}</Text>
-                <Text style={styles.productSubtitle}>AI recommendation</Text>
+            <View key={item.id} style={styles.listRow}>
+              <View style={styles.listCopy}>
+                <Text style={styles.listTitle}>{item.name}</Text>
+                <Text style={styles.listSubtitle}>AI recommendation</Text>
               </View>
               <Pressable style={styles.actionButton} onPress={() => navigation.navigate("Browse" as never)}>
                 <Text style={styles.actionText}>{item.price} BDT</Text>
@@ -506,13 +475,28 @@ export function HomeScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Popular products</Text>
-          {loading ? <Text style={styles.cardSubtitle}>Loading products...</Text> : null}
+          <Text style={styles.cardTitle}>Fast-moving deals</Text>
+          <Text style={styles.cardDescription}>Fast-moving products from trending demand signals.</Text>
+          {(trendingProducts.length ? trendingProducts : products).slice(0, 3).map((item) => (
+            <View key={item.id} style={styles.listRow}>
+              <View style={styles.listCopy}>
+                <Text style={styles.listTitle}>{item.name}</Text>
+                <Text style={styles.listSubtitle}>Limited-time pricing</Text>
+              </View>
+              <Text style={styles.listValue}>{item.price} BDT</Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Popular right now</Text>
+          <Text style={styles.cardDescription}>Quick jump into the live catalog from your active shop.</Text>
+          {loading ? <Text style={styles.loadingText}>Loading live products...</Text> : null}
           {products.map((item) => (
-            <View key={item.id} style={styles.productRow}>
-              <View>
-                <Text style={styles.productTitle}>{item.name}</Text>
-                <Text style={styles.productSubtitle}>{selectedShop?.name || "Shop"}</Text>
+            <View key={item.id} style={styles.listRow}>
+              <View style={styles.listCopy}>
+                <Text style={styles.listTitle}>{item.name}</Text>
+                <Text style={styles.listSubtitle}>{selectedShop?.name || "Shop"}</Text>
               </View>
               <Pressable style={styles.actionButton} onPress={() => navigation.navigate("Browse" as never)}>
                 <Text style={styles.actionText}>{item.price} BDT</Text>
@@ -522,20 +506,21 @@ export function HomeScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Nearby shops</Text>
+          <Text style={styles.cardTitle}>Nearby storefronts</Text>
+          <Text style={styles.cardDescription}>Shortlist trusted stores close to your current market selection.</Text>
           {filteredShops.slice(0, 4).map((shop, index) => (
-            <View key={shop.id} style={styles.shopRow}>
-              <View>
-                <Text style={styles.productTitle}>{shop.name}</Text>
-                <Text style={styles.productSubtitle}>{(0.6 + index * 0.2).toFixed(1)} km away</Text>
+            <View key={shop.id} style={styles.listRow}>
+              <View style={styles.listCopy}>
+                <Text style={styles.listTitle}>{shop.name}</Text>
+                <Text style={styles.listSubtitle}>{(0.6 + index * 0.2).toFixed(1)} km away</Text>
               </View>
-              <Text style={styles.shopRating}>? 4.{6 + index}</Text>
+              <Text style={styles.listValue}>4.{6 + index}</Text>
             </View>
           ))}
         </View>
 
         <View style={styles.footerNav}>
-          {[["Home", "Home"], ["Search", "SearchResults"], ["Cart", "Cart"], ["Orders", "OrderTracking"], ["Account", "Auth"]].map(([label, screen]) => (
+          {[ ["Home", "Home"], ["Search", "SearchResults"], ["Cart", "Cart"], ["Orders", "OrderTracking"], ["Account", "Auth"] ].map(([label, screen]) => (
             <Pressable key={label} style={styles.footerItem} onPress={() => navigation.navigate(screen as never)}>
               <Text style={styles.footerText}>{label}</Text>
             </Pressable>
@@ -547,9 +532,9 @@ export function HomeScreen() {
         <View style={styles.mapOverlay}>
           <View style={styles.mapOverlayCard}>
             <View style={styles.mapOverlayHeader}>
-              <View>
+              <View style={styles.listCopy}>
                 <Text style={styles.cardTitle}>Map quick view</Text>
-                <Text style={styles.cardSubtitle}>Drag the orange button anywhere and tap it again to close.</Text>
+                <Text style={styles.cardDescription}>Drag the orange button anywhere and tap it again to close.</Text>
               </View>
               <Pressable style={styles.mapCloseButton} onPress={() => setShowMapPreview(false)}>
                 <Text style={styles.mapCloseText}>Close</Text>
@@ -560,8 +545,8 @@ export function HomeScreen() {
                 <View key={shop.id} style={[styles.mapPin, { left: 20 + index * 32, top: 28 + (index % 3) * 28 }]} />
               ))}
             </View>
-            <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate("MapDiscovery" as never)}>
-              <Text style={styles.secondaryText}>Open full map</Text>
+            <Pressable style={styles.mapOpenButton} onPress={() => navigation.navigate("MapDiscovery" as never)}>
+              <Text style={styles.mapOpenText}>Open full map</Text>
             </Pressable>
           </View>
         </View>
@@ -582,71 +567,72 @@ function uniqueValues(rows: LocationRow[], key: keyof LocationRow) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#f8f4ef" },
+  safeArea: { flex: 1, backgroundColor: BRAND.bg },
   container: { padding: 16, gap: 16, paddingBottom: 120 },
-  heroCard: { backgroundColor: "#101828", borderRadius: 24, padding: 18, gap: 16 },
-  heroRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12 },
-  heroCopy: { flex: 1, gap: 6 },
-  heroTitle: { fontSize: 22, fontWeight: "700", color: "#ffffff" },
-  heroSubtitle: { fontSize: 13, lineHeight: 18, color: "#d0d5dd" },
-  heroOutlineButton: { borderRadius: 999, borderWidth: 1, borderColor: "#344054", paddingHorizontal: 14, paddingVertical: 10, backgroundColor: "#182230" },
-  heroOutlineText: { fontSize: 12, fontWeight: "700", color: "#ffffff" },
-  topNavRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  topNavCard: { width: "47%", borderRadius: 18, padding: 14, backgroundColor: "#ffffff", gap: 5 },
-  topNavLabel: { fontSize: 11, color: "#667085", textTransform: "uppercase" },
-  topNavValue: { fontSize: 14, fontWeight: "700", color: "#111827" },
-  metricRow: { flexDirection: "row", gap: 8 },
-  metricCard: { flex: 1, backgroundColor: "#ffffff", borderRadius: 18, padding: 14, borderWidth: 1, borderColor: "#e5e7eb", gap: 6 },
-  metricLabel: { fontSize: 11, color: "#6b7280", textTransform: "uppercase" },
-  metricValue: { fontSize: 16, fontWeight: "700", color: "#111827" },
-  card: { backgroundColor: "#ffffff", borderRadius: 18, padding: 16, borderWidth: 1, borderColor: "#e5e7eb", gap: 12 },
-  cardTitle: { fontSize: 15, fontWeight: "600", color: "#111827" },
-  cardSubtitle: { fontSize: 12, color: "#6b7280" },
+  heroCard: {
+    backgroundColor: BRAND.navy,
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: BRAND.navySoft,
+    gap: 10,
+  },
+  heroEyebrow: { color: "#C4D2E8", fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.8 },
+  heroTitle: { color: "#FFFFFF", fontSize: 24, lineHeight: 30, fontWeight: "800" },
+  heroSubtitle: { color: "#D7E2F1", fontSize: 14, lineHeight: 21 },
+  heroActions: { flexDirection: "row", gap: 10, marginTop: 6 },
+  heroPrimaryButton: { flex: 1, borderRadius: 14, paddingVertical: 12, alignItems: "center", backgroundColor: "#FFFFFF" },
+  heroPrimaryText: { color: BRAND.navy, fontSize: 13, fontWeight: "800" },
+  heroSecondaryButton: { flex: 1, borderRadius: 14, paddingVertical: 12, alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", backgroundColor: "rgba(255,255,255,0.08)" },
+  heroSecondaryText: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
+  statRow: { flexDirection: "row", gap: 10, flexWrap: "wrap", marginTop: 6 },
+  statCard: { flexGrow: 1, minWidth: 96, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 18, padding: 12, borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", gap: 4 },
+  statLabel: { color: "#C4D2E8", fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.6 },
+  statValue: { color: "#FFFFFF", fontSize: 16, fontWeight: "800" },
+  card: { backgroundColor: BRAND.surface, borderRadius: 22, padding: 16, borderWidth: 1, borderColor: BRAND.border, gap: 12 },
+  cardTitle: { fontSize: 18, fontWeight: "800", color: BRAND.text },
+  cardDescription: { fontSize: 13, lineHeight: 20, color: BRAND.textMuted },
+  cardNote: { fontSize: 12, color: BRAND.navy, fontWeight: "700" },
+  input: { backgroundColor: BRAND.surfaceMuted, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: BRAND.text, borderColor: BRAND.border, borderWidth: 1 },
+  suggestionList: { borderTopWidth: 1, borderTopColor: BRAND.border },
+  suggestionRow: { paddingVertical: 10 },
+  suggestionText: { fontSize: 13, color: BRAND.text, fontWeight: "600" },
   chipRow: { gap: 8 },
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: "#e5e7eb", backgroundColor: "#f9fafb" },
-  chipActive: { backgroundColor: "#111827", borderColor: "#111827" },
-  chipText: { fontSize: 12, color: "#111827" },
-  chipTextActive: { color: "#ffffff" },
-  input: { backgroundColor: "#f9fafb", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, borderColor: "#e5e7eb", borderWidth: 1 },
-  suggestionList: { borderTopWidth: 1, borderTopColor: "#e5e7eb" },
-  suggestionRow: { paddingVertical: 8 },
-  suggestionText: { fontSize: 13, color: "#111827" },
-  mapPreview: { height: 140, borderRadius: 16, backgroundColor: "#eef2ff", borderWidth: 1, borderColor: "#c7d2fe", position: "relative" },
-  mapPin: { position: "absolute", width: 10, height: 10, borderRadius: 999, backgroundColor: "#1d4ed8" },
-  secondaryButton: { marginTop: 10, borderRadius: 12, paddingVertical: 10, alignItems: "center", borderWidth: 1, borderColor: "#d1d5db" },
-  secondaryText: { fontSize: 12, fontWeight: "600", color: "#111827" },
-  mapOverlay: { position: "absolute", left: 12, right: 12, bottom: 24 },
-  mapOverlayCard: { backgroundColor: "#ffffff", borderRadius: 20, padding: 16, borderWidth: 1, borderColor: "#d0d5dd", gap: 12, shadowColor: "#000000", shadowOpacity: 0.12, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8 },
-  mapOverlayHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
-  mapCloseButton: { borderRadius: 999, backgroundColor: "#101828", paddingHorizontal: 12, paddingVertical: 8 },
-  mapCloseText: { color: "#ffffff", fontSize: 12, fontWeight: "700" },
-  floatingMapToggle: { position: "absolute", zIndex: 20 },
-  floatingMapButton: { borderRadius: 999, backgroundColor: "#f97316", paddingHorizontal: 16, paddingVertical: 12, shadowColor: "#7c2d12", shadowOpacity: 0.28, shadowRadius: 16, shadowOffset: { width: 0, height: 10 }, elevation: 8 },
-  floatingMapText: { color: "#ffffff", fontSize: 12, fontWeight: "700" },
-  categoryPill: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "#111827" },
-  categoryText: { fontSize: 12, color: "#ffffff" },
-  bannerRow: { flexDirection: "row", gap: 8 },
-  bannerCard: { flex: 1, backgroundColor: "#111827", borderRadius: 16, padding: 12, gap: 4 },
-  bannerTitle: { color: "#ffffff", fontWeight: "600", fontSize: 12 },
-  bannerSubtitle: { color: "#e5e7eb", fontSize: 10 },
-  dealRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6 },
-  dealTitle: { fontSize: 13, color: "#111827" },
-  dealPrice: { fontSize: 13, fontWeight: "600", color: "#111827" },
-  creditSaleCard: { borderRadius: 14, borderWidth: 1, borderColor: "#e5e7eb", padding: 12, gap: 10 },
-  productRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 8 },
-  productTitle: { fontSize: 14, fontWeight: "600", color: "#111827" },
-  productSubtitle: { fontSize: 11, color: "#6b7280" },
-  actionButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: "#111827" },
-  actionText: { color: "#ffffff", fontSize: 12, fontWeight: "600" },
+  chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: BRAND.border, backgroundColor: BRAND.surfaceMuted },
+  chipActive: { backgroundColor: BRAND.navy, borderColor: BRAND.navy },
+  chipText: { fontSize: 12, color: BRAND.text, fontWeight: "600" },
+  chipTextActive: { color: "#FFFFFF" },
+  financeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  financeCard: { minWidth: 100, flexGrow: 1, borderRadius: 16, padding: 12, borderWidth: 1, borderColor: BRAND.border, backgroundColor: "#F7F9FC", gap: 4 },
+  financeLabel: { color: BRAND.textMuted, fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
+  financeValue: { color: BRAND.text, fontSize: 15, fontWeight: "800" },
+  listRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12, paddingVertical: 8 },
+  listCopy: { flex: 1, gap: 3 },
+  listTitle: { fontSize: 14, fontWeight: "700", color: BRAND.text },
+  listSubtitle: { fontSize: 11, color: BRAND.textMuted },
+  listValue: { fontSize: 13, fontWeight: "800", color: BRAND.navy },
+  creditSaleCard: { borderRadius: 16, borderWidth: 1, borderColor: BRAND.border, padding: 12, gap: 10, backgroundColor: "#F9FBFD" },
+  actionButton: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: BRAND.navy },
+  actionText: { color: "#FFFFFF", fontSize: 12, fontWeight: "800" },
   walletActionRow: { flexDirection: "row", gap: 8 },
-  walletActionButton: { flex: 1, borderRadius: 10, borderWidth: 1, borderColor: "#d1d5db", paddingVertical: 8, alignItems: "center", backgroundColor: "#ffffff" },
-  walletActionText: { fontSize: 11, fontWeight: "600", color: "#111827" },
-  shopRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6 },
-  shopRating: { fontSize: 12, color: "#f59e0b" },
-  footerNav: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 12, paddingHorizontal: 8, borderTopWidth: 1, borderTopColor: "#e5e7eb" },
+  walletActionButton: { flex: 1, borderRadius: 10, borderWidth: 1, borderColor: BRAND.border, paddingVertical: 8, alignItems: "center", backgroundColor: BRAND.surface },
+  walletActionText: { fontSize: 11, fontWeight: "700", color: BRAND.text },
+  loadingText: { fontSize: 12, color: BRAND.orange, fontWeight: "700" },
+  footerNav: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 12, paddingHorizontal: 8, borderTopWidth: 1, borderTopColor: BRAND.border },
   footerItem: { padding: 6 },
-  footerText: { fontSize: 12, color: "#111827", fontWeight: "600" },
+  footerText: { fontSize: 12, color: BRAND.text, fontWeight: "700" },
+  mapOverlay: { position: "absolute", left: 12, right: 12, bottom: 24 },
+  mapOverlayCard: { backgroundColor: BRAND.surface, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: BRAND.border, gap: 12, shadowColor: "#000000", shadowOpacity: 0.12, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8 },
+  mapOverlayHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
+  mapPreview: { height: 140, borderRadius: 16, backgroundColor: "#EEF3F9", borderWidth: 1, borderColor: BRAND.border, position: "relative" },
+  mapPin: { position: "absolute", width: 10, height: 10, borderRadius: 999, backgroundColor: BRAND.orange },
+  mapCloseButton: { borderRadius: 999, backgroundColor: BRAND.navy, paddingHorizontal: 12, paddingVertical: 8 },
+  mapCloseText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
+  mapOpenButton: { marginTop: 10, borderRadius: 12, paddingVertical: 10, alignItems: "center", borderWidth: 1, borderColor: BRAND.border, backgroundColor: BRAND.surface },
+  mapOpenText: { fontSize: 12, fontWeight: "700", color: BRAND.text },
+  floatingMapToggle: { position: "absolute", zIndex: 20 },
+  floatingMapButton: { borderRadius: 999, backgroundColor: BRAND.orange, paddingHorizontal: 16, paddingVertical: 12, shadowColor: "#7C2D12", shadowOpacity: 0.28, shadowRadius: 16, shadowOffset: { width: 0, height: 10 }, elevation: 8 },
+  floatingMapText: { color: "#FFFFFF", fontSize: 12, fontWeight: "800" },
 });
-
 
 

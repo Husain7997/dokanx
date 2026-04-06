@@ -4,10 +4,22 @@ import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { clearCartRequest, getCartRequest, saveCartRequest } from "../lib/api-client";
+import { DokanXLogo } from "../components/dokanx-logo";
 import { useAuthStore } from "../store/auth-store";
 import type { CartItem } from "../store/cart-store";
 import { useCartStore } from "../store/cart-store";
 import { useTenantStore } from "../store/tenant-store";
+
+const BRAND = {
+  navy: "#0B1E3C",
+  orange: "#FF7A00",
+  screen: "#F4F7FB",
+  surface: "#FFFFFF",
+  border: "#D7DFEA",
+  text: "#0B1E3C",
+  muted: "#5F6F86",
+  tint: "#EEF3FA",
+};
 
 export function CartScreen() {
   const navigation = useNavigation();
@@ -85,7 +97,7 @@ export function CartScreen() {
         setItems(normalizeRemoteItems(remoteItems));
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to sync cart.";
+      const message = err instanceof Error ? err.message : "Unable to sync your cart right now.";
       setError(message);
     } finally {
       setSyncing(false);
@@ -131,7 +143,7 @@ export function CartScreen() {
         }
       } catch (err) {
         if (!active) return;
-        const message = err instanceof Error ? err.message : "Unable to load cart.";
+        const message = err instanceof Error ? err.message : "Unable to load your cart right now.";
         setError(message);
       } finally {
         if (active) setSyncing(false);
@@ -146,16 +158,32 @@ export function CartScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Cart Summary</Text>
-        {syncing ? <Text style={styles.infoText}>Syncing cart...</Text> : null}
+        <View style={styles.heroCard}>
+          <View style={styles.heroTopRow}>
+            <DokanXLogo variant="full" size="md" />
+            <Pressable style={styles.heroButton} onPress={() => navigation.navigate("Browse" as never)}>
+              <Text style={styles.heroButtonText}>Keep browsing</Text>
+            </Pressable>
+          </View>
+          <Text style={styles.kicker}>Cart summary</Text>
+          <Text style={styles.title}>Review items before moving to checkout.</Text>
+          <Text style={styles.subtitle}>Group items by shop, adjust quantity quickly, and keep the mobile checkout path easy to understand.</Text>
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}><Text style={styles.statLabel}>Lines</Text><Text style={styles.statValue}>{items.length}</Text></View>
+            <View style={styles.statCard}><Text style={styles.statLabel}>Shop</Text><Text style={styles.statValue}>{selectedShop?.name || "Unknown"}</Text></View>
+            <View style={styles.statCard}><Text style={styles.statLabel}>Total</Text><Text style={styles.statValue}>{totals.total} BDT</Text></View>
+          </View>
+        </View>
+
+        {syncing ? <Text style={styles.infoText}>Syncing your cart...</Text> : null}
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
         {items.length === 0 ? (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Your cart is empty</Text>
-            <Text style={styles.emptyText}>Add items from the browse screen to get started.</Text>
+            <Text style={styles.emptyText}>Add products from browse to start building this order.</Text>
             <Pressable style={styles.checkoutButton} onPress={() => navigation.navigate("Browse" as never)}>
-              <Text style={styles.checkoutText}>Browse products</Text>
+              <Text style={styles.checkoutText}>Open browse</Text>
             </Pressable>
           </View>
         ) : null}
@@ -210,7 +238,7 @@ export function CartScreen() {
               <Text style={styles.summaryTotalValue}>{totals.total} BDT</Text>
             </View>
             <Pressable style={styles.checkoutButton} onPress={handleCheckout} disabled={syncing}>
-              <Text style={styles.checkoutText}>Proceed to checkout</Text>
+              <Text style={styles.checkoutText}>Continue to checkout</Text>
             </Pressable>
             <Pressable
               style={[styles.checkoutButton, styles.clearButton]}
@@ -232,7 +260,7 @@ export function CartScreen() {
                   }
                   setItems([]);
                 } catch (err) {
-                  const message = err instanceof Error ? err.message : "Unable to clear cart.";
+                  const message = err instanceof Error ? err.message : "Unable to clear your cart right now.";
                   setError(message);
                 } finally {
                   setSyncing(false);
@@ -240,7 +268,7 @@ export function CartScreen() {
               }}
               disabled={syncing}
             >
-              <Text style={styles.checkoutText}>Clear cart</Text>
+              <Text style={styles.checkoutText}>Remove all items</Text>
             </Pressable>
           </View>
         ) : null}
@@ -252,45 +280,107 @@ export function CartScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#f8f4ef",
+    backgroundColor: BRAND.screen,
   },
   container: {
     padding: 16,
     gap: 16,
   },
-  title: {
-    fontSize: 20,
+  heroCard: {
+    backgroundColor: BRAND.surface,
+    borderRadius: 24,
+    padding: 18,
+    gap: 14,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+  },
+  heroTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+  },
+  heroButton: {
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: BRAND.navy,
+  },
+  heroButtonText: {
+    color: "#ffffff",
+    fontSize: 12,
     fontWeight: "700",
-    color: "#1f2937",
+  },
+  kicker: {
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 1.2,
+    color: BRAND.orange,
+    textTransform: "uppercase",
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: BRAND.text,
+  },
+  subtitle: {
+    fontSize: 13,
+    color: BRAND.muted,
+    lineHeight: 20,
+  },
+  statsRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  statCard: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    backgroundColor: BRAND.tint,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    gap: 4,
+  },
+  statLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: BRAND.muted,
+    textTransform: "uppercase",
+  },
+  statValue: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: BRAND.text,
   },
   infoText: {
     fontSize: 12,
-    color: "#6b7280",
+    color: BRAND.muted,
   },
   errorText: {
     fontSize: 12,
     color: "#b91c1c",
   },
   card: {
-    backgroundColor: "#ffffff",
+    backgroundColor: BRAND.surface,
     borderRadius: 18,
     padding: 16,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: BRAND.border,
     gap: 12,
   },
   cardTitle: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#111827",
+    color: BRAND.text,
   },
   emptyText: {
     fontSize: 13,
-    color: "#6b7280",
+    color: BRAND.muted,
   },
   itemRow: {
     borderTopWidth: 1,
-    borderTopColor: "#f3f4f6",
+    borderTopColor: "#eef3fa",
     paddingTop: 12,
     gap: 10,
   },
@@ -300,15 +390,15 @@ const styles = StyleSheet.create({
   itemName: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#111827",
+    color: BRAND.text,
   },
   itemMeta: {
     fontSize: 12,
-    color: "#6b7280",
+    color: BRAND.muted,
   },
   itemPrice: {
     fontSize: 13,
-    color: "#374151",
+    color: BRAND.text,
   },
   quantityControls: {
     flexDirection: "row",
@@ -317,22 +407,22 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   qtyButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: "#f3f4f6",
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: BRAND.tint,
     alignItems: "center",
     justifyContent: "center",
   },
   qtyText: {
     fontSize: 16,
-    fontWeight: "600",
-    color: "#111827",
+    fontWeight: "700",
+    color: BRAND.text,
   },
   qtyValue: {
     fontSize: 14,
-    fontWeight: "600",
-    color: "#111827",
+    fontWeight: "700",
+    color: BRAND.text,
   },
   removeButton: {
     marginLeft: "auto",
@@ -353,31 +443,31 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 13,
-    color: "#6b7280",
+    color: BRAND.muted,
   },
   summaryValue: {
     fontSize: 13,
-    color: "#111827",
+    color: BRAND.text,
   },
   summaryTotalLabel: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#111827",
+    color: BRAND.text,
   },
   summaryTotalValue: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#111827",
+    color: BRAND.text,
   },
   checkoutButton: {
     marginTop: 12,
-    backgroundColor: "#111827",
+    backgroundColor: BRAND.navy,
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: "center",
   },
   clearButton: {
-    backgroundColor: "#374151",
+    backgroundColor: "#4b5563",
   },
   checkoutText: {
     color: "#ffffff",
@@ -385,3 +475,5 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
+
+

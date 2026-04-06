@@ -1,4 +1,4 @@
-﻿import { apiRequest, registerUnauthorizedHandler } from "../../../shared/api-client";
+import { apiRequest, registerUnauthorizedHandler } from "../../../shared/api-client";
 import { getApiBaseUrl } from "../../../shared/api-config";
 
 const MERCHANT_APP_VERSION = "1.0.0";
@@ -142,6 +142,7 @@ export function getMerchantCustomersRequest(token: string) {
       totalSpend?: number;
       totalDue?: number;
       createdAt?: string;
+      isBlocked?: boolean;
     }>;
   }>("/api/shops/me/customers", { token });
 }
@@ -158,6 +159,7 @@ export function searchMerchantCustomersRequest(token: string, query: string) {
       totalSpend?: number;
       totalDue?: number;
       createdAt?: string;
+      isBlocked?: boolean;
     }>;
   }>(`/api/shops/me/customers?q=${encodeURIComponent(query)}`, { token });
 }
@@ -174,6 +176,8 @@ export type MerchantProductApiRow = {
   brand?: string;
   barcode?: string;
   imageUrl?: string;
+  productionDate?: string;
+  expiryDate?: string;
 };
 
 
@@ -216,6 +220,8 @@ export function createMerchantProductRequest(token: string, payload: {
   stock: number;
   barcode?: string;
   imageUrl?: string;
+  productionDate?: string;
+  expiryDate?: string;
   discountRate?: number;
 }) {
   return request<{ data?: { _id?: string; name?: string } }>("/api/products", {
@@ -233,6 +239,8 @@ export function createMerchantProductsBulkRequest(token: string, rows: Array<{
   stock: number;
   barcode?: string;
   imageUrl?: string;
+  productionDate?: string;
+  expiryDate?: string;
   discountRate?: number;
 }>) {
   return request<{
@@ -256,6 +264,8 @@ export function updateMerchantProductRequest(token: string, productId: string, p
   stock: number;
   barcode?: string;
   imageUrl?: string;
+  productionDate?: string;
+  expiryDate?: string;
   discountRate?: number;
 }) {
   return request<{ data?: { _id?: string; name?: string } }>(`/api/products/${productId}`, {
@@ -355,6 +365,7 @@ export type MerchantFeatureSettings = {
   posScannerEnabled?: boolean;
   cameraScannerEnabled?: boolean;
   bluetoothScannerEnabled?: boolean;
+  scannerFeedbackEnabled?: boolean;
   productSearchEnabled?: boolean;
   discountToolsEnabled?: boolean;
   pricingSafetyEnabled?: boolean;
@@ -499,16 +510,68 @@ export function updateMerchantNotificationSettingsRequest(token: string, payload
   });
 }
 
-export function listMerchantCampaignsRequest(token: string) {
-  return request<{ data?: Array<{ _id?: string; name?: string; type?: string; status?: string }> }>("/api/marketing/campaigns", { token });
+export function topupMerchantWalletRequest(token: string, payload: { amount: number; referenceId?: string; reference?: string }) {
+  return request<{ data?: Record<string, unknown>; message?: string }>("/api/wallet/credit", {
+    method: "POST",
+    token,
+    body: payload,
+  });
 }
 
-export function createMerchantCampaignRequest(token: string, payload: { name: string; type?: string }) {
+export function blockMerchantCustomerRequest(token: string, userId: string) {
+  return request<{ data?: { _id?: string; isBlocked?: boolean }; message?: string }>(`/api/shops/me/customers/${userId}/block`, {
+    method: "PATCH",
+    token,
+  });
+}
+
+export function unblockMerchantCustomerRequest(token: string, userId: string) {
+  return request<{ data?: { _id?: string; isBlocked?: boolean }; message?: string }>(`/api/shops/me/customers/${userId}/unblock`, {
+    method: "PATCH",
+    token,
+  });
+}
+
+export function listMerchantCustomerComplaintsRequest(token: string) {
+  return request<{ data?: Array<{ _id?: string; customerId?: string; globalCustomerId?: string; title?: string; detail?: string; channel?: string; status?: string; createdAt?: string }> }>("/api/shops/me/customer-complaints", { token });
+}
+
+export function createMerchantCustomerComplaintRequest(token: string, payload: { customerId: string; globalCustomerId?: string; title: string; detail?: string; channel?: string }) {
+  return request<{ data?: Record<string, unknown> }>("/api/shops/me/customer-complaints", {
+    method: "POST",
+    token,
+    body: payload,
+  });
+}
+
+export function updateMerchantCustomerComplaintRequest(token: string, complaintId: string, payload: { status?: string; detail?: string }) {
+  return request<{ data?: Record<string, unknown> }>(`/api/shops/me/customer-complaints/${complaintId}`, {
+    method: "PATCH",
+    token,
+    body: payload,
+  });
+}
+
+export type MerchantCampaignApiRow = { _id?: string; name?: string; type?: string; status?: string; platform?: string; channel?: string; content?: string; offerTitle?: string; ctaLabel?: string; redirectUrl?: string; trackingCode?: string; targetingSummary?: string; autoMessage?: string; createdAt?: string; scheduleAt?: string; };
+
+export function listMerchantCampaignsRequest(token: string) {
+  return request<{ data?: MerchantCampaignApiRow[] }>("/api/marketing/campaigns", { token });
+}
+
+export function createMerchantCampaignRequest(token: string, payload: { name: string; type?: string; status?: string; platform?: string; channel?: string; content?: string; offerTitle?: string; ctaLabel?: string; redirectUrl?: string; trackingCode?: string; targetingSummary?: string; autoMessage?: string }) {
   return request<{ data?: Record<string, unknown> }>("/api/marketing/campaigns", {
     method: "POST",
     token,
     body: payload,
   });
+}
+
+export function getMerchantPrintCodesRequest(token: string, options: { data?: string; barcode?: string; size?: number }) {
+  const params = new URLSearchParams();
+  if (options.data) params.set("data", options.data);
+  if (options.barcode) params.set("barcode", options.barcode);
+  if (options.size) params.set("size", String(options.size));
+  return request<{ data?: { qrDataUrl?: string; barcodeDataUrl?: string; target?: string; barcode?: string } }>(`/api/shops/me/print-codes?${params.toString()}`, { token });
 }
 
 export function getMerchantAiInsightsRequest(token: string) {
@@ -672,6 +735,9 @@ export function updateMerchantTeamMemberRequest(token: string, userId: string, p
     data?: MerchantTeamMember;
   }>(`/api/shops/me/team/${userId}`, { method: "PATCH", token, body: payload });
 }
+
+
+
 
 
 

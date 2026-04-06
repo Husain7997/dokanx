@@ -1,4 +1,4 @@
-﻿const Product = require("../models/product.model");
+const Product = require("../models/product.model");
 const Inventory = require("../models/Inventory.model");
 const ProductReview = require("../models/productReview.model");
 const { t } = require("@/core/infrastructure");
@@ -29,6 +29,8 @@ function normalizeProductPayload(body) {
     stock: Math.max(0, Number(source.stock || 0)),
     barcode: typeof source.barcode === "string" && source.barcode.trim() ? source.barcode.trim() : null,
     imageUrl: typeof source.imageUrl === "string" ? source.imageUrl.trim() : "",
+    productionDate: source.productionDate ? new Date(source.productionDate) : null,
+    expiryDate: source.expiryDate ? new Date(source.expiryDate) : null,
     slug: typeof source.slug === "string" && source.slug.trim() ? source.slug.trim() : null,
     discountRate: Math.max(0, Math.min(100, Number(source.discountRate || 0))),
     warranty: normalizeProtectionConfig(source.warranty, "service"),
@@ -70,6 +72,8 @@ async function createProductRecord({ shopId, ownerId, source }) {
     slug: payload.slug,
     barcode: payload.barcode,
     imageUrl: payload.imageUrl,
+    productionDate: payload.productionDate,
+    expiryDate: payload.expiryDate,
     shopId,
     owner: ownerId,
     reserved: 0,
@@ -179,6 +183,8 @@ exports.updateProduct = async (req, res) => {
     product.slug = payload.slug;
     product.barcode = payload.barcode;
     product.imageUrl = payload.imageUrl;
+    product.productionDate = payload.productionDate;
+    product.expiryDate = payload.expiryDate;
     product.warranty = payload.warranty;
     product.guarantee = payload.guarantee;
 
@@ -346,3 +352,4 @@ exports.createProductReview = async (req, res) => {
     return res.status(500).json({ message: "Failed to submit review" });
   }
 };
+

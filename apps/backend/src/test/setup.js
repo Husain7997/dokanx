@@ -4,6 +4,7 @@ const { MongoMemoryReplSet } = require("mongodb-memory-server");
 
 let memoryServer = null;
 const runOnceStore = new Map();
+const shouldSkipMongoSetup = process.env.SKIP_MONGO_SETUP === "1";
 
 dotenv.config({
   path: ".env.test",
@@ -14,6 +15,10 @@ dotenv.config({
 jest.setTimeout(30000);
 
 beforeAll(async () => {
+  if (shouldSkipMongoSetup) {
+    return;
+  }
+
   if (mongoose.connection.readyState === 1) {
     return;
   }
@@ -63,6 +68,10 @@ beforeEach(() => {
 });
 
 afterAll(async () => {
+  if (shouldSkipMongoSetup) {
+    return;
+  }
+
   if (mongoose.connection.readyState === 1) {
     await mongoose.connection.dropDatabase();
     await mongoose.disconnect();

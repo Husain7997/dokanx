@@ -74,7 +74,7 @@ export default function ReviewsPage() {
             <div key={String(row._id || row.productId)} className="grid gap-2 rounded-2xl border border-border/60 px-4 py-3">
               <div className="flex flex-wrap justify-between gap-2">
                 <span>{row.reviewerName || "Customer"}</span>
-                <span>{row.rating ?? 0} â˜…</span>
+                <span>{row.rating ?? 0} stars</span>
                 <span>{row.status || "PENDING"}</span>
                 <span>{row.createdAt ? new Date(row.createdAt).toLocaleString() : "Pending"}</span>
               </div>
@@ -82,10 +82,11 @@ export default function ReviewsPage() {
             </div>
           ))}
           {!reviews.length && !error ? (
-            <p>No reviews yet.</p>
+            <p className="text-sm text-muted-foreground">No customer reviews have been submitted yet. New product feedback will appear here for moderation.</p>
           ) : null}
         </div>
       </Card>
     </div>
   );
 }
+

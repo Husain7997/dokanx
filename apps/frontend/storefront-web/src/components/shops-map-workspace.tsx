@@ -170,7 +170,7 @@ export function ShopsMapWorkspace({ initialShops }: ShopsMapWorkspaceProps) {
                     <Badge variant={shop.verified ? "success" : "neutral"}>
                       {shop.verified ? "Verified" : "New"}
                     </Badge>
-                    <span className="text-sm font-medium">{shop.rating} ★</span>
+                    <span className="text-sm font-medium">{shop.rating} stars</span>
                   </div>
                 </div>
                 <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -194,9 +194,9 @@ export function ShopsMapWorkspace({ initialShops }: ShopsMapWorkspaceProps) {
             ))
           ) : (
             <Card className="border-dashed border-border/70 bg-card/60">
-              <CardTitle>No shops found</CardTitle>
+              <CardTitle>No shops match this map view</CardTitle>
               <CardDescription className="mt-2">
-                Try removing a filter or searching with fewer keywords.
+                Try clearing one filter, widening the area, or searching with fewer keywords.
               </CardDescription>
             </Card>
           )}
@@ -205,7 +205,7 @@ export function ShopsMapWorkspace({ initialShops }: ShopsMapWorkspaceProps) {
         <Card className="relative overflow-hidden border-border/60 bg-card/70">
           <CardTitle>Full map</CardTitle>
           <CardDescription className="mt-2">
-            Marker groups update as you filter shops and zoom into dense areas.
+            Marker groups update as you refine filters and zoom into dense market areas.
           </CardDescription>
           <div className="relative mt-6 h-[520px] overflow-hidden rounded-3xl border border-border/60 bg-[radial-gradient(circle_at_top_left,rgba(15,118,110,0.18),transparent_55%),radial-gradient(circle_at_bottom_right,rgba(37,99,235,0.18),transparent_55%),linear-gradient(135deg,rgba(15,23,42,0.05),rgba(15,23,42,0.18))]">
             <div className="absolute inset-0 opacity-50 [background-image:linear-gradient(transparent_23px,rgba(148,163,184,0.12)_24px),linear-gradient(90deg,transparent_23px,rgba(148,163,184,0.12)_24px)] [background-size:24px_24px]" />
@@ -276,3 +276,6 @@ export function ShopsMapWorkspace({ initialShops }: ShopsMapWorkspaceProps) {
     </div>
   );
 }
+
+
+

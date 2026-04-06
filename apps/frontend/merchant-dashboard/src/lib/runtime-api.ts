@@ -191,6 +191,53 @@ type TrackingResponse = {
   } & JsonValue;
 };
 
+type DeliveryConfigResponse = {
+  data?: {
+    groupingRadiusKm?: number;
+    sameZoneCharge?: number;
+    groupedCharge?: number;
+    externalCarrierCharge?: number;
+  } & JsonValue;
+};
+
+type DeliveryEstimateResponse = {
+  data?: {
+    deliveryCharge?: number;
+    totalDistance?: number;
+    strategy?: string;
+    route?: Array<{
+      shopId?: string;
+      label?: string;
+      city?: string;
+      coordinates?: { lat?: number; lng?: number };
+    }>;
+  } & JsonValue;
+};
+
+type SearchSuggestionResponse = {
+  data?: Array<{
+    id?: string;
+    name?: string;
+    entityType?: string;
+    score?: number;
+    reason?: string;
+  }>;
+  count?: number;
+};
+
+type PublicShopListResponse = {
+  data?: Array<{
+    _id?: string;
+    name?: string;
+    slug?: string;
+    logoUrl?: string;
+    category?: string;
+    rating?: number;
+    city?: string;
+    country?: string;
+  } & JsonValue>;
+};
+
 type MarketplaceAppsResponse = {
   data?: Array<{
     _id?: string;
@@ -406,6 +453,48 @@ export function updateShopSettings(payload: {
 
 export function getShopSettings() {
   return request<ShopSettingsResponse>("/shops/me/settings");
+}
+
+export function listPublicShops() {
+  return request<PublicShopListResponse>("/shops/public");
+}
+
+export function getDeliveryConfig() {
+  return request<DeliveryConfigResponse>("/delivery/config");
+}
+
+export function updateDeliveryConfig(payload: {
+  groupingRadiusKm?: number;
+  sameZoneCharge?: number;
+  groupedCharge?: number;
+  externalCarrierCharge?: number;
+}) {
+  return request<DeliveryConfigResponse>("/delivery/config", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function estimateDeliveryCharge(payload: {
+  stops: Array<{
+    label: string;
+    city: string;
+    coordinates: { lat: number; lng: number };
+  }>;
+  destination: {
+    city: string;
+    coordinates: { lat: number; lng: number };
+  };
+  orderId?: string;
+}) {
+  return request<DeliveryEstimateResponse>("/delivery/estimate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function searchAISuggestions(query: string, limit = 8) {
+  return request<SearchSuggestionResponse>(`/search/suggestions?q=${encodeURIComponent(query)}&limit=${limit}`);
 }
 
 export function listTeamMembers() {

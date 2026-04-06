@@ -47,9 +47,9 @@ export function OrdersWorkspace() {
   return (
     <div className="grid gap-6">
       <Card>
-        <CardTitle>Customer order history</CardTitle>
+        <CardTitle>Customer order timeline</CardTitle>
         <CardDescription className="mt-2">
-          Live order history is loaded from the authenticated customer account when available.
+          Live order history loads from the authenticated customer account when available.
         </CardDescription>
       </Card>
       <OrderTimeline
@@ -64,7 +64,7 @@ export function OrdersWorkspace() {
           <Card key={String(order._id || order.id || "")}>
             <CardTitle>Order {String(order._id || order.id || "").slice(-6)}</CardTitle>
             <CardDescription className="mt-2">
-              {order.deliveryGroupId ? `Grouped delivery ${order.deliveryGroupId}` : "Single-shop delivery"}
+              {order.deliveryGroupId ? `Grouped delivery reference ${order.deliveryGroupId}` : "Single-shop fulfillment"}
             </CardDescription>
             <div className="mt-4 grid gap-3 text-sm text-muted-foreground">
               <p>
@@ -92,3 +92,4 @@ export function OrdersWorkspace() {
     </div>
   );
 }
+
