@@ -11,6 +11,20 @@ const jwt = require("jsonwebtoken");
 const { t } =
   require('@/core/infrastructure');
 const agentService = require("../modules/agent/agent.service");
+const { getOrSet, bumpNamespace } = require("../infrastructure/cache/versioned-cache.service");
+const { resolveShopTheme } = require("../utils/theme.util");
+const { listCuratedMarketplaceThemes } = require("../utils/theme-marketplace.util");
+
+async function invalidateShopCaches() {
+  await Promise.all([
+    bumpNamespace("public-shops"),
+    bumpNamespace("search"),
+  ]);
+}
+
+function normalizePhoneDigits(value) {
+  return String(value || "").replace(/\D/g, "") || null;
+}
 
 
 
@@ -52,6 +66,7 @@ exports.createShop = async (req, res) => {
 
     req.user.shopId = shop._id;
     await req.user.save();
+    await invalidateShopCaches();
 
     await createAudit({
       action: "CREATE_SHOP",
@@ -132,99 +147,115 @@ exports.listPublicShops = async (req, res) => {
     const safeLimit = Math.min(200, Math.max(1, Number(limit || 100)));
     const filter = { isActive: true, status: "ACTIVE" };
 
-    if (category) {
-      const shopIds = await Product.distinct("shopId", { category: String(category) });
-      if (!shopIds.length) {
-        return res.json({ data: [] });
-      }
-      filter._id = { $in: shopIds };
-    }
+    const cached = await getOrSet({
+      namespace: "public-shops",
+      key: {
+        scope: "public-shops",
+        query: req.query,
+      },
+      ttlSeconds: category || rating || distance ? 45 : 120,
+      resolver: async () => {
+        if (category) {
+          const shopIds = await Product.distinct("shopId", { category: String(category) });
+          if (!shopIds.length) {
+            return { data: [] };
+          }
+          filter._id = { $in: shopIds };
+        }
 
-    const shops = await Shop.find(filter)
-      .select("name domain slug trustScore popularityScore city country")
-      .limit(safeLimit)
-      .lean();
+        const shops = await Shop.find(filter)
+          .select("name domain slug trustScore popularityScore city country logoUrl themeId themeConfig themeOverrides themeExperiment brandPrimaryColor brandAccentColor")
+          .limit(safeLimit)
+          .lean();
 
-    if (!shops.length) {
-      return res.json({ data: [] });
-    }
+        if (!shops.length) {
+          return { data: [] };
+        }
 
-    const shopIds = shops.map((shop) => shop._id);
-    const [locations, ratingsMap, distanceMap, categoryRows] = await Promise.all([
-      ShopLocation.find({ shopId: { $in: shopIds }, isActive: true })
-        .sort({ createdAt: 1 })
-        .lean(),
-      buildShopRatings(shopIds),
-      buildShopDistances(shopIds.map((id) => String(id)), normalizedLat, normalizedLng),
-      Product.aggregate([
-        { $match: { shopId: { $in: shopIds }, category: { $nin: [null, ""] } } },
-        { $group: { _id: { shopId: "$shopId", category: "$category" }, count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
-      ]),
-    ]);
+        const shopIds = shops.map((shop) => shop._id);
+        const [locations, ratingsMap, distanceMap, categoryRows] = await Promise.all([
+          ShopLocation.find({ shopId: { $in: shopIds }, isActive: true })
+            .sort({ createdAt: 1 })
+            .lean(),
+          buildShopRatings(shopIds),
+          buildShopDistances(shopIds.map((id) => String(id)), normalizedLat, normalizedLng),
+          Product.aggregate([
+            { $match: { shopId: { $in: shopIds }, category: { $nin: [null, ""] } } },
+            { $group: { _id: { shopId: "$shopId", category: "$category" }, count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+          ]),
+        ]);
 
-    const primaryLocationMap = new Map();
-    locations.forEach((location) => {
-      const key = String(location.shopId || "");
-      if (!key || primaryLocationMap.has(key)) return;
-      primaryLocationMap.set(key, location);
+        const primaryLocationMap = new Map();
+        locations.forEach((location) => {
+          const key = String(location.shopId || "");
+          if (!key || primaryLocationMap.has(key)) return;
+          primaryLocationMap.set(key, location);
+        });
+        const categoryMap = new Map();
+        categoryRows.forEach((row) => {
+          const key = String(row?._id?.shopId || "");
+          if (!key || categoryMap.has(key)) return;
+          categoryMap.set(key, String(row?._id?.category || ""));
+        });
+
+        const curatedThemes = await listCuratedMarketplaceThemes();
+        let data = shops.map((shop) => {
+          const location = primaryLocationMap.get(String(shop._id || ""));
+          const coords = location?.coordinates?.coordinates || [];
+          const ratings = ratingsMap.get(String(shop._id || "")) || { avgRating: 0, count: 0 };
+          const distanceKm = distanceMap.get(String(shop._id || "")) ?? null;
+
+          return {
+            _id: shop._id,
+            id: shop._id,
+            shopId: shop._id,
+            name: shop.name,
+            domain: shop.domain || null,
+            slug: shop.slug || null,
+            city: shop.city || location?.city || null,
+            country: shop.country || location?.country || null,
+            lat: coords.length >= 2 ? Number(coords[1]) : null,
+            lng: coords.length >= 2 ? Number(coords[0]) : null,
+            locationName: location?.name || null,
+            category: categoryMap.get(String(shop._id || "")) || null,
+            ratingAverage: Number(ratings.avgRating || 0),
+            ratingCount: Number(ratings.count || 0),
+            distanceKm,
+            trustScore: Number(shop.trustScore || 0),
+            popularityScore: Number(shop.popularityScore || 0),
+            isTrending: Number(shop.popularityScore || 0) >= 10,
+            logoUrl: shop.logoUrl || null,
+            theme: resolveShopTheme(shop, curatedThemes),
+            themeExperiment: shop.themeExperiment || null,
+          };
+        });
+
+        data = data.filter((shop) => shop.lat != null && shop.lng != null);
+        if (minRating != null) {
+          data = data.filter((shop) => Number(shop.ratingAverage || 0) >= minRating);
+        }
+        if (maxDistance != null) {
+          data = data.filter((shop) => shop.distanceKm != null && Number(shop.distanceKm) <= maxDistance);
+        }
+
+        data.sort((a, b) => {
+          const scoreA =
+            (a.distanceKm == null ? 0 : 100 - Math.min(100, Number(a.distanceKm) * 5)) +
+            Number(a.ratingAverage || 0) * 10 +
+            Number(a.popularityScore || 0) * 0.2;
+          const scoreB =
+            (b.distanceKm == null ? 0 : 100 - Math.min(100, Number(b.distanceKm) * 5)) +
+            Number(b.ratingAverage || 0) * 10 +
+            Number(b.popularityScore || 0) * 0.2;
+          return scoreB - scoreA;
+        });
+
+        return { data };
+      },
     });
-    const categoryMap = new Map();
-    categoryRows.forEach((row) => {
-      const key = String(row?._id?.shopId || "");
-      if (!key || categoryMap.has(key)) return;
-      categoryMap.set(key, String(row?._id?.category || ""));
-    });
 
-    let data = shops.map((shop) => {
-      const location = primaryLocationMap.get(String(shop._id || ""));
-      const coords = location?.coordinates?.coordinates || [];
-      const ratings = ratingsMap.get(String(shop._id || "")) || { avgRating: 0, count: 0 };
-      const distanceKm = distanceMap.get(String(shop._id || "")) ?? null;
-
-      return {
-        _id: shop._id,
-        id: shop._id,
-        shopId: shop._id,
-        name: shop.name,
-        domain: shop.domain || null,
-        slug: shop.slug || null,
-        city: shop.city || location?.city || null,
-        country: shop.country || location?.country || null,
-        lat: coords.length >= 2 ? Number(coords[1]) : null,
-        lng: coords.length >= 2 ? Number(coords[0]) : null,
-        locationName: location?.name || null,
-        category: categoryMap.get(String(shop._id || "")) || null,
-        ratingAverage: Number(ratings.avgRating || 0),
-        ratingCount: Number(ratings.count || 0),
-        distanceKm,
-        trustScore: Number(shop.trustScore || 0),
-        popularityScore: Number(shop.popularityScore || 0),
-        isTrending: Number(shop.popularityScore || 0) >= 10,
-      };
-    });
-
-    data = data.filter((shop) => shop.lat != null && shop.lng != null);
-    if (minRating != null) {
-      data = data.filter((shop) => Number(shop.ratingAverage || 0) >= minRating);
-    }
-    if (maxDistance != null) {
-      data = data.filter((shop) => shop.distanceKm != null && Number(shop.distanceKm) <= maxDistance);
-    }
-
-    data.sort((a, b) => {
-      const scoreA =
-        (a.distanceKm == null ? 0 : 100 - Math.min(100, Number(a.distanceKm) * 5)) +
-        Number(a.ratingAverage || 0) * 10 +
-        Number(a.popularityScore || 0) * 0.2;
-      const scoreB =
-        (b.distanceKm == null ? 0 : 100 - Math.min(100, Number(b.distanceKm) * 5)) +
-        Number(b.ratingAverage || 0) * 10 +
-        Number(b.popularityScore || 0) * 0.2;
-      return scoreB - scoreA;
-    });
-
-    res.json({ data });
+    res.json(cached.value);
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -363,7 +394,7 @@ exports.createCustomer = async (req, res) => {
     const existing = await User.findOne({
       role: "CUSTOMER",
       $or: [
-        { phone },
+        { normalizedPhone: normalizePhoneDigits(phone) },
         ...(email ? [{ email }] : []),
       ],
     });
@@ -432,6 +463,7 @@ exports.approveShop = async (req, res) => {
    
     shop.isActive = true;
     await shop.save();
+    await invalidateShopCaches();
 
     res.json({
       message: t('common.updated', req.lang),
@@ -455,6 +487,7 @@ exports.suspendShop = async (req, res) => {
   
   shop.isActive = false;
   await shop.save();
+  await invalidateShopCaches();
 
   res.json({
     message: t('common.updated', req.lang),
@@ -550,7 +583,8 @@ exports.updateCustomerComplaint = async (req, res) => {
   const updates = {};
   if (req.body?.status !== undefined) updates.status = req.body.status;
   if (req.body?.detail !== undefined) updates.detail = req.body.detail;
-  const complaint = await CustomerComplaint.findOneAndUpdate({ _id: complaintId, shopId }, updates, { new: true });
+  const complaint = await CustomerComplaint.findOneAndUpdate({ _id: complaintId, shopId }, updates, { returnDocument: "after" });
   if (!complaint) return res.status(404).json({ message: "Complaint not found" });
   res.json({ data: complaint });
 };
+

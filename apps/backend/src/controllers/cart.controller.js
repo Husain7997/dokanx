@@ -91,7 +91,7 @@ exports.saveCart = async (req, res) => {
       items: normalizedItems,
       totals,
     },
-    { new: true, upsert: true }
+    { returnDocument: "after", upsert: true }
   );
 
   const searchId = req.headers["x-search-id"] ? String(req.headers["x-search-id"]) : null;
@@ -166,7 +166,7 @@ exports.mergeCart = async (req, res) => {
       totals,
       guestToken: null,
     },
-    { new: true, upsert: true }
+    { returnDocument: "after", upsert: true }
   );
 
   await Cart.deleteOne({ _id: guestCart._id });
@@ -188,3 +188,4 @@ exports.removeCoupon = async (req, res) => {
   if (!shopId) return res.status(400).json({ message: "shopId required" });
   res.json({ message: "Coupon removed" });
 };
+

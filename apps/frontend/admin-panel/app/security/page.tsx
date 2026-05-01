@@ -3,13 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { Badge, Button, Card, CardDescription, CardTitle, DataTable, Input, SelectDropdown } from "@dokanx/ui";
 
-import { blockIp, getRiskSettings, listAuditLogs, listIpBlocks, unblockIp, updateRiskSettings } from "@/lib/admin-runtime-api";
+import { AdminOpsPageHeader } from "@/components/admin-ops-page-header";
+import { blockIp, getOpsSettings, getRiskSettings, listAuditLogs, listIpBlocks, unblockIp, updateOpsSettings, updateRiskSettings } from "@/lib/admin-runtime-api";
 
 type AuditRow = {
   _id?: string;
   action?: string;
   targetType?: string;
   targetId?: string;
+  performedBy?: { name?: string; email?: string };
+  meta?: Record<string, unknown>;
   createdAt?: string;
 };
 
@@ -36,6 +39,13 @@ export default function SecurityPage() {
   const [riskTag, setRiskTag] = useState("Security");
   const [riskStatus, setRiskStatus] = useState<string | null>(null);
   const defaultRiskRules = { high: 80, medium: 50, tag: "Security" };
+  const [lagWatchMs, setLagWatchMs] = useState(60000);
+  const [lagCriticalMs, setLagCriticalMs] = useState(300000);
+  const [queueWaitingWatch, setQueueWaitingWatch] = useState(20);
+  const [queueActiveWatch, setQueueActiveWatch] = useState(10);
+  const [outboxPendingWatch, setOutboxPendingWatch] = useState(50);
+  const [opsStatus, setOpsStatus] = useState<string | null>(null);
+  const defaultOpsRules = { lagWatchMs: 60000, lagCriticalMs: 300000, queueWaitingWatch: 20, queueActiveWatch: 10, outboxPendingWatch: 50 };
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -56,6 +66,15 @@ export default function SecurityPage() {
           setHighRiskThreshold(Number(riskResponse.data.highThreshold ?? 80));
           setMediumRiskThreshold(Number(riskResponse.data.mediumThreshold ?? 50));
           setRiskTag(String(riskResponse.data.tag ?? "Security"));
+        }
+        const opsResponse = await getOpsSettings();
+        if (!active) return;
+        if (opsResponse?.data) {
+          setLagWatchMs(Number(opsResponse.data.lagWatchMs ?? defaultOpsRules.lagWatchMs));
+          setLagCriticalMs(Number(opsResponse.data.lagCriticalMs ?? defaultOpsRules.lagCriticalMs));
+          setQueueWaitingWatch(Number(opsResponse.data.queueWaitingWatch ?? defaultOpsRules.queueWaitingWatch));
+          setQueueActiveWatch(Number(opsResponse.data.queueActiveWatch ?? defaultOpsRules.queueActiveWatch));
+          setOutboxPendingWatch(Number(opsResponse.data.outboxPendingWatch ?? defaultOpsRules.outboxPendingWatch));
         }
       } catch (err) {
         if (!active) return;
@@ -98,6 +117,18 @@ export default function SecurityPage() {
         const action = String(log.action || "").toUpperCase();
         return action.includes("IP") || action.includes("BLOCK");
       }),
+    [filteredLogs]
+  );
+
+  const settingsAuditLogs = useMemo(
+    () =>
+      filteredLogs.filter((log) =>
+        [
+          "ADMIN_RISK_SETTINGS_UPDATED",
+          "ADMIN_OPS_THRESHOLD_UPDATED",
+          "ADMIN_THRESHOLD_UPDATED",
+        ].includes(String(log.action || "").toUpperCase())
+      ),
     [filteredLogs]
   );
 
@@ -188,13 +219,62 @@ export default function SecurityPage() {
     }
   }
 
+  async function handleSaveOpsRules() {
+    setOpsStatus(null);
+    try {
+      const response = await updateOpsSettings({
+        lagWatchMs: Number(lagWatchMs),
+        lagCriticalMs: Number(lagCriticalMs),
+        queueWaitingWatch: Number(queueWaitingWatch),
+        queueActiveWatch: Number(queueActiveWatch),
+        outboxPendingWatch: Number(outboxPendingWatch),
+      });
+      if (response?.data) {
+        setLagWatchMs(Number(response.data.lagWatchMs ?? lagWatchMs));
+        setLagCriticalMs(Number(response.data.lagCriticalMs ?? lagCriticalMs));
+        setQueueWaitingWatch(Number(response.data.queueWaitingWatch ?? queueWaitingWatch));
+        setQueueActiveWatch(Number(response.data.queueActiveWatch ?? queueActiveWatch));
+        setOutboxPendingWatch(Number(response.data.outboxPendingWatch ?? outboxPendingWatch));
+      }
+      setOpsStatus("Operational thresholds saved.");
+    } catch (err) {
+      setOpsStatus(err instanceof Error ? err.message : "Unable to save operational thresholds.");
+    }
+  }
+
+  async function handleResetOpsRules() {
+    setLagWatchMs(defaultOpsRules.lagWatchMs);
+    setLagCriticalMs(defaultOpsRules.lagCriticalMs);
+    setQueueWaitingWatch(defaultOpsRules.queueWaitingWatch);
+    setQueueActiveWatch(defaultOpsRules.queueActiveWatch);
+    setOutboxPendingWatch(defaultOpsRules.outboxPendingWatch);
+    setOpsStatus(null);
+    try {
+      const response = await updateOpsSettings(defaultOpsRules);
+      if (response?.data) {
+        setLagWatchMs(Number(response.data.lagWatchMs ?? defaultOpsRules.lagWatchMs));
+        setLagCriticalMs(Number(response.data.lagCriticalMs ?? defaultOpsRules.lagCriticalMs));
+        setQueueWaitingWatch(Number(response.data.queueWaitingWatch ?? defaultOpsRules.queueWaitingWatch));
+        setQueueActiveWatch(Number(response.data.queueActiveWatch ?? defaultOpsRules.queueActiveWatch));
+        setOutboxPendingWatch(Number(response.data.outboxPendingWatch ?? defaultOpsRules.outboxPendingWatch));
+      }
+      setOpsStatus("Operational thresholds reset to defaults.");
+    } catch (err) {
+      setOpsStatus(err instanceof Error ? err.message : "Unable to reset operational thresholds.");
+    }
+  }
+
   return (
     <div className="grid gap-6">
-      <div>
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Admin</p>
-        <h1 className="dx-display text-3xl">Security</h1>
-        <p className="text-sm text-muted-foreground">Login logs, API usage, and IP blocking.</p>
-      </div>
+      <AdminOpsPageHeader
+        title="Security"
+        description="Login logs, API usage, IP blocking, and settings governance from one security desk."
+        actions={[
+          { href: "/risk", label: "Open risk desk", variant: "secondary" },
+          { href: "/system-health", label: "Open system health", variant: "outline" },
+          { href: "/dashboard", label: "Open dashboard", variant: "outline" },
+        ]}
+      />
       {error ? (
         <Card>
           <CardTitle>Security</CardTitle>
@@ -328,6 +408,30 @@ export default function SecurityPage() {
         </div>
       </Card>
 
+      <Card>
+        <CardTitle>Operational pressure thresholds</CardTitle>
+        <CardDescription className="mt-2">Tune queue and outbox watch or critical boundaries used by admin runtime views.</CardDescription>
+        <div className="mt-4 grid gap-3 md:grid-cols-5">
+          <Input type="number" value={String(lagWatchMs)} onChange={(event) => setLagWatchMs(Number(event.target.value))} placeholder="Lag watch ms" />
+          <Input type="number" value={String(lagCriticalMs)} onChange={(event) => setLagCriticalMs(Number(event.target.value))} placeholder="Lag critical ms" />
+          <Input type="number" value={String(queueWaitingWatch)} onChange={(event) => setQueueWaitingWatch(Number(event.target.value))} placeholder="Queue waiting watch" />
+          <Input type="number" value={String(queueActiveWatch)} onChange={(event) => setQueueActiveWatch(Number(event.target.value))} placeholder="Queue active watch" />
+          <Input type="number" value={String(outboxPendingWatch)} onChange={(event) => setOutboxPendingWatch(Number(event.target.value))} placeholder="Outbox pending watch" />
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Watch lag ≥ {lagWatchMs}ms, Critical lag ≥ {lagCriticalMs}ms, Queue waiting ≥ {queueWaitingWatch}, Queue active ≥ {queueActiveWatch}, Outbox pending ≥ {outboxPendingWatch}.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-3">
+          <Button size="sm" variant="secondary" onClick={handleSaveOpsRules}>
+            Save operational thresholds
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleResetOpsRules}>
+            Reset defaults
+          </Button>
+          {opsStatus ? <span className="text-xs text-muted-foreground">{opsStatus}</span> : null}
+        </div>
+      </Card>
+
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardTitle>Login logs</CardTitle>
@@ -439,6 +543,29 @@ export default function SecurityPage() {
       </Card>
 
       <Card>
+        <CardTitle>Settings change audit</CardTitle>
+        <CardDescription className="mt-2">Track who changed risk, ops, or admin threshold rules and when.</CardDescription>
+        <DataTable
+          columns={[
+            { key: "action", header: "Action" },
+            { key: "actor", header: "Actor" },
+            { key: "summary", header: "Summary" },
+            { key: "time", header: "Time" },
+          ]}
+          rows={settingsAuditLogs.map((log) => ({
+            id: String(log._id || ""),
+            action: String(log.action || "SETTINGS_UPDATED").replace(/_/g, " "),
+            actor: log.performedBy?.name || log.performedBy?.email || "Admin",
+            summary: describeSettingsChange(log),
+            time: log.createdAt ? new Date(log.createdAt).toLocaleString() : "Unknown",
+          }))}
+        />
+        {!settingsAuditLogs.length ? (
+          <p className="mt-3 text-sm text-muted-foreground">No risk or operational threshold changes have been recorded in the current audit window.</p>
+        ) : null}
+      </Card>
+
+      <Card>
         <CardTitle>IP block audit trail</CardTitle>
         <CardDescription className="mt-2">Audit log of IP block/unblock events.</CardDescription>
         <div className="mt-3 grid gap-3">
@@ -540,5 +667,25 @@ function getRiskScore(action: string, highThreshold: number, mediumThreshold: nu
     return { score, label: `${tag} Medium`, variant: "warning" as const };
   }
   return { score, label: `${tag} Low`, variant: "neutral" as const };
+}
+
+function describeSettingsChange(log: AuditRow) {
+  const meta = (log.meta || {}) as {
+    previous?: Record<string, unknown>;
+    next?: Record<string, unknown>;
+  };
+  const previous = meta.previous || {};
+  const next = meta.next || {};
+
+  const changes = Object.keys(next)
+    .filter((key) => String(previous[key] ?? "") !== String(next[key] ?? ""))
+    .slice(0, 3)
+    .map((key) => `${key}: ${String(previous[key] ?? "-")} -> ${String(next[key] ?? "-")}`);
+
+  if (changes.length) {
+    return changes.join(" | ");
+  }
+
+  return "Settings updated";
 }
 

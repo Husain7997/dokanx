@@ -19,12 +19,13 @@
 
   
 const { protect } = require("./auth.middleware");
-const { allowRoles, blockCustomer } = require("./rbac.middleware");
+const { allowRoles, blockCustomer, requirePermissions } = require("./rbac.middleware");
 const tenantResolver = require("./tenant.middleware");
 
 module.exports = {
   protect,
   allowRoles,
+  requirePermissions,
   blockCustomer,
   tenantResolver,
     

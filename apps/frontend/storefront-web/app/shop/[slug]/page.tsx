@@ -3,8 +3,10 @@ import Link from "next/link";
 import { headers } from "next/headers";
 
 import { StorefrontProductGrid } from "@/components/storefront-product-grid";
+import { StorefrontThemeProvider } from "@/components/storefront-theme-provider";
 import { getProductsData, getShopBySlug, getShopRecommendations } from "@/lib/server-data";
 import { getTenantConfig } from "@/lib/tenant";
+import { DEFAULT_STOREFRONT_THEME, type StorefrontThemeState } from "@/lib/theme-config";
 
 export const dynamic = "force-dynamic";
 
@@ -35,8 +37,10 @@ export default async function ShopPage({ params }: { params: Promise<{ slug: str
   const recommendations = await getShopRecommendations(tenant, String(shop._id || ""));
   const nearbyPopular = (recommendations.nearby_popular_shops as Array<Record<string, unknown>>) || [];
   const topRated = (recommendations.top_rated_shops as Array<Record<string, unknown>>) || [];
+  const shopTheme = (shop.theme as StorefrontThemeState | undefined) || DEFAULT_STOREFRONT_THEME;
 
   return (
+    <StorefrontThemeProvider theme={shopTheme}>
     <div className="grid gap-8">
       <Card>
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
@@ -115,5 +119,6 @@ export default async function ShopPage({ params }: { params: Promise<{ slug: str
         </Card>
       ) : null}
     </div>
+    </StorefrontThemeProvider>
   );
 }

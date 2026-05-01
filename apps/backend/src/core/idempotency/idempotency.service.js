@@ -12,6 +12,10 @@ async function findExisting(key) {
   return Idempotency.findOne({ key, status: "COMPLETED" });
 }
 
+async function findRecord(key) {
+  return Idempotency.findOne({ key });
+}
+
 async function reserveExecution({ key, scope = "global", route = "worker", requestHash = key, ttlMs = 24 * 60 * 60 * 1000 }) {
   const now = new Date();
   const expiresAt = new Date(now.getTime() + ttlMs);
@@ -29,7 +33,7 @@ async function reserveExecution({ key, scope = "global", route = "worker", reque
     },
     {
       upsert: true,
-      new: true,
+      returnDocument: "after",
       includeResultMetadata: true,
     }
   );
@@ -79,7 +83,7 @@ async function saveResult({
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       },
     },
-    { new: true, upsert: true }
+    { returnDocument: "after", upsert: true }
   );
 }
 
@@ -92,7 +96,7 @@ async function failExecution({ key, error }) {
         error: String(error?.message || error || "Unknown error"),
       },
     },
-    { new: true }
+    { returnDocument: "after" }
   );
 }
 
@@ -100,6 +104,7 @@ module.exports = {
   failExecution,
   hashRequest,
   findExisting,
+  findRecord,
   reserveExecution,
   saveResult,
   waitForCompletion,

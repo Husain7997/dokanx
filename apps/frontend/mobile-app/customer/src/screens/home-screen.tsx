@@ -282,6 +282,12 @@ export function HomeScreen() {
             <Pressable style={styles.heroSecondaryButton} onPress={() => setShowMapPreview((current) => !current)}>
               <Text style={styles.heroSecondaryText}>{showMapPreview ? "Hide Map" : "Show Map"}</Text>
             </Pressable>
+            <Pressable style={styles.heroTertiaryButton} onPress={() => navigation.navigate("Notifications" as never)}>
+              <Text style={styles.heroTertiaryText}>üîî Alerts</Text>
+            </Pressable>
+            <Pressable style={styles.heroTertiaryButton} onPress={() => navigation.navigate("Tasks" as never)}>
+              <Text style={styles.heroTertiaryText}>üìù Tasks</Text>
+            </Pressable>
           </View>
           <View style={styles.statRow}>
             <View style={styles.statCard}>
@@ -319,7 +325,7 @@ export function HomeScreen() {
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Location selector</Text>
-          <Text style={styles.cardDescription}>Bangladesh ï {selectedDistrict === "all" ? "Select district" : selectedDistrict} ï {selectedMarket === "all" ? "Market" : selectedMarket}</Text>
+          <Text style={styles.cardDescription}>Bangladesh ÔøΩ {selectedDistrict === "all" ? "Select district" : selectedDistrict} ÔøΩ {selectedMarket === "all" ? "Market" : selectedMarket}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
             <Pressable style={[styles.chip, selectedDistrict === "all" ? styles.chipActive : null]} onPress={() => setSelectedDistrict("all")}>
               <Text style={[styles.chipText, selectedDistrict === "all" ? styles.chipTextActive : null]}>All districts</Text>
@@ -585,6 +591,8 @@ const styles = StyleSheet.create({
   heroPrimaryText: { color: BRAND.navy, fontSize: 13, fontWeight: "800" },
   heroSecondaryButton: { flex: 1, borderRadius: 14, paddingVertical: 12, alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", backgroundColor: "rgba(255,255,255,0.08)" },
   heroSecondaryText: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
+  heroTertiaryButton: { flex: 1, borderRadius: 14, paddingVertical: 12, alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", backgroundColor: "rgba(255,255,255,0.08)" },
+  heroTertiaryText: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
   statRow: { flexDirection: "row", gap: 10, flexWrap: "wrap", marginTop: 6 },
   statCard: { flexGrow: 1, minWidth: 96, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 18, padding: 12, borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", gap: 4 },
   statLabel: { color: "#C4D2E8", fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.6 },

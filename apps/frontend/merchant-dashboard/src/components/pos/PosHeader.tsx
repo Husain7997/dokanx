@@ -4,9 +4,12 @@ interface PosHeaderProps {
   sessionId: string | null;
   onOpenSession: () => void;
   onCloseSession: () => void;
+  isBusy?: boolean;
 }
 
-export function PosHeader({ sessionId, onOpenSession, onCloseSession }: PosHeaderProps) {
+export function PosHeader({ sessionId, onOpenSession, onCloseSession, isBusy }: PosHeaderProps) {
+  const actionLabel = sessionId ? (isBusy ? "Closing..." : "Close Session") : (isBusy ? "Opening..." : "Open Session");
+
   return (
     <header className="flex items-center justify-between border-b border-border bg-surface px-6 py-4">
       <div className="flex items-center gap-3">
@@ -22,16 +25,18 @@ export function PosHeader({ sessionId, onOpenSession, onCloseSession }: PosHeade
         {!sessionId ? (
           <button
             onClick={onOpenSession}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            disabled={isBusy}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60 hover:bg-primary/90"
           >
-            Open Session
+            {actionLabel}
           </button>
         ) : (
           <button
             onClick={onCloseSession}
-            className="rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90"
+            disabled={isBusy}
+            className="rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground disabled:cursor-not-allowed disabled:opacity-60 hover:bg-destructive/90"
           >
-            Close Session
+            {actionLabel}
           </button>
         )}
       </div>

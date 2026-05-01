@@ -2,7 +2,7 @@ const request = require('supertest');
 const app = require('../../app');
 const mongoose = require('mongoose');
 
-const { createAdminAndLogin } = require('../helpers/auth.helper');
+const { createAdminAndLogin, requestSensitiveOtpChallenge } = require('../helpers/auth.helper');
 const { createPayoutRequest } = require('../helpers/payout.helper');
 
 describe('ADMIN PAYOUT FLOW', () => {
@@ -22,18 +22,26 @@ describe('ADMIN PAYOUT FLOW', () => {
   });
 
   it('✅ admin can approve payout', async () => {
+    const otpChallenge = await requestSensitiveOtpChallenge(adminToken, 'PAYOUT_APPROVE', payoutId);
+
     const res = await request(app)
       .post(`/api/admin/payouts/${payoutId}/approve`)
-      .set('Authorization', `Bearer ${adminToken}`);
+      .set('Authorization', `Bearer ${adminToken}`)
+      .set('X-OTP-Challenge-Id', otpChallenge.challengeId)
+      .set('X-OTP-Code', otpChallenge.previewCode);
 
     expect(res.statusCode).toBe(200);
     expect(res.body.status).toBe('APPROVED');
   });
 
   it('❌ admin cannot approve twice', async () => {
+    const otpChallenge = await requestSensitiveOtpChallenge(adminToken, 'PAYOUT_APPROVE', payoutId);
+
     const res = await request(app)
       .post(`/api/admin/payouts/${payoutId}/approve`)
-      .set('Authorization', `Bearer ${adminToken}`);
+      .set('Authorization', `Bearer ${adminToken}`)
+      .set('X-OTP-Challenge-Id', otpChallenge.challengeId)
+      .set('X-OTP-Code', otpChallenge.previewCode);
 
     expect(res.statusCode).toBe(400);
   });

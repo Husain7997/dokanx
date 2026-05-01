@@ -3,11 +3,16 @@ const mongoose = require('mongoose');
 const Settlement = require('../../models/settlement.model');
 const FinancePeriod = require('../../models/FinancePeriod');
 const Finance = require('../../models/Finance');
+const {
+  createReadAggregate,
+  createReadQuery,
+  createReadOneQuery,
+} = require("../../infrastructure/database/mongo.client");
 /**
  * KPI SUMMARY
  */
 exports.kpiSummary = async (req, res) => {
-  const [result] = await Settlement.aggregate([
+  const [result] = await createReadAggregate(Settlement, [
     {
       $group: {
         _id: null,
@@ -26,7 +31,7 @@ exports.kpiSummary = async (req, res) => {
  * REVENUE vs PAYOUT (daily)
  */
 exports.revenueVsPayout = async (req, res) => {
-  const data = await Settlement.aggregate([
+  const data = await createReadAggregate(Settlement, [
     {
       $group: {
         _id: {
@@ -46,7 +51,7 @@ exports.revenueVsPayout = async (req, res) => {
  * TOP SHOPS
  */
 exports.topShops = async (req, res) => {
-  const data = await Settlement.aggregate([
+  const data = await createReadAggregate(Settlement, [
     {
       $group: {
         _id: '$shopId',
@@ -66,7 +71,7 @@ exports.topShops = async (req, res) => {
 exports.lockFinancePeriod = async (req, res) => {
   const { period } = req.body;
 
-  const financePeriod = await FinancePeriod.findOne({ period });
+  const financePeriod = await createReadOneQuery(FinancePeriod, { period });
   if (!financePeriod)
     return res.status(404).json({ message: 'Period not found' });
 
@@ -82,7 +87,7 @@ exports.lockFinancePeriod = async (req, res) => {
 
 exports.listFinances = async (req, res) => {
   try {
-    const finances = await Finance.find().sort({ createdAt: -1 });
+    const finances = await createReadQuery(Finance, {}).sort({ createdAt: -1 }).lean();
     res.json({ data: finances });
   } catch (err) {
     console.error(err);
@@ -110,9 +115,9 @@ exports.settleFinance = async (req, res) => {
  * PENDING / FAILED PAYOUTS
  */
 exports.payoutAlerts = async (req, res) => {
-  const data = await Settlement.find({
+  const data = await createReadQuery(Settlement, {
     payoutStatus: { $in: ['PENDING', 'FAILED'] }
-  }).sort({ createdAt: -1 });
+  }).sort({ createdAt: -1 }).lean();
 
   res.json({ data });
 };
@@ -121,7 +126,7 @@ exports.payoutAlerts = async (req, res) => {
 const { toCSV } = require('../../utils/csv.util');
 
 exports.exportSettlementsCSV = async (req, res) => {
-  const settlements = await Settlement.find().lean();
+  const settlements = await createReadQuery(Settlement, {}).lean();
 
   const csv = toCSV(settlements);
 

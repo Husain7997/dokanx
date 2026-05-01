@@ -72,7 +72,7 @@ exports.revokeKey = async (req, res) => {
   const key = await ApiKey.findOneAndUpdate(
     { _id: keyId, developerId: developer._id },
     { revokedAt: new Date() },
-    { new: true }
+    { returnDocument: "after" }
   );
 
   if (!key) return res.status(404).json({ message: "API key not found" });
@@ -87,3 +87,4 @@ exports.revokeKey = async (req, res) => {
     req,
   });
 };
+

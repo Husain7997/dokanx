@@ -101,7 +101,7 @@ async function upsertRule(payload) {
       isActive: payload.isActive !== false,
       metadata: payload.metadata || {},
     },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: "after" }
   );
 }
 
@@ -111,3 +111,4 @@ module.exports = {
   listRules,
   upsertRule,
 };
+

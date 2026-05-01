@@ -375,7 +375,7 @@ async function upsertSnapshot({ metricType, shopId, dateKey, payload, metadata }
   return AnalyticsSnapshot.findOneAndUpdate(
     { metricType, shopId: shopId || null, dateKey },
     { metricType, shopId: shopId || null, dateKey, payload, metadata },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: "after" }
   );
 }
 
@@ -527,3 +527,4 @@ module.exports = {
   listSnapshots,
   getLatestSnapshot,
 };
+

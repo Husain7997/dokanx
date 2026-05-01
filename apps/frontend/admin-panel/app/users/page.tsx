@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Alert, AnalyticsCards, Badge, Button, Card, CardDescription, CardTitle, DataTable } from "@dokanx/ui";
+import { useSearchParams } from "next/navigation";
+import { Alert, AnalyticsCards, Badge, Button, Card, CardDescription, CardTitle, DataTable, Input } from "@dokanx/ui";
 
 import { blockUser, listAdminUsers, unblockUser } from "@/lib/admin-runtime-api";
 
@@ -11,14 +12,23 @@ type UserRow = {
   email?: string;
   role?: string;
   isBlocked?: boolean;
+  createdAt?: string;
+  lastLogin?: string;
+  phone?: string;
 };
 
 export const dynamic = "force-dynamic";
 
 export default function Page() {
+  const searchParams = useSearchParams();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    setSearchQuery(searchParams.get("q") || "");
+  }, [searchParams]);
 
   useEffect(() => {
     let active = true;
@@ -38,18 +48,58 @@ export default function Page() {
     };
   }, []);
 
+  const loadUsers = async () => {
+    try {
+      const response = await listAdminUsers();
+      setUsers(Array.isArray(response.data) ? (response.data as UserRow[]) : []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load users.");
+    }
+  };
+
+  const handleToggleBlock = async (user: UserRow) => {
+    if (!user._id) return;
+    setBusyId(user._id);
+    try {
+      if (user.isBlocked) {
+        await unblockUser(user._id);
+      } else {
+        await blockUser(user._id);
+      }
+      await loadUsers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to update user.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const summary = useMemo(() => {
     const total = users.length;
     const blocked = users.filter((user) => user.isBlocked).length;
     const active = total - blocked;
-    const admins = users.filter((user) => String(user.role || "").toUpperCase().includes("ADMIN")).length;
+    const admins = users.filter((user) => ["SUPER_ADMIN", "FINANCE_ADMIN", "SUPPORT_ADMIN", "AUDIT_ADMIN"].includes(String(user.role || ""))).length;
+    const customers = users.filter((user) => user.role === "CUSTOMER").length;
+    const merchants = users.filter((user) => user.role === "OWNER" || user.role === "MERCHANT").length;
     return [
-      { label: "Total users", value: String(total), meta: "Accounts visible to admin controls" },
-      { label: "Active", value: String(active), meta: "Currently usable accounts" },
-      { label: "Blocked", value: String(blocked), meta: "Restricted by moderation" },
-      { label: "Admin roles", value: String(admins), meta: "Internal privileged accounts" },
+      { label: "Total users", value: String(total), meta: "All platform accounts" },
+      { label: "Active", value: String(active), meta: "Currently usable" },
+      { label: "Blocked", value: String(blocked), meta: "Access restricted" },
+      { label: "Admin roles", value: String(admins), meta: "Privileged accounts" },
+      { label: "Customers", value: String(customers), meta: "End users" },
+      { label: "Merchants", value: String(merchants), meta: "Business accounts" },
     ];
   }, [users]);
+
+  const filteredUsers = useMemo(() => {
+    const needle = searchQuery.trim().toLowerCase();
+    if (!needle) return users;
+    return users.filter((user) =>
+      [user._id, user.name, user.email, user.phone, user.role].some((value) =>
+        String(value || "").toLowerCase().includes(needle)
+      )
+    );
+  }, [searchQuery, users]);
 
   return (
     <div className="grid gap-6">
@@ -77,55 +127,58 @@ export default function Page() {
         <CardDescription className="mt-2">
           Use this table to review account roles, verify access status, and quickly block or unblock users when needed.
         </CardDescription>
+        <div className="mt-4 max-w-sm">
+          <Input
+            placeholder="Search users, email, role, phone..."
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+          />
+        </div>
         <div className="mt-4">
           <DataTable
             columns={[
               { key: "name", header: "Name" },
               { key: "email", header: "Email" },
+              { key: "phone", header: "Phone" },
               { key: "role", header: "Role" },
+              { key: "createdAt", header: "Joined" },
+              { key: "lastLogin", header: "Last Login" },
               {
                 key: "status",
                 header: "Status",
-                render: (row) => <Badge variant={row.isBlocked ? "warning" : "success"}>{row.status}</Badge>,
+                render: (row) => (
+                  <Badge variant={row.isBlocked ? "warning" : "success"}>{row.isBlocked ? "Blocked" : "Active"}</Badge>
+                ),
               },
               {
                 key: "actions",
                 header: "Actions",
                 render: (row) => (
-                  <Button
-                    size="sm"
-                    variant={row.isBlocked ? "secondary" : "default"}
-                    onClick={async () => {
-                      if (!row.id) return;
-                      setBusyId(row.id);
-                      try {
-                        if (row.isBlocked) {
-                          await unblockUser(row.id);
-                        } else {
-                          await blockUser(row.id);
-                        }
-                        const response = await listAdminUsers();
-                        setUsers(Array.isArray(response.data) ? (response.data as UserRow[]) : []);
-                      } catch (err) {
-                        setError(err instanceof Error ? err.message : "Unable to update user.");
-                      } finally {
-                        setBusyId(null);
-                      }
-                    }}
-                    disabled={busyId === row.id}
-                  >
-                    {busyId === row.id ? "Updating..." : row.isBlocked ? "Unblock" : "Block"}
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant={row.isBlocked ? "primary" : "danger"}
+                      disabled={busyId === row._id}
+                      onClick={() => handleToggleBlock(row)}
+                    >
+                      {row.isBlocked ? "Unblock" : "Block"}
+                    </Button>
+                    <Button size="sm" variant="outline" asChild>
+                      <a href={`/permissions?q=${encodeURIComponent(String(row._id || row.email || ""))}`}>Governance</a>
+                    </Button>
+                  </div>
                 ),
               },
             ]}
-            rows={users.map((user) => ({
-              id: String(user._id || ""),
-              isBlocked: Boolean(user.isBlocked),
-              name: user.name || "User",
-              email: user.email || "Unknown",
+            rows={filteredUsers.map((user) => ({
+              _id: user._id,
+              name: user.name || "Unknown",
+              email: user.email || "N/A",
+              phone: user.phone || "N/A",
               role: user.role || "CUSTOMER",
-              status: user.isBlocked ? "Blocked" : "Active",
+              createdAt: user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "N/A",
+              lastLogin: user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : "Never",
+              isBlocked: Boolean(user.isBlocked),
             }))}
           />
         </div>

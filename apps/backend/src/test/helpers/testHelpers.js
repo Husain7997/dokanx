@@ -100,10 +100,11 @@ async function createLedger(overrides = {}) {
     walletId: overrides.walletId,
     amount: overrides.amount ?? 100,
     type: overrides.type ?? 'CREDIT',
-    source: overrides.source ?? 'SYSTEM',
-    referenceType: overrides.referenceType ?? 'TEST',
-    reference: overrides.reference ?? 'TEST',
-    balanceAfter: overrides.balanceAfter ?? 0,
+    referenceId: overrides.referenceId || overrides.reference || `TEST-${Date.now()}`,
+    meta: overrides.meta || {
+      source: overrides.source || 'SYSTEM',
+      referenceType: overrides.referenceType || 'TEST',
+    },
   });
 }
 
@@ -115,7 +116,6 @@ async function createSettlement(overrides = {}) {
 
   return Settlement.create({
     shopId: overrides.shopId,        // ✅ REQUIRED
-    shopId: overrides.shopId,      // ✅ REQUIRED
     idempotencyKey:
       overrides.idempotencyKey || `settle-${Date.now()}`,
     orderCount: overrides.orderCount ?? 1, // ✅ REQUIRED

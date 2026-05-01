@@ -1,0 +1,71 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dokanx-ingress
+  namespace: dokanx
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - dokanx.com
+    - api.dokanx.com
+    - merchant.dokanx.com
+    - admin.dokanx.com
+    - dev.dokanx.com
+    secretName: dokanx-tls
+  rules:
+  - host: dokanx.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: dokanx-storefront
+            port:
+              number: 3000
+  - host: api.dokanx.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: dokanx-backend
+            port:
+              number: 3001
+  - host: merchant.dokanx.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: dokanx-merchant-dashboard
+            port:
+              number: 3000
+  - host: admin.dokanx.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: dokanx-admin-panel
+            port:
+              number: 3000
+  - host: dev.dokanx.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: dokanx-developer-portal
+            port:
+              number: 3000

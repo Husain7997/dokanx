@@ -1,18 +1,56 @@
-// src/controllers/readiness.controller.js
+const { mongoose, getMongoState } = require("../database/mongo.client");
+const redis = require("@/core/infrastructure/redis.client");
 
-const mongoose = require("mongoose");
+const REDIS_PING_TIMEOUT_MS = Number(process.env.READINESS_REDIS_TIMEOUT_MS || 1000);
 
-exports.readinessCheck = async (req, res) => {
+async function getRedisState() {
+  const baseState = {
+    status: redis?.status || "unknown",
+    connected: redis?.status === "ready" || redis?.status === "connect",
+  };
+
+  if (!redis || typeof redis.ping !== "function") {
+    return {
+      ...baseState,
+      connected: false,
+      ping: "unavailable",
+    };
+  }
+
   try {
-    const mongoState = mongoose.connection.readyState;
+    const ping = await Promise.race([
+      redis.ping(),
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Redis ping timeout")), REDIS_PING_TIMEOUT_MS);
+      }),
+    ]);
 
-    const mongo =
-      mongoState === 1 ? "connected" : "disconnected";
+    return {
+      ...baseState,
+      connected: true,
+      ping,
+    };
+  } catch (error) {
+    return {
+      ...baseState,
+      connected: false,
+      ping: "failed",
+      error: error.message,
+    };
+  }
+}
 
-    res.status(200).json({
-      status: "ready",
+exports.readinessCheck = async (_req, res) => {
+  try {
+    const mongoState = getMongoState();
+    const redisState = await getRedisState();
+    const isReady = mongoose.connection.readyState === 1 && redisState.connected;
+
+    res.status(isReady ? 200 : 503).json({
+      status: isReady ? "ready" : "not-ready",
       services: {
-        database: mongo,
+        database: mongoState,
+        redis: redisState,
         uptime: process.uptime(),
         timestamp: new Date().toISOString(),
       },

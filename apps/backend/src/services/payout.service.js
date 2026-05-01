@@ -2,6 +2,7 @@
 
 const Payout =
   require("../models/payout.model");
+const Settlement = require("../models/settlement.model");
 
 const crypto = require("crypto");
 
@@ -32,7 +33,7 @@ async function processPayout({ shopId }) {
               .toString("hex")}`,
         },
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: "after" }
     );
 
   if (payout.status === "SUCCESS")
@@ -62,6 +63,48 @@ async function processPayout({ shopId }) {
   return payout;
 }
 
+async function approvePayout(payoutId, adminId) {
+  const payout = await Payout.findById(payoutId);
+  if (!payout) {
+    const error = new Error("Payout not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (['APPROVED', 'PROCESSING', 'SUCCESS'].includes(payout.status)) {
+    const error = new Error('Payout already approved or processed');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  payout.status = 'APPROVED';
+  payout.approvedBy = adminId;
+  payout.approvedAt = new Date();
+  await payout.save();
+  return payout;
+}
+
+async function executePayout(payoutId, idempotencyKey) {
+  const payout = await Payout.findById(payoutId);
+  if (!payout) {
+    const error = new Error("Payout not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (payout.status === 'SUCCESS') {
+    return payout;
+  }
+
+  if (payout.status !== 'APPROVED' && payout.status !== 'FAILED' && payout.status !== 'PROCESSING') {
+    const error = new Error('Payout is not ready for execution');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return processPayout({ shopId: payout.shopId });
+}
+
 async function createShopPayoutRequest({
   shopId,
   amount,
@@ -80,7 +123,58 @@ async function createShopPayoutRequest({
 
 }
 
+async function createAdminPayout({ shopId, amount, adminId }) {
+  return Payout.create({
+    shopId,
+    amount,
+    requestedBy: adminId,
+    status: "APPROVED",
+    approvedBy: adminId,
+    approvedAt: new Date(),
+    type: "MANUAL",
+    reference: `ADMIN_${shopId}_${Date.now()}`,
+  });
+}
+
+async function retryPayout(payoutId) {
+  const payout = await Payout.findById(payoutId);
+  if (!payout) {
+    const error = new Error("Payout not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  payout.status = "PROCESSING";
+  await payout.save();
+  return payout;
+}
+
+async function triggerSettlementPayout(settlementId, options = {}) {
+  const settlement = await Settlement.findById(settlementId);
+  if (!settlement) {
+    const error = new Error("Settlement not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const payout = await processPayout({ shopId: settlement.shopId });
+  settlement.status = options.forceRetry ? "PROCESSING" : "COMPLETED";
+  settlement.payoutRef = payout.reference || payout._id?.toString() || settlement.payoutRef;
+  settlement.processedAt = new Date();
+  await settlement.save();
+
+  return {
+    settlement,
+    payout,
+  };
+}
+
 module.exports = {
   processPayout,
+  approvePayout,
+  executePayout,
+  retryPayout,
+  createAdminPayout,
   createShopPayoutRequest,
+  triggerSettlementPayout,
 };

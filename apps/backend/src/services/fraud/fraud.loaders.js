@@ -5,6 +5,10 @@ const Order = require("../../models/order.model");
 const PaymentAttempt = require("../../models/paymentAttempt.model");
 const Shop = require("../../models/shop.model");
 const User = require("../../models/user.model");
+const {
+  createReadOneQuery,
+  createReadQuery,
+} = require("../../infrastructure/database/mongo.client");
 
 const {
   resolveCustomerId,
@@ -13,7 +17,7 @@ const {
 const { LEVELS, normalizeStoredFingerprint } = require("./fraud.utils");
 
 async function notifyAdmins(caseDoc) {
-  const admins = await User.find({ role: "ADMIN" }).select("_id").lean();
+  const admins = await createReadQuery(User, { role: "ADMIN" }).select("_id").lean();
   if (!admins.length) return;
 
   const title = caseDoc.level === LEVELS.HIGH ? "High risk fraud alert" : "Fraud risk alert";
@@ -37,7 +41,7 @@ async function notifyAdmins(caseDoc) {
 }
 
 async function loadOrderBundle(orderId, paymentAttemptId) {
-  const order = await Order.findById(orderId)
+  const order = await createReadOneQuery(Order, { _id: orderId })
     .populate("user customer customerId", "name email createdAt isBlocked")
     .lean();
   if (!order) throw new Error("Order not found");
@@ -45,15 +49,17 @@ async function loadOrderBundle(orderId, paymentAttemptId) {
   const shopId = resolveShopId(order);
   const customerId = resolveCustomerId(order);
   const [shop, paymentAttempts, merchantOrders, userOrders, couponCarts] = await Promise.all([
-    shopId ? Shop.findById(shopId).select("name owner isActive createdAt").lean() : null,
-    PaymentAttempt.find({ order: order._id }).sort({ createdAt: -1 }).lean(),
-    shopId ? Order.find({ shopId }).select("status createdAt user totalAmount paymentStatus").lean() : [],
+    shopId ? createReadOneQuery(Shop, { _id: shopId }).select("name owner isActive createdAt").lean() : null,
+    createReadQuery(PaymentAttempt, { order: order._id }).sort({ createdAt: -1 }).lean(),
+    shopId ? createReadQuery(Order, { shopId }).select("status createdAt user totalAmount paymentStatus").lean() : [],
     customerId
-      ? Order.find({ $or: [{ customerId }, { customer: customerId }, { user: customerId }] })
+      ? createReadQuery(Order, { $or: [{ customerId }, { customer: customerId }, { user: customerId }] })
           .select("status createdAt totalAmount contact")
           .lean()
       : [],
-    Cart.find({ shopId, couponCode: { $ne: null } }).select("couponCode userId guestToken updatedAt").lean(),
+    createReadQuery(Cart, { shopId, couponCode: { $ne: null } })
+      .select("couponCode userId guestToken updatedAt")
+      .lean(),
   ]);
 
   const paymentAttempt =
@@ -68,7 +74,7 @@ async function loadRecentAuditSignals(context = {}) {
   if (context.userAgent) query.push({ userAgent: context.userAgent });
   if (!query.length) return [];
 
-  return AuditLog.find({
+  return createReadQuery(AuditLog, {
     $or: query,
     createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
   })
@@ -94,8 +100,8 @@ async function enrichOverview(data) {
   });
 
   const [users, shops] = await Promise.all([
-    userIds.size ? User.find({ _id: { $in: Array.from(userIds) } }).select("name email").lean() : [],
-    shopIds.size ? Shop.find({ _id: { $in: Array.from(shopIds) } }).select("name slug").lean() : [],
+    userIds.size ? createReadQuery(User, { _id: { $in: Array.from(userIds) } }).select("name email").lean() : [],
+    shopIds.size ? createReadQuery(Shop, { _id: { $in: Array.from(shopIds) } }).select("name slug").lean() : [],
   ]);
 
   const userMap = new Map(users.map((user) => [String(user._id), user.name || user.email || String(user._id).slice(-6)]));

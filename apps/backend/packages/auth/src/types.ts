@@ -4,6 +4,8 @@ import type { AuthRole, SessionState, SessionUser, TenantConfig } from "@dokanx/
 
 export type AuthUser = SessionUser & {
   roleName: AuthRole;
+  permissionOverrides?: string[];
+  effectivePermissions?: string[];
 };
 
 export type AuthState = Omit<SessionState, "user"> & {

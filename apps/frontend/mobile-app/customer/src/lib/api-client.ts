@@ -341,3 +341,76 @@ export function clearCartRequest(params: {
     cartToken: params.cartToken || undefined,
   });
 }
+
+export function listNotificationsRequest(token: string) {
+  return request<{ data?: Array<Record<string, unknown>> }>("/api/notifications", {
+    token,
+  });
+}
+
+export function markNotificationReadRequest(token: string, notificationId: string) {
+  return request<{ data?: Record<string, unknown> }>(`/api/notifications/${notificationId}/read`, {
+    method: "PUT",
+    token,
+  });
+}
+
+export function markAllNotificationsReadRequest(token: string) {
+  return request<{ data?: Record<string, unknown> }>("/api/notifications/mark-all-read", {
+    method: "PUT",
+    token,
+  });
+}
+
+export function listTasksRequest(token: string, params?: { completed?: boolean; category?: string; limit?: number; skip?: number }) {
+  const search = params ? new URLSearchParams(params as Record<string, string>).toString() : "";
+  return request<{ data?: Array<Record<string, unknown>>; pagination?: Record<string, unknown> }>(
+    `/api/tasks${search ? `?${search}` : ""}`,
+    { token }
+  );
+}
+
+export function createTaskRequest(token: string, payload: {
+  title: string;
+  description?: string;
+  priority?: "low" | "medium" | "high";
+  dueDate?: string;
+  category?: "shopping" | "payment" | "order" | "general";
+  metadata?: Record<string, unknown>;
+}) {
+  return request<{ data?: Record<string, unknown> }>("/api/tasks", {
+    method: "POST",
+    token,
+    body: payload,
+  });
+}
+
+export function updateTaskRequest(token: string, taskId: string, payload: {
+  title?: string;
+  description?: string;
+  completed?: boolean;
+  priority?: "low" | "medium" | "high";
+  dueDate?: string;
+  category?: "shopping" | "payment" | "order" | "general";
+  metadata?: Record<string, unknown>;
+}) {
+  return request<{ data?: Record<string, unknown> }>(`/api/tasks/${taskId}`, {
+    method: "PUT",
+    token,
+    body: payload,
+  });
+}
+
+export function deleteTaskRequest(token: string, taskId: string) {
+  return request<{ message?: string }>(`/api/tasks/${taskId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+export function toggleTaskCompletionRequest(token: string, taskId: string) {
+  return request<{ data?: Record<string, unknown> }>(`/api/tasks/${taskId}/toggle`, {
+    method: "PATCH",
+    token,
+  });
+}

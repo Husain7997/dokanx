@@ -6,6 +6,7 @@ import type { Product } from "@dokanx/types";
 import { Button, ProductCard } from "@dokanx/ui";
 
 import { addToCart, getProductReviews, trackRecommendationClick, trackRecommendationImpression } from "@/lib/runtime-api";
+import { useStorefrontTheme } from "@/components/storefront-theme-provider";
 
 type StorefrontProduct = Partial<Product> & {
   _id?: string;
@@ -22,6 +23,7 @@ type StorefrontProduct = Partial<Product> & {
 type StorefrontProductGridProps = {
   products: StorefrontProduct[];
   trackingContext?: string;
+  columnsOverride?: number;
 };
 
 function resolveProductId(product: StorefrontProduct) {
@@ -48,7 +50,8 @@ function resolveDiscountLabel(product: StorefrontProduct) {
   return undefined;
 }
 
-export function StorefrontProductGrid({ products, trackingContext }: StorefrontProductGridProps) {
+export function StorefrontProductGrid({ products, trackingContext, columnsOverride }: StorefrontProductGridProps) {
+  const { config } = useStorefrontTheme();
   const [ratings, setRatings] = useState<Record<string, { average: number; count: number }>>({});
   const ratingsCacheRef = useRef<Record<string, { average: number; count: number; timestamp: number }>>({});
   const inFlightRef = useRef<Set<string>>(new Set());
@@ -130,14 +133,21 @@ export function StorefrontProductGrid({ products, trackingContext }: StorefrontP
     trackRecommendationImpression({ productIds, context: trackingContext }).catch(() => undefined);
   }, [productIds, trackingContext]);
 
+  const columns = Number.isFinite(Number(columnsOverride)) ? Number(columnsOverride) : config.layout.productColumns;
+
   return (
-    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+    <div
+      className={`grid ${config.layout.productListStyle === "list" ? "grid-cols-1" : columns >= 4 ? "sm:grid-cols-2 xl:grid-cols-4" : columns === 3 ? "sm:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2 xl:grid-cols-2"}`}
+      style={{ gap: "var(--theme-gap)" }}
+    >
       {products.map((product) => (
         <StorefrontProductCard
           key={resolveProductId(product) || product.name}
           product={product}
           trackingContext={trackingContext}
           ratings={ratings}
+          variant={config.components.productCard}
+          listStyle={config.layout.productListStyle}
         />
       ))}
     </div>
@@ -148,10 +158,14 @@ function StorefrontProductCard({
   product,
   trackingContext,
   ratings,
+  variant,
+  listStyle,
 }: {
   product: StorefrontProduct;
   trackingContext?: string;
   ratings: Record<string, { average: number; count: number }>;
+  variant: "minimal" | "modern" | "detailed";
+  listStyle: "grid" | "list";
 }) {
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -196,7 +210,7 @@ function StorefrontProductCard({
   }
 
   return (
-    <div className="space-y-3">
+    <div className={`space-y-3 ${listStyle === "list" ? "xl:flex xl:items-start xl:gap-4 xl:space-y-0" : ""}`}>
       <ProductCard
         title={product.name || "Product"}
         price={displayPrice}
@@ -216,8 +230,9 @@ function StorefrontProductCard({
             loading={loading}
             loadingText="Adding to cart"
             className="w-full"
+            style={{ background: variant === "minimal" ? "transparent" : "var(--theme-primary)", color: variant === "minimal" ? "var(--theme-text)" : "var(--theme-button-text)", borderColor: "var(--theme-primary)" }}
           >
-            Add To Cart
+            {variant === "detailed" ? "Add to grouped cart" : "Add To Cart"}
           </Button>
         }
         secondaryAction={
@@ -229,7 +244,7 @@ function StorefrontProductCard({
                 trackRecommendationClick({ productId, context: trackingContext }).catch(() => undefined);
               }}
             >
-              View Product
+              {variant === "minimal" ? "Open" : "View Product"}
             </Link>
           </Button>
         }

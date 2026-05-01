@@ -16,7 +16,6 @@
                          "@dokanx/utils":  "file:../../backend/packages/utils",
                          "@tanstack/react-query":  "^5.68.0",
                          "chart.js":  "^4.4.6",
-                         "dokanx":  "file:../../..",
                          "next":  "^15.2.0",
                          "react":  "^19.2.3",
                          "react-chartjs-2":  "^5.2.0",

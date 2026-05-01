@@ -1,194 +1,147 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Alert, AnalyticsCards, Badge, Button, Card, CardDescription, CardTitle, DataTable, Input } from "@dokanx/ui";
+import { useSearchParams } from "next/navigation";
+import { Alert, AnalyticsCards, Badge, Button, Card, CardDescription, CardTitle, DataTable, Input, Select } from "@dokanx/ui";
 
-import {
-  checkFraudTransaction,
-  getClaimAnalytics,
-  getFraudAlerts,
-  getFraudOverview,
-  getFraudReports,
-  listClaims,
-  updateClaimStatus,
-  reviewFraudCase,
-} from "@/lib/admin-runtime-api";
+import { listOrders, refundOrderPayment, updateOrderDispute } from "@/lib/admin-runtime-api";
 
-type FraudSignal = {
-  code?: string;
-  label?: string;
-  weight?: number;
-  value?: unknown;
-  threshold?: unknown;
-};
-
-type FraudCase = {
+type OrderRow = {
   _id?: string;
-  entityType?: string;
-  entityId?: string;
-  orderId?: string;
-  paymentAttemptId?: string;
-  userId?: string;
-  userName?: string;
-  shopId?: string;
-  shopName?: string;
-  score?: number;
-  level?: "safe" | "medium" | "high";
   status?: string;
-  summary?: string;
-  signals?: FraudSignal[];
-  recommendedActions?: string[];
-  updatedAt?: string;
+  paymentStatus?: string;
+  disputeStatus?: string;
+  disputeReason?: string;
+  adminNotes?: string;
+  totalAmount?: number;
+  shop?: { name?: string };
+  user?: { name?: string; email?: string };
+  createdAt?: string;
+  deliveryStatus?: string;
 };
 
-type OverviewState = {
-  summary?: {
-    cases?: number;
-    openCases?: number;
-    reviewRequired?: number;
-    blockedUsers?: number;
-    suspendedMerchants?: number;
-    frozenWallets?: number;
-    fraudRate?: number;
-    paymentFailureRate?: number;
-  };
-  flaggedOrders?: FraudCase[];
-  suspiciousUsers?: Array<{
-    userId?: string;
-    userName?: string;
-    score?: number;
-    orderCount?: number;
-    latestCaseAt?: string;
-  }>;
-  highRiskMerchants?: Array<{
-    shopId?: string;
-    shopName?: string;
-    score?: number;
-    caseCount?: number;
-    latestCaseAt?: string;
-  }>;
-  alerts?: FraudCase[];
-  analytics?: {
-    totalOrders?: number;
-    totalAttempts?: number;
-    failedAttempts?: number;
-    topSignals?: Array<{ code?: string; count?: number }>;
-  };
+type DisputeRow = {
+  _id: string;
+  orderId: string;
+  type: string;
+  status: string;
+  reason: string;
+  createdAt?: string;
 };
 
 export const dynamic = "force-dynamic";
 
 export default function OrdersPage() {
-  const [overview, setOverview] = useState<OverviewState | null>(null);
-  const [alerts, setAlerts] = useState<FraudCase[]>([]);
-  const [claims, setClaims] = useState<Array<Record<string, unknown>>>([]);
-  const [claimAnalytics, setClaimAnalytics] = useState<Record<string, unknown> | null>(null);
-  const [selectedCaseId, setSelectedCaseId] = useState<string>("");
-  const [reviewNote, setReviewNote] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [filterStatus, setFilterStatus] = useState<string>("ALL");
+  const [filterPaymentStatus, setFilterPaymentStatus] = useState<string>("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [busyOrderId, setBusyOrderId] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadData() {
-    setLoading(true);
+  async function loadOrders() {
     setError(null);
     try {
-      const [overviewResponse, alertsResponse, reportsResponse] = await Promise.all([
-        getFraudOverview(),
-        getFraudAlerts(),
-        getFraudReports(),
-      ]);
-      const [claimResponse, claimAnalyticsResponse] = await Promise.all([
-        listClaims(),
-        getClaimAnalytics(),
-      ]);
-
-      const normalizedOverview = normalizeOverview(overviewResponse.data, reportsResponse.data);
-      setOverview(normalizedOverview);
-      setAlerts(normalizeFraudCases(alertsResponse.data));
-      setClaims(Array.isArray(claimResponse.data) ? claimResponse.data : []);
-      setClaimAnalytics((claimAnalyticsResponse.data || null) as Record<string, unknown> | null);
+      const response = await listOrders();
+      setOrders(Array.isArray(response.data) ? (response.data as OrderRow[]) : []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load fraud controls.");
-    } finally {
-      setLoading(false);
+      setError(err instanceof Error ? err.message : "Unable to load orders.");
     }
   }
 
   useEffect(() => {
-    void loadData();
+    void loadOrders();
   }, []);
 
-  const allCases = useMemo(() => {
-    const map = new Map<string, FraudCase>();
-    [...(overview?.flaggedOrders || []), ...(alerts || []), ...(overview?.alerts || [])].forEach((item) => {
-      if (!item._id) return;
-      map.set(String(item._id), item);
-    });
-    return Array.from(map.values());
-  }, [alerts, overview?.alerts, overview?.flaggedOrders]);
-
   useEffect(() => {
-    if (!selectedCaseId && allCases[0]?._id) {
-      setSelectedCaseId(String(allCases[0]._id));
-    }
-  }, [allCases, selectedCaseId]);
+    setSearchQuery(searchParams.get("q") || "");
+    setFilterStatus(searchParams.get("status") || "ALL");
+  }, [searchParams]);
 
-  const selectedCase = useMemo(
-    () => allCases.find((item) => String(item._id || "") === selectedCaseId) || null,
-    [allCases, selectedCaseId]
-  );
-
-  const cards = useMemo(() => {
-    const summary = overview?.summary || {};
+  const summary = useMemo(() => {
+    const total = orders.length;
+    const pending = orders.filter((order) => ["PLACED", "CONFIRMED", "PROCESSING"].includes(String(order.status || ""))).length;
+    const paid = orders.filter((order) => order.paymentStatus === "SUCCESS").length;
+    const disputed = orders.filter((order) => order.disputeStatus && order.disputeStatus !== "NONE").length;
+    const delivered = orders.filter((order) => order.status === "DELIVERED").length;
+    const cancelled = orders.filter((order) => order.status === "CANCELLED").length;
     return [
-      { label: "Fraud cases", value: String(summary.cases ?? 0), meta: "Tracked transactions" },
-      { label: "Open reviews", value: String(summary.openCases ?? 0), meta: "Needs analyst action" },
-      { label: "High risk", value: String(summary.reviewRequired ?? 0), meta: "Manual review queue" },
-      { label: "Fraud rate", value: `${summary.fraudRate ?? 0}%`, meta: "Flagged orders / total" },
-      { label: "Payment failure", value: `${summary.paymentFailureRate ?? 0}%`, meta: "Failed attempts" },
-      { label: "Blocked users", value: String(summary.blockedUsers ?? 0), meta: "Abusive accounts" },
-      { label: "Suspended merchants", value: String(summary.suspendedMerchants ?? 0), meta: "Abuse control" },
-      { label: "Frozen wallets", value: String(summary.frozenWallets ?? 0), meta: "Held payouts" },
+      { label: "Total orders", value: String(total), meta: "All merchant orders" },
+      { label: "Pending", value: String(pending), meta: "Awaiting fulfillment" },
+      { label: "Paid", value: String(paid), meta: "Successful payments" },
+      { label: "Disputed", value: String(disputed), meta: "Needs review" },
+      { label: "Delivered", value: String(delivered), meta: "Completed orders" },
+      { label: "Cancelled", value: String(cancelled), meta: "Closed unsuccessfully" },
     ];
-  }, [overview?.summary]);
+  }, [orders]);
 
-  async function handleReview(action: string) {
-    if (!selectedCase?._id) return;
-    setBusy(true);
-    setStatus(null);
+  const filteredOrders = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return orders.filter((order) => {
+      const statusMatch = filterStatus === "ALL" || order.status === filterStatus;
+      const paymentMatch = filterPaymentStatus === "ALL" || order.paymentStatus === filterPaymentStatus;
+      const searchMatch =
+        !query ||
+        String(order._id || "").toLowerCase().includes(query) ||
+        String(order.user?.name || "").toLowerCase().includes(query) ||
+        String(order.user?.email || "").toLowerCase().includes(query) ||
+        String(order.shop?.name || "").toLowerCase().includes(query);
+      return statusMatch && paymentMatch && searchMatch;
+    });
+  }, [filterPaymentStatus, filterStatus, orders, searchQuery]);
+
+  const disputes = useMemo<DisputeRow[]>(() => {
+    return orders
+      .filter((order) => order.disputeStatus && order.disputeStatus !== "NONE")
+      .map((order) => ({
+        _id: `DSP-${String(order._id || "")}`,
+        orderId: String(order._id || ""),
+        type: order.disputeReason || "GENERAL",
+        status: order.disputeStatus || "OPEN",
+        reason: order.adminNotes || order.disputeReason || "No dispute note provided",
+        createdAt: order.createdAt,
+      }));
+  }, [orders]);
+
+  async function handleForceCancel(orderId: string) {
+    if (!orderId) return;
+    setBusyOrderId(orderId);
+    setStatusMessage(null);
+    setError(null);
     try {
-      await reviewFraudCase({
-        caseId: String(selectedCase._id),
-        action,
-        note: reviewNote,
+      await updateOrderDispute(orderId, {
+        disputeStatus: "IN_REVIEW",
+        disputeReason: "ADMIN_FORCE_CANCEL",
+        adminNotes: "Admin requested cancellation review from the global order console.",
       });
-      setStatus(`Action applied: ${action}`);
-      await loadData();
+      setStatusMessage(`Cancellation review queued for order ${orderId.slice(-6)}.`);
+      await loadOrders();
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : "Unable to apply review action.");
+      setError(err instanceof Error ? err.message : "Unable to queue order cancellation.");
     } finally {
-      setBusy(false);
+      setBusyOrderId(null);
     }
   }
 
-  async function handleRecheck() {
-    if (!selectedCase?.orderId) return;
-    setBusy(true);
-    setStatus(null);
+  async function handleRefund(orderId: string, amount?: number) {
+    if (!orderId || !Number(amount || 0)) return;
+    setBusyOrderId(orderId);
+    setStatusMessage(null);
+    setError(null);
     try {
-      await checkFraudTransaction({
-        orderId: String(selectedCase.orderId),
-        paymentAttemptId: selectedCase.paymentAttemptId ? String(selectedCase.paymentAttemptId) : undefined,
-        source: "admin_recheck",
+      await refundOrderPayment({
+        orderId,
+        amount: Number(amount || 0),
+        reason: "Admin console refund",
       });
-      setStatus("Transaction rescored.");
-      await loadData();
+      setStatusMessage(`Refund processed for order ${orderId.slice(-6)}.`);
+      await loadOrders();
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : "Unable to rescore transaction.");
+      setError(err instanceof Error ? err.message : "Unable to process refund.");
     } finally {
-      setBusy(false);
+      setBusyOrderId(null);
     }
   }
 
@@ -198,437 +151,151 @@ export default function OrdersPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-3xl space-y-2">
             <p className="text-xs uppercase tracking-[0.24em] text-[#FFD49F]">DokanX Admin</p>
-            <h1 className="dx-display text-3xl">Fraud Detection</h1>
+            <h1 className="dx-display text-3xl">Global Order Management</h1>
             <p className="text-sm text-slate-200">
-              Review payment fraud, fake order risk, suspicious users, and merchant abuse from one investigation queue.
+              Monitor platform-wide orders, review dispute signals, and trigger refund or cancellation workflows from one place.
             </p>
           </div>
           <Badge variant="secondary" className="border-white/15 bg-white/10 text-white">
-            {allCases.length} cases
+            {orders.length} orders
           </Badge>
         </div>
       </div>
 
-      <AnalyticsCards items={cards} />
+      <AnalyticsCards items={summary} />
+
+      {error ? <Alert variant="warning">{error}</Alert> : null}
+      {statusMessage ? <Alert variant="info">{statusMessage}</Alert> : null}
 
       <Card>
-        <CardTitle>Fraud operations map</CardTitle>
+        <CardTitle>Order control center</CardTitle>
         <CardDescription className="mt-2">
-          Start with live alerts and analytics, then move into the review console to approve, investigate, or rescore flagged activity.
+          Filter all orders by lifecycle state, search by customer or merchant, and jump into detail pages for deeper review.
         </CardDescription>
-      </Card>
-
-      {loading ? <Alert variant="info">Loading fraud controls...</Alert> : null}
-
-      {error ? (
-        <Alert variant="warning">{error}</Alert>
-      ) : null}
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardTitle>Warranty claim analytics</CardTitle>
-          <CardDescription className="mt-2">Admin monitoring for warranty and guarantee activity.</CardDescription>
-          <div className="mt-4 grid gap-3 text-sm text-muted-foreground">
-            <p>Total claims: {Number(claimAnalytics?.totalClaims || 0)}</p>
-            <p>Pending: {Number(claimAnalytics?.pending || 0)}</p>
-            <p>Resolved: {Number(claimAnalytics?.resolved || 0)}</p>
-            <p>Refunds: {Number(claimAnalytics?.refunds || 0)}</p>
-          </div>
-        </Card>
-
-        <Card>
-          <CardTitle>Claim override queue</CardTitle>
-          <CardDescription className="mt-2">Override merchant decisions and monitor abuse flags.</CardDescription>
-          <div className="mt-4 grid gap-3 text-sm text-muted-foreground">
-            {claims.slice(0, 8).map((claim, index) => (
-              <div key={`${String(claim._id || index)}`} className="rounded-2xl border border-border/60 px-4 py-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-semibold text-foreground">
-                    {String(claim.type || "claim").toUpperCase()} {String(claim.status || "pending").toUpperCase()}
-                  </span>
+        <div className="mt-4 flex flex-wrap gap-4">
+          <Input
+            placeholder="Search orders, customers, merchants..."
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            className="max-w-sm"
+          />
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <option value="ALL">All status</option>
+            <option value="PLACED">Placed</option>
+            <option value="CONFIRMED">Confirmed</option>
+            <option value="PROCESSING">Processing</option>
+            <option value="SHIPPED">Shipped</option>
+            <option value="DELIVERED">Delivered</option>
+            <option value="CANCELLED">Cancelled</option>
+          </Select>
+          <Select value={filterPaymentStatus} onValueChange={setFilterPaymentStatus}>
+            <option value="ALL">All payments</option>
+            <option value="SUCCESS">Paid</option>
+            <option value="PENDING">Pending</option>
+            <option value="FAILED">Failed</option>
+          </Select>
+        </div>
+        <div className="mt-4">
+          <DataTable
+            columns={[
+              { key: "orderId", header: "Order ID" },
+              { key: "customer", header: "Customer" },
+              { key: "merchant", header: "Merchant" },
+              { key: "amount", header: "Amount" },
+              { key: "status", header: "Order status" },
+              { key: "payment", header: "Payment" },
+              { key: "delivery", header: "Delivery" },
+              { key: "createdAt", header: "Created" },
+              {
+                key: "actions",
+                header: "Actions",
+                render: (row) => (
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="secondary" onClick={async () => {
-                      if (!claim._id) return;
-                      await updateClaimStatus(String(claim._id), { status: "approved", decisionNote: "Admin override" });
-                      await loadData();
-                    }}>
-                      Approve
+                    <Button size="sm" variant="secondary" asChild>
+                      <a href={`/orders/${String(row._id || "")}`}>View</a>
                     </Button>
-                    <Button size="sm" onClick={async () => {
-                      if (!claim._id) return;
-                      await updateClaimStatus(String(claim._id), { status: "resolved", resolutionType: "refund", decisionNote: "Admin refund override" });
-                      await loadData();
-                    }}>
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      disabled={busyOrderId === row._id}
+                      onClick={() => handleForceCancel(String(row._id || ""))}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busyOrderId === row._id || !Number(row.totalAmount || 0)}
+                      onClick={() => handleRefund(String(row._id || ""), Number(row.totalAmount || 0))}
+                    >
                       Refund
                     </Button>
                   </div>
-                </div>
-                <p className="mt-2 text-xs">Order {String(claim.orderId || "")} | Product {String(claim.productId || "")}</p>
-                {!!(claim.fraudFlags && Array.isArray(claim.fraudFlags) && claim.fraudFlags.length) ? (
-                  <p className="mt-1 text-xs">Flags: {(claim.fraudFlags as string[]).join(", ")}</p>
-                ) : null}
-              </div>
-            ))}
-            {!claims.length ? <p>No warranty claims are waiting in this queue right now.</p> : null}
-          </div>
-        </Card>
-
-        <Card>
-          <CardTitle>Live alerts</CardTitle>
-          <CardDescription className="mt-2">Medium and high risk cases generated by the scoring engine.</CardDescription>
-          <div className="mt-4 grid gap-3 text-sm text-muted-foreground">
-            {(alerts.length ? alerts : overview?.alerts || []).slice(0, 8).map((item) => (
-              <button
-                key={String(item._id)}
-                type="button"
-                onClick={() => setSelectedCaseId(String(item._id || ""))}
-                className="rounded-2xl border border-border/60 px-4 py-3 text-left"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-semibold text-foreground">
-                    {String(item.entityType || "case").toUpperCase()} {String(item.entityId || "").slice(-6)}
-                  </span>
-                  <Badge variant={resolveBadge(item.level)}>{formatLevel(item.level, item.score)}</Badge>
-                </div>
-                <p className="mt-2 text-sm">{item.summary || "Fraud alert generated."}</p>
-                <p className="mt-2 text-xs">
-                  {item.updatedAt ? new Date(item.updatedAt).toLocaleString() : "Unknown time"}
-                </p>
-              </button>
-            ))}
-            {!loading && !(alerts.length || overview?.alerts?.length) ? <p>No active fraud alerts are open right now.</p> : null}
-          </div>
-        </Card>
-
-        <Card>
-          <CardTitle>Fraud analytics</CardTitle>
-          <CardDescription className="mt-2">Platform-level anomaly rates and dominant attack signals.</CardDescription>
-          <div className="mt-4 grid gap-3 text-sm text-muted-foreground">
-            <div className="rounded-2xl border border-border/60 px-4 py-3">
-              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Attempts</p>
-              <p className="mt-2 text-lg font-semibold text-foreground">{overview?.analytics?.totalAttempts ?? 0}</p>
-              <p className="text-xs">Failed: {overview?.analytics?.failedAttempts ?? 0}</p>
-            </div>
-            <div className="rounded-2xl border border-border/60 px-4 py-3">
-              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Top signals</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {(overview?.analytics?.topSignals || []).map((signal) => (
-                  <Badge key={String(signal.code)} variant="neutral">
-                    {signal.code} {signal.count}
-                  </Badge>
-                ))}
-                {!overview?.analytics?.topSignals?.length ? <span>No signal data has been generated yet.</span> : null}
-              </div>
-            </div>
-            <div className="rounded-2xl border border-border/60 px-4 py-3">
-              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Coverage</p>
-              <p className="mt-2">Orders scored: {overview?.analytics?.totalOrders ?? 0}</p>
-              <p className="text-xs">Signals include IP, device fingerprint, account age, refunds, and payment failures.</p>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardTitle>Flagged orders</CardTitle>
-          <CardDescription className="mt-2">Orders currently carrying fraud risk.</CardDescription>
-          <DataTable
-            columns={[
-              { key: "order", header: "Order" },
-              { key: "score", header: "Risk" },
-              { key: "status", header: "Status" },
-              { key: "action", header: "Action" },
+                ),
+              },
             ]}
-            rows={(overview?.flaggedOrders || []).map((item) => ({
-              order: `#${String(item.orderId || item.entityId || "").slice(-6)}`,
-              score: <Badge variant={resolveBadge(item.level)}>{formatLevel(item.level, item.score)}</Badge>,
-              status: item.status || "OPEN",
-              action: (
-                <Button size="sm" variant="secondary" onClick={() => setSelectedCaseId(String(item._id || ""))}>
-                  Review
-                </Button>
+            rows={filteredOrders.map((order) => ({
+              _id: order._id,
+              orderId: `#${String(order._id || "").slice(-6)}`,
+              customer: order.user?.name || order.user?.email || "Unknown",
+              merchant: order.shop?.name || "Unknown",
+              amount: `${Number(order.totalAmount || 0).toFixed(2)} BDT`,
+              status: (
+                <Badge
+                  variant={
+                    order.status === "DELIVERED"
+                      ? "success"
+                      : order.status === "CANCELLED"
+                        ? "warning"
+                        : "neutral"
+                  }
+                >
+                  {order.status || "PLACED"}
+                </Badge>
               ),
+              payment: (
+                <Badge variant={order.paymentStatus === "SUCCESS" ? "success" : order.paymentStatus === "FAILED" ? "warning" : "neutral"}>
+                  {order.paymentStatus || "PENDING"}
+                </Badge>
+              ),
+              delivery: order.deliveryStatus || "Pending",
+              createdAt: order.createdAt ? new Date(order.createdAt).toLocaleString() : "N/A",
+              totalAmount: order.totalAmount,
             }))}
           />
-        </Card>
+        </div>
+      </Card>
 
-        <Card>
-          <CardTitle>Suspicious users</CardTitle>
-          <CardDescription className="mt-2">Users repeatedly associated with flagged transactions.</CardDescription>
+      <Card>
+        <CardTitle>Dispute resolution queue</CardTitle>
+        <CardDescription className="mt-2">
+          Orders carrying dispute flags or admin review notes are surfaced here for faster follow-up.
+        </CardDescription>
+        <div className="mt-4">
           <DataTable
             columns={[
-              { key: "user", header: "User" },
-              { key: "score", header: "Risk" },
-              { key: "orders", header: "Flagged orders" },
-              { key: "lastSeen", header: "Last seen" },
+              { key: "disputeId", header: "Dispute ID" },
+              { key: "orderId", header: "Order ID" },
+              { key: "type", header: "Type" },
+              { key: "reason", header: "Reason" },
+              { key: "status", header: "Status" },
+              { key: "createdAt", header: "Created" },
             ]}
-            rows={(overview?.suspiciousUsers || []).map((item) => ({
-              user: item.userName || String(item.userId || "").slice(-6),
-              score: <Badge variant={resolveBadgeFromScore(item.score)}>{item.score ?? 0}/100</Badge>,
-              orders: item.orderCount ?? 0,
-              lastSeen: item.latestCaseAt ? new Date(item.latestCaseAt).toLocaleString() : "Unknown",
+            rows={disputes.map((dispute) => ({
+              disputeId: `#${dispute._id.slice(-6)}`,
+              orderId: `#${dispute.orderId.slice(-6)}`,
+              type: dispute.type,
+              reason: dispute.reason,
+              status: (
+                <Badge variant={dispute.status === "RESOLVED" ? "success" : dispute.status === "REJECTED" ? "warning" : "neutral"}>
+                  {dispute.status}
+                </Badge>
+              ),
+              createdAt: dispute.createdAt ? new Date(dispute.createdAt).toLocaleDateString() : "N/A",
             }))}
           />
-        </Card>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-        <Card>
-          <CardTitle>High risk merchants</CardTitle>
-          <CardDescription className="mt-2">Merchants linked to repeated refund or abuse patterns.</CardDescription>
-          <DataTable
-            columns={[
-              { key: "merchant", header: "Merchant" },
-              { key: "score", header: "Risk" },
-              { key: "cases", header: "Cases" },
-              { key: "lastSeen", header: "Last seen" },
-            ]}
-            rows={(overview?.highRiskMerchants || []).map((item) => ({
-              merchant: item.shopName || String(item.shopId || "").slice(-6),
-              score: <Badge variant={resolveBadgeFromScore(item.score)}>{item.score ?? 0}/100</Badge>,
-              cases: item.caseCount ?? 0,
-              lastSeen: item.latestCaseAt ? new Date(item.latestCaseAt).toLocaleString() : "Unknown",
-            }))}
-          />
-        </Card>
-
-        <Card>
-          <CardTitle>Review console</CardTitle>
-          <CardDescription className="mt-2">Approve, investigate, block, suspend, freeze, or rescore.</CardDescription>
-          {selectedCase ? (
-            <div className="mt-4 grid gap-4 text-sm text-muted-foreground">
-              <div className="rounded-2xl border border-border/60 px-4 py-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-semibold text-foreground">
-                    {String(selectedCase.entityType || "case").toUpperCase()} {String(selectedCase.entityId || "").slice(-6)}
-                  </span>
-                  <Badge variant={resolveBadge(selectedCase.level)}>{formatLevel(selectedCase.level, selectedCase.score)}</Badge>
-                </div>
-                <p className="mt-2">{selectedCase.summary || "No summary provided."}</p>
-                <p className="mt-2 text-xs">Status: {selectedCase.status || "OPEN"}</p>
-              </div>
-
-              <div className="rounded-2xl border border-border/60 px-4 py-3">
-                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Signals</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {(selectedCase.signals || []).map((signal) => (
-                    <Badge key={`${signal.code}-${signal.label}`} variant="neutral">
-                      {signal.label} +{signal.weight ?? 0}
-                    </Badge>
-                  ))}
-                  {!selectedCase.signals?.length ? <span>No fraud signals are listed for this case yet.</span> : null}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-border/60 px-4 py-3">
-                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Analyst note</p>
-                <Input
-                  className="mt-3"
-                  value={reviewNote}
-                  onChange={(event) => setReviewNote(event.target.value)}
-                  placeholder="Add review note for this fraud case"
-                />
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Button size="sm" variant="secondary" onClick={() => handleReview("APPROVE")} disabled={busy}>
-                    Approve
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => handleReview("INVESTIGATE")} disabled={busy}>
-                    Investigate
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => handleReview("BLOCK_USER")} disabled={busy || !selectedCase.userId}>
-                    Block user
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleReview("SUSPEND_MERCHANT")}
-                    disabled={busy || !selectedCase.shopId}
-                  >
-                    Suspend merchant
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleReview("FREEZE_WALLET")}
-                    disabled={busy || !selectedCase.shopId}
-                  >
-                    Freeze wallet
-                  </Button>
-                  <Button size="sm" onClick={handleRecheck} disabled={busy || !selectedCase.orderId}>
-                    Recheck
-                  </Button>
-                </div>
-                {status ? <p className="mt-3 text-xs">{status}</p> : null}
-              </div>
-            </div>
-          ) : (
-            <p className="mt-4 text-sm text-muted-foreground">Select a fraud case to begin detailed review.</p>
-          )}
-        </Card>
-      </div>
+        </div>
+      </Card>
     </div>
   );
 }
-
-function resolveBadge(level?: string) {
-  if (level === "high") return "danger" as const;
-  if (level === "medium") return "warning" as const;
-  return "neutral" as const;
-}
-
-function resolveBadgeFromScore(score?: number) {
-  if ((score || 0) >= 61) return "danger" as const;
-  if ((score || 0) >= 31) return "warning" as const;
-  return "neutral" as const;
-}
-
-function formatLevel(level?: string, score?: number) {
-  return `${String(level || "safe").toUpperCase()} ${score ?? 0}/100`;
-}
-
-function normalizeFraudCases(input: unknown): FraudCase[] {
-  if (!Array.isArray(input)) return [];
-  return input
-    .map((item, index) => normalizeFraudCase(item, index))
-    .filter((item): item is FraudCase => item !== null);
-}
-
-function normalizeFraudCase(input: unknown, index = 0): FraudCase | null {
-  if (!input || typeof input !== "object") return null;
-  const row = input as Record<string, unknown>;
-  const id = firstString(row._id, row.entityId, row.orderId, `case-${index}`);
-  return {
-    _id: id,
-    entityType: firstString(row.entityType, "case"),
-    entityId: firstString(row.entityId, row.orderId, id),
-    orderId: toOptionalString(row.orderId),
-    paymentAttemptId: toOptionalString(row.paymentAttemptId),
-    userId: toOptionalString(row.userId),
-    shopId: toOptionalString(row.shopId),
-    score: toNumber(row.score),
-    level: normalizeLevel(row.level, row.score),
-    status: firstString(row.status, "OPEN"),
-    summary: firstString(row.summary, "Fraud alert generated."),
-    signals: normalizeSignals(row.signals),
-    recommendedActions: Array.isArray(row.recommendedActions)
-      ? row.recommendedActions.map((value) => String(value))
-      : [],
-    updatedAt: toOptionalString(row.updatedAt, row.createdAt),
-  };
-}
-
-function normalizeSignals(input: unknown): FraudSignal[] {
-  if (!Array.isArray(input)) return [];
-  return input
-    .map((item) => {
-      if (!item || typeof item !== "object") return null;
-      const row = item as Record<string, unknown>;
-      return {
-        code: toOptionalString(row.code),
-        label: firstString(row.label, row.code, "Signal"),
-        weight: toNumber(row.weight) ?? 0,
-        value: row.value,
-        threshold: row.threshold,
-      };
-    })
-    .filter(Boolean) as FraudSignal[];
-}
-
-function normalizeOverview(overview: unknown, reports: unknown): OverviewState {
-  const source = overview && typeof overview === "object" ? (overview as Record<string, unknown>) : {};
-  const reportData = reports && typeof reports === "object" ? (reports as Record<string, unknown>) : {};
-  const summary = source.summary && typeof source.summary === "object" ? (source.summary as Record<string, unknown>) : {};
-  const analytics =
-    source.analytics && typeof source.analytics === "object"
-      ? (source.analytics as Record<string, unknown>)
-      : reportData;
-
-  return {
-    summary: {
-      cases: toNumber(summary.cases) ?? 0,
-      openCases: toNumber(summary.openCases) ?? 0,
-      reviewRequired: toNumber(summary.reviewRequired) ?? 0,
-      blockedUsers: toNumber(summary.blockedUsers) ?? 0,
-      suspendedMerchants: toNumber(summary.suspendedMerchants) ?? 0,
-      frozenWallets: toNumber(summary.frozenWallets) ?? 0,
-      fraudRate: toNumber(summary.fraudRate) ?? 0,
-      paymentFailureRate: toNumber(summary.paymentFailureRate) ?? 0,
-    },
-    flaggedOrders: normalizeFraudCases(source.flaggedOrders),
-    alerts: normalizeFraudCases(source.alerts),
-    suspiciousUsers: normalizeRiskRows(source.suspiciousUsers, "userId", "orderCount"),
-    highRiskMerchants: normalizeRiskRows(source.highRiskMerchants, "shopId", "caseCount"),
-    analytics: {
-      totalOrders: toNumber(analytics.totalOrders) ?? 0,
-      totalAttempts: toNumber(analytics.totalAttempts) ?? 0,
-      failedAttempts: toNumber(analytics.failedAttempts) ?? 0,
-      topSignals: Array.isArray(analytics.topSignals)
-        ? analytics.topSignals
-            .map((item) => {
-              if (!item || typeof item !== "object") return null;
-              const row = item as Record<string, unknown>;
-              return {
-                code: firstString(row.code, "UNKNOWN"),
-                count: toNumber(row.count) ?? 0,
-              };
-            })
-            .filter(Boolean) as Array<{ code?: string; count?: number }>
-        : [],
-    },
-  };
-}
-
-function normalizeRiskRows(input: unknown, idKey: "userId" | "shopId", countKey: "orderCount" | "caseCount") {
-  if (!Array.isArray(input)) return [];
-  return input
-    .map((item) => {
-      if (!item || typeof item !== "object") return null;
-      const row = item as Record<string, unknown>;
-      return {
-        [idKey]: toOptionalString(row[idKey]),
-        score: toNumber(row.score) ?? 0,
-        [countKey]: toNumber(row[countKey]) ?? 0,
-        latestCaseAt: toOptionalString(row.latestCaseAt),
-      };
-    })
-    .filter((item) => item !== null) as Array<{
-      userId?: string;
-      shopId?: string;
-      score?: number;
-      orderCount?: number;
-      caseCount?: number;
-      latestCaseAt?: string;
-    }>;
-}
-
-function normalizeLevel(level: unknown, score: unknown): "safe" | "medium" | "high" {
-  if (level === "high" || level === "medium" || level === "safe") return level;
-  const numericScore = toNumber(score) ?? 0;
-  if (numericScore >= 61) return "high";
-  if (numericScore >= 31) return "medium";
-  return "safe";
-}
-
-function toNumber(value: unknown): number | undefined {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string" && value.trim()) {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  return undefined;
-}
-
-function toOptionalString(...values: unknown[]): string | undefined {
-  for (const value of values) {
-    if (typeof value === "string" && value.trim()) return value;
-  }
-  return undefined;
-}
-
-function firstString(...values: unknown[]): string {
-  return toOptionalString(...values) || "";
-}
-
-
-

@@ -30,6 +30,19 @@ type PayoutAlertsResponse = {
 type AdminMetricsResponse = {
   shops?: number;
   orders?: number;
+  queues?: Record<string, {
+    name?: string;
+    counts?: Record<string, number>;
+    deadLetter?: Record<string, number>;
+    oldestWaitingMs?: number;
+  }>;
+  outbox?: {
+    pending?: number;
+    inFlight?: number;
+    errored?: number;
+    oldestPendingAt?: string | null;
+    oldestPendingLagMs?: number;
+  };
 };
 
 type AdminKpiResponse = {
@@ -68,6 +81,19 @@ type AdminRecommendationMetricsResponse = {
       clicks?: number;
       ctr?: number;
     }>;
+    storefrontSections?: {
+      impressions?: number;
+      ctaClicks?: number;
+      ctr?: number;
+      breakdown?: Array<{
+        sectionId?: string;
+        sectionType?: string;
+        themeId?: string;
+        impressions?: number;
+        ctaClicks?: number;
+        ctr?: number;
+      }>;
+    };
     topClickedProducts?: Array<{ productId?: string; name?: string; slug?: string; clicks?: number }>;
   };
 };
@@ -103,6 +129,31 @@ type AdminAgentResponse = {
   } & JsonValue>;
 };
 
+type BillingPlan = {
+  _id?: string;
+  name?: string;
+  price?: number;
+  limits?: { shops?: number; products?: number; ordersPerMonth?: number } & JsonValue;
+  features?: { analytics?: boolean; autoSettlement?: boolean; prioritySupport?: boolean } & JsonValue;
+  isActive?: boolean;
+};
+
+type BillingPlanResponse = {
+  data?: BillingPlan[];
+};
+
+type BillingSubscription = {
+  _id?: string;
+  tenantId?: string;
+  planId?: string;
+  status?: string;
+  currentPeriodEnd?: string;
+} & JsonValue;
+
+type BillingSubscriptionResponse = {
+  data?: BillingSubscription[];
+};
+
 type AdminShopResponse = {
   data?: Array<{
     _id?: string;
@@ -112,6 +163,29 @@ type AdminShopResponse = {
     isActive?: boolean;
     owner?: { name?: string; email?: string } & JsonValue;
     createdAt?: string;
+  } & JsonValue>;
+};
+
+type AdminMarketplaceThemeResponse = {
+  data?: Array<{
+    id?: string;
+    name?: string;
+    category?: string;
+    plan?: string;
+    requiredTier?: string;
+    preview?: string;
+    version?: string;
+    versionNotes?: string;
+    approvalStatus?: string;
+    marketplaceStatus?: string;
+    marketplaceFeatured?: boolean;
+    sourceShopId?: string;
+    sourceShopName?: string;
+    submittedForReviewAt?: string;
+    approvedAt?: string;
+    rejectedAt?: string;
+    rejectionReason?: string;
+    reviewedByName?: string;
   } & JsonValue>;
 };
 
@@ -275,6 +349,16 @@ type ThresholdSettingsResponse = {
     warningEnd?: number;
     criticalStart?: number;
     criticalEnd?: number;
+  } & JsonValue;
+};
+
+type OpsSettingsResponse = {
+  data?: {
+    lagWatchMs?: number;
+    lagCriticalMs?: number;
+    queueWaitingWatch?: number;
+    queueActiveWatch?: number;
+    outboxPendingWatch?: number;
   } & JsonValue;
 };
 
@@ -632,8 +716,59 @@ export function listMerchants() {
   return request<AdminUserResponse>("/admin/merchants");
 }
 
+export function updateAdminUser(userId: string, payload: { role?: string; permissionOverrides?: string[] }) {
+  return request<{ message?: string; data?: JsonValue }>(`/admin/users/${userId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function listShops() {
   return request<AdminShopResponse>("/admin/shops");
+}
+
+export function listBillingPlans() {
+  return request<BillingPlanResponse>("/admin/billing/plans");
+}
+
+export function createBillingPlan(payload: {
+  name: string;
+  price: number;
+  limits?: { shops?: number; products?: number; ordersPerMonth?: number };
+  features?: { analytics?: boolean; autoSettlement?: boolean; prioritySupport?: boolean };
+}) {
+  return request<{ data?: BillingPlan }>("/admin/billing/plans", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateBillingPlan(planId: string, payload: {
+  name?: string;
+  price?: number;
+  limits?: { shops?: number; products?: number; ordersPerMonth?: number };
+  features?: { analytics?: boolean; autoSettlement?: boolean; prioritySupport?: boolean };
+}) {
+  return request<{ data?: BillingPlan }>(`/admin/billing/plans/${planId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listBillingSubscriptions() {
+  return request<BillingSubscriptionResponse>("/admin/billing/subscriptions");
+}
+
+export function assignBillingSubscription(payload: {
+  tenantId: string;
+  planId: string;
+  status?: string;
+  currentPeriodEnd?: string;
+}) {
+  return request<{ data?: BillingSubscription }>("/admin/billing/subscriptions", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function listOrders() {
@@ -816,15 +951,17 @@ export function refundWallet(payload: { shopId: string; amount: number; reason?:
   });
 }
 
-export function freezeWallet(shopId: string) {
+export function freezeWallet(shopId: string, payload: { reason?: string } = {}) {
   return request<{ message?: string }>(`/admin/wallets/${shopId}/freeze`, {
     method: "POST",
+    body: JSON.stringify(payload),
   });
 }
 
-export function unfreezeWallet(shopId: string) {
+export function unfreezeWallet(shopId: string, payload: { reason?: string } = {}) {
   return request<{ message?: string }>(`/admin/wallets/${shopId}/unfreeze`, {
     method: "POST",
+    body: JSON.stringify(payload),
   });
 }
 
@@ -882,6 +1019,10 @@ export function getThresholdSettings() {
   return request<ThresholdSettingsResponse>("/settings/thresholds");
 }
 
+export function getOpsSettings() {
+  return request<OpsSettingsResponse>("/settings/ops");
+}
+
 export function updateThresholdSettings(payload: {
   warningStart: number;
   warningEnd: number;
@@ -889,6 +1030,19 @@ export function updateThresholdSettings(payload: {
   criticalEnd: number;
 }) {
   return request<ThresholdSettingsResponse>("/admin/settings/thresholds", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateOpsSettings(payload: {
+  lagWatchMs: number;
+  lagCriticalMs: number;
+  queueWaitingWatch: number;
+  queueActiveWatch: number;
+  outboxPendingWatch: number;
+}) {
+  return request<OpsSettingsResponse>("/admin/settings/ops", {
     method: "PUT",
     body: JSON.stringify(payload),
   });
@@ -967,27 +1121,51 @@ export function getAiWarehouseCohorts(params: { range?: string } = {}) {
   return request<AiWarehouseCohortsResponse>(`/ai/warehouse/cohorts${query ? `?${query}` : ""}`);
 }
 
-export function blockUser(userId: string) {
+export function blockUser(userId: string, payload: { reason?: string } = {}) {
   return request<{ message?: string }>(`/admin/users/${userId}/block`, {
     method: "PUT",
+    body: JSON.stringify(payload),
   });
 }
 
-export function unblockUser(userId: string) {
+export function unblockUser(userId: string, payload: { reason?: string } = {}) {
   return request<{ message?: string }>(`/admin/users/${userId}/unblock`, {
     method: "PUT",
+    body: JSON.stringify(payload),
   });
 }
 
-export function approveShop(shopId: string) {
+export function approveShop(shopId: string, payload: { reason?: string } = {}) {
   return request<{ message?: string }>(`/admin/shops/${shopId}/approve`, {
     method: "PUT",
+    body: JSON.stringify(payload),
   });
 }
 
-export function suspendShop(shopId: string) {
+export function suspendShop(shopId: string, payload: { reason?: string } = {}) {
   return request<{ message?: string }>(`/admin/shops/${shopId}/suspend`, {
     method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listMarketplaceThemes() {
+  return request<AdminMarketplaceThemeResponse>("/admin/themes");
+}
+
+export function reviewMarketplaceTheme(
+  shopId: string,
+  themeId: string,
+  payload: {
+    approvalStatus: "APPROVED" | "REJECTED";
+    marketplaceStatus?: "LISTED" | "PRIVATE";
+    marketplaceFeatured?: boolean;
+    rejectionReason?: string;
+  }
+) {
+  return request<{ message?: string; data?: JsonValue }>(`/admin/themes/${shopId}/${themeId}/review`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
   });
 }
 

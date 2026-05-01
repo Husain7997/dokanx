@@ -224,7 +224,7 @@ async function attachAgentToShop({ shopId, agentCode }) {
       agentId: agent._id,
       acquisitionSource: "agent",
     },
-    { new: true }
+    { returnDocument: "after" }
   );
 
   if (!shop) return null;
@@ -279,7 +279,7 @@ async function updateAgentStatus(agentId, status) {
   const agent = await Agent.findByIdAndUpdate(
     agentId,
     { status: normalizedStatus },
-    { new: true }
+    { returnDocument: "after" }
   )
     .populate("userId", "name email phone")
     .lean();
@@ -357,3 +357,4 @@ module.exports = {
   trackReferralClick,
   updateAgentStatus,
 };
+

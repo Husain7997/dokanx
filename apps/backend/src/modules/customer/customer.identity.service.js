@@ -57,7 +57,7 @@ async function ensureCustomerIdentityForUser(user) {
   if (user.name && identity.name !== user.name) updates.name = user.name;
 
   if (Object.keys(updates).length) {
-    await CustomerIdentity.findByIdAndUpdate(identity._id, { $set: updates }, { new: true });
+    await CustomerIdentity.findByIdAndUpdate(identity._id, { $set: updates }, { returnDocument: "after" });
     return { ...identity.toObject(), ...updates };
   }
 
@@ -69,3 +69,4 @@ module.exports = {
   ensureCustomerIdentityForUser,
   normalizePhone,
 };
+

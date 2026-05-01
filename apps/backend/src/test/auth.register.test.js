@@ -31,6 +31,7 @@ describe("POST /api/auth/register", () => {
     const savedUser = await User.findOne({ email: "customer1@example.com" }).select("+password");
     expect(savedUser).toBeTruthy();
     expect(savedUser.phone).toBe("+8801712345678");
+    expect(savedUser.normalizedPhone).toBe("8801712345678");
     expect(savedUser.password).not.toBe("Passw0rd!");
   });
 
@@ -57,5 +58,57 @@ describe("POST /api/auth/register", () => {
       .expect(400);
 
     expect(response.body.message).toBe("Password must include letters and numbers");
+  });
+
+  it("issues a refresh cookie, refreshes the session, and logs out cleanly", async () => {
+    await request(app)
+      .post("/api/auth/register")
+      .send({
+        name: "Customer Four",
+        email: "customer4@example.com",
+        phone: "+8801712345679",
+        password: "Passw0rd!",
+      })
+      .expect(201);
+
+    const loginResponse = await request(app)
+      .post("/api/auth/login")
+      .send({
+        email: "customer4@example.com",
+        password: "Passw0rd!",
+      })
+      .expect(200);
+
+    expect(loginResponse.body.accessToken).toBeTruthy();
+    expect(loginResponse.headers["set-cookie"]?.join(";")).toContain("dx_refresh_token=");
+
+    const refreshResponse = await request(app)
+      .post("/api/auth/refresh")
+      .set("Cookie", loginResponse.headers["set-cookie"])
+      .expect(200);
+
+    expect(refreshResponse.body.accessToken).toBeTruthy();
+
+    const logoutResponse = await request(app)
+      .post("/api/auth/logout")
+      .set("Cookie", loginResponse.headers["set-cookie"])
+      .expect(200);
+
+    expect(logoutResponse.body.success).toBe(true);
+
+    await request(app)
+      .post("/api/auth/refresh")
+      .set("Cookie", loginResponse.headers["set-cookie"])
+      .expect(401);
+  });
+
+  it("applies security headers on API responses", async () => {
+    const response = await request(app)
+      .get("/api/health")
+      .expect(200);
+
+    expect(response.headers["x-frame-options"]).toBe("DENY");
+    expect(response.headers["x-content-type-options"]).toBe("nosniff");
+    expect(response.headers["content-security-policy"]).toContain("default-src 'self'");
   });
 });

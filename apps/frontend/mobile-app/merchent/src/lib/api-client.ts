@@ -52,16 +52,17 @@ export async function probeMerchantLoginEndpoint() {
       url: target,
     };
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Merchant login endpoint unreachable";
     return {
       ok: false,
       status: null,
       url: target,
-      message: error instanceof Error ? error.message : "Merchant login endpoint unreachable",
+      message: `Unable to reach ${target}: ${message}`,
     };
   }
 }
 
-export { registerUnauthorizedHandler };
+export { getApiBaseUrl, registerUnauthorizedHandler };
 
 export function merchantLoginRequest(payload: { email: string; password: string }) {
   return request<{ token?: string; accessToken?: string }>("/api/auth/login", {
@@ -208,6 +209,10 @@ export function searchMerchantProductsRequest(shopId: string, query: string) {
   return request<{ data?: MerchantProductApiRow[] }>(`/api/products/shop/${encodeURIComponent(shopId)}?q=${encodeURIComponent(query)}`);
 }
 
+export function searchMerchantProductsAISuggestionsRequest(query: string) {
+  return request<{ data?: Array<{ id: string; name: string; entityType: string }> }>(`/api/search/suggestions?q=${encodeURIComponent(query)}`);
+}
+
 export function getMerchantProductByBarcodeRequest(shopId: string, barcode: string) {
   return request<{ data?: MerchantProductApiRow }>(`/api/products/barcode/${encodeURIComponent(barcode)}?shopId=${encodeURIComponent(shopId)}`);
 }
@@ -329,8 +334,25 @@ export function payMerchantCreditDueRequest(token: string, payload: {
   });
 }
 
+export function openMerchantPosSessionRequest(token: string, payload: { openingBalance?: number }) {
+  return request<{ data?: { _id?: string; status?: string; openingBalance?: number; openedAt?: string } }>("/api/pos/sessions", {
+    method: "POST",
+    token,
+    body: payload,
+  });
+}
+
+export function closeMerchantPosSessionRequest(token: string, sessionId: string, payload: { closingBalance?: number }) {
+  return request<{ data?: { _id?: string; status?: string; closingBalance?: number; closedAt?: string } }>(`/api/pos/sessions/${sessionId}/close`, {
+    method: "POST",
+    token,
+    body: payload,
+  });
+}
+
 export function createMerchantPosOrderRequest(token: string, payload: {
   customerId?: string;
+  sessionId?: string;
   paymentMode?: "CASH" | "ONLINE" | "WALLET" | "CREDIT";
   paymentBreakdown?: Array<{ mode: "CASH" | "ONLINE" | "WALLET" | "CREDIT"; amount: number }>;
   items: Array<{ product?: string; name?: string; quantity: number; price?: number }>;
@@ -735,6 +757,7 @@ export function updateMerchantTeamMemberRequest(token: string, userId: string, p
     data?: MerchantTeamMember;
   }>(`/api/shops/me/team/${userId}`, { method: "PATCH", token, body: payload });
 }
+
 
 
 

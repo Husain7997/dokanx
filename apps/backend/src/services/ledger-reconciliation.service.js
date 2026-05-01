@@ -332,7 +332,7 @@ async function repairOrderLedgerEntries(shopId, orderIssues, session = null) {
           },
         },
       },
-      { upsert: true, new: true, session }
+      { upsert: true, returnDocument: "after", session }
     );
 
     actions.push({
@@ -367,7 +367,7 @@ async function rebuildWalletFromLedger(shopId, session = null) {
         isFrozen: false,
       },
     },
-    { new: true, upsert: true, session }
+    { returnDocument: "after", upsert: true, session }
   );
 
   return {
@@ -433,3 +433,4 @@ module.exports = {
   listMismatchedShops,
   repairShopFinancialState,
 };
+

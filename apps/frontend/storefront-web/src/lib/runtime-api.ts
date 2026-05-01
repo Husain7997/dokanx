@@ -546,6 +546,52 @@ export function trackRecommendationClick(payload: { productId: string; context: 
   });
 }
 
+export function trackStorefrontSectionImpression(payload: {
+  sectionId: string;
+  sectionType: string;
+  themeId?: string;
+  shopId?: string;
+  context?: string;
+  host?: string;
+}) {
+  return request<MutationResponse>("/analytics/events", {
+    method: "POST",
+    body: JSON.stringify({
+      type: "STOREFRONT_SECTION_IMPRESSION",
+      sectionId: payload.sectionId,
+      sectionType: payload.sectionType,
+      themeId: payload.themeId,
+      shopId: payload.shopId,
+      context: payload.context || "storefront-home",
+      host: payload.host,
+    }),
+  });
+}
+
+export function trackStorefrontSectionClick(payload: {
+  sectionId: string;
+  sectionType: string;
+  themeId?: string;
+  shopId?: string;
+  context?: string;
+  ctaLink?: string;
+  host?: string;
+}) {
+  return request<MutationResponse>("/analytics/events", {
+    method: "POST",
+    body: JSON.stringify({
+      type: "STOREFRONT_SECTION_CTA_CLICK",
+      sectionId: payload.sectionId,
+      sectionType: payload.sectionType,
+      themeId: payload.themeId,
+      shopId: payload.shopId,
+      context: payload.context || "storefront-home",
+      ctaLink: payload.ctaLink,
+      host: payload.host,
+    }),
+  });
+}
+
 export function searchShops(
   query: string,
   filters?: { district?: string; market?: string; lat?: string; lng?: string; distance?: string }

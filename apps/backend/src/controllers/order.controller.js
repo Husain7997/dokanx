@@ -13,13 +13,12 @@ const { t } =
   require('@/core/infrastructure');
 const { addJob } = require("@/core/infrastructure");
 const { createAudit } = require("../utils/audit.util");
-const { logSearchEvent } = require("../services/search.service");
-const fraudService = require("../services/fraud.service");
-const commissionService = require("../modules/commission-engine/commission.service");
-const deliveryService = require("../modules/delivery-engine/delivery.service");
-const creditService = require("../modules/credit-engine/credit.service");
 const DeliveryGroup = require("../modules/delivery-engine/deliveryGroup.model");
 const Shop = require("../models/shop.model");
+const {
+  createReadQuery,
+  createReadOneQuery,
+} = require("../infrastructure/database/mongo.client");
 
 async function serializeCustomerOrder(orderDoc) {
   if (!orderDoc) return null;
@@ -80,6 +79,7 @@ exports.placeOrder = async (req, res) => {
 
   try {
     if (String(req.body?.paymentMode || "").toUpperCase() === "CREDIT") {
+      const creditService = require("../modules/credit-engine/credit.service");
       await creditService.assertCreditEligibility({
         customerId: req.user?.globalCustomerId || req.user?._id,
         shopId: req.body.shopId || req.shop?._id || req.shop,
@@ -112,7 +112,6 @@ exports.placeOrder = async (req, res) => {
         },
         session
       });
-await addJob("settlement", { orderId: order._id });
       await publishEvent({
         type: "ORDER_CREATED",
         aggregateId: order._id,
@@ -125,20 +124,8 @@ await addJob("settlement", { orderId: order._id });
       orderId: order._id
     });
 
-    const orderDoc = await Order.findById(order._id);
-    if (orderDoc) {
-      await commissionService.applyCommission(orderDoc);
-      await deliveryService.groupOrdersByCustomerAndLocation({ order: orderDoc });
-      if (String(req.body?.paymentMode || "").toUpperCase() === "CREDIT") {
-        await creditService.createCreditSale({
-          orderId: orderDoc._id,
-          customerId: orderDoc.customerId,
-          shopId: orderDoc.shopId,
-          amount: orderDoc.totalAmount,
-        }, req.user);
-      }
-      order = orderDoc.toObject();
-    }
+    const searchId = req.headers["x-search-id"] ? String(req.headers["x-search-id"]) : null;
+    const searchQuery = req.headers["x-search-query"] ? String(req.headers["x-search-query"]) : "";
 
     await createAudit({
       action: "ORDER_CREATED",
@@ -154,44 +141,33 @@ await addJob("settlement", { orderId: order._id });
       },
     });
 
-    try {
-      await fraudService.evaluateTransaction({
-        orderId: order._id,
-        source: "order_created",
-        context: {
-          ip: req.ip,
-          userAgent: req.headers["user-agent"] || "",
-          deviceFingerprint: req.headers["x-device-fingerprint"] || "",
-          couponCode: req.body?.couponCode || "",
-        },
-      });
-    } catch (fraudError) {
-      logger.warn("Fraud evaluation failed", {
-        orderId: order._id,
-        error: fraudError?.message || String(fraudError),
-      });
-    }
+    await addJob("order-post-create", {
+      orderId: order._id,
+      paymentMode: String(req.body?.paymentMode || order.paymentMode || "ONLINE").toUpperCase(),
+      actorUserId: req.user?._id || null,
+      searchId,
+      searchQuery,
+      requestMeta: {
+        ip: req.ip,
+        userAgent: req.headers["user-agent"] || "",
+        deviceFingerprint: req.headers["x-device-fingerprint"] || "",
+        couponCode: req.body?.couponCode || "",
+        itemCount: Array.isArray(req.body.items) ? req.body.items.length : 0,
+        totalAmount: Number(req.body.totalAmount || 0),
+        shopId: req.body?.shopId || req.shop?._id || null,
+      },
+    }, {
+      queueName: "payments",
+      attempts: 3,
+      backoff: { type: "exponential", delay: 3000 },
+      removeOnComplete: true,
+      removeOnFail: false,
+    });
 
     res.status(201).json({
       message: t("order.created", req.lang),
       data: order
     });
-
-    const searchId = req.headers["x-search-id"] ? String(req.headers["x-search-id"]) : null;
-    const searchQuery = req.headers["x-search-query"] ? String(req.headers["x-search-query"]) : "";
-    if (searchId) {
-      await logSearchEvent({
-        searchId,
-        query: searchQuery,
-        eventType: "CHECKOUT",
-        userId: req.user?._id || null,
-        shopId: req.shop?._id || null,
-        metadata: {
-          items: Array.isArray(req.body.items) ? req.body.items.length : 0,
-          totalAmount: Number(req.body.totalAmount || 0),
-        },
-      });
-    }
 
   } catch (err) {
     logger.error("Order create failed", {
@@ -223,7 +199,7 @@ exports.getOrders = async (req, res) => {
     ? Math.min(rawLimit, 100)
     : null;
 
-  let query = Order.find({
+  let query = createReadQuery(Order, {
     shopId: req.shop?._id || req.user?.shopId,
   })
     .populate("items.product", "name price")
@@ -243,7 +219,7 @@ exports.getOrders = async (req, res) => {
 };
 
 exports.getMyOrders = async (req, res) => {
-  const orders = await Order.find({
+  const orders = await createReadQuery(Order, {
     customerId: req.user?._id,
   })
     .populate("items.product", "name price slug shopId")
@@ -258,7 +234,7 @@ exports.getMyOrders = async (req, res) => {
 };
 
 exports.getOrderById = async (req, res) => {
-  const order = await Order.findById(req.params.orderId)
+  const order = await createReadOneQuery(Order, { _id: req.params.orderId })
     .populate("items.product", "name price slug shopId");
 
   if (!order) {
@@ -291,7 +267,7 @@ exports.getAllOrders = async (req, res) => {
   const page = Number(req.query.page) || 0;
   const limit = Number(req.query.limit) || 10;
 
-  const orders = await Order.find()
+  const orders = await createReadQuery(Order, {})
     .skip(page * limit)
     .limit(limit)
     .populate("user shop");
@@ -327,7 +303,7 @@ exports.updateOrderStatus = async (req, res) => {
       if (req.body.disputeStatus) update.disputeStatus = req.body.disputeStatus;
       if (req.body.adminNotes !== undefined) update.adminNotes = req.body.adminNotes;
       if (req.body.disputeReason) update.disputeReason = req.body.disputeReason;
-      order = await Order.findByIdAndUpdate(req.params.orderId, update, { new: true });
+      order = await Order.findByIdAndUpdate(req.params.orderId, update, { returnDocument: "after" });
 
       if (order) {
         await createAudit({
@@ -358,4 +334,5 @@ exports.updateOrderStatus = async (req, res) => {
 
   }
 };
+
 

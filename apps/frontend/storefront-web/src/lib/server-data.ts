@@ -1,4 +1,5 @@
 import type { Cart, MarketplaceApp, Order, Product, TenantConfig } from "@dokanx/types";
+import { DEFAULT_STOREFRONT_THEME, type StorefrontThemeState } from "./theme-config";
 
 import { createServerApi } from "./server-api";
 import { getApiBaseUrl } from "@dokanx/utils";
@@ -19,6 +20,29 @@ async function safeCall<T>(request: () => Promise<T>, fallback: T): Promise<T> {
   } catch {
     return fallback;
   }
+}
+
+function buildThemeCssVariables(theme: StorefrontThemeState): Record<string, string> {
+  const config = theme.config;
+  const fontMap: Record<string, string> = {
+    Poppins: "'Poppins', ui-sans-serif, system-ui, sans-serif",
+    Sora: "'Sora', ui-sans-serif, system-ui, sans-serif",
+    Inter: "'Inter', ui-sans-serif, system-ui, sans-serif",
+    Roboto: "'Roboto', ui-sans-serif, system-ui, sans-serif",
+    Fraunces: "'Fraunces', Georgia, serif",
+  };
+  return {
+    "--theme-primary": config.colors.primary,
+    "--theme-secondary": config.colors.secondary,
+    "--theme-background": config.colors.background,
+    "--theme-surface": config.colors.surface,
+    "--theme-text": config.colors.text,
+    "--theme-button-text": config.colors.buttonText,
+    "--theme-font-family": fontMap[config.typography.fontFamily] || "'Poppins', ui-sans-serif, system-ui, sans-serif",
+    "--theme-columns": String(config.layout.productColumns),
+    "--theme-gap": config.layout.spacing === "compact" ? "1rem" : config.layout.spacing === "spacious" ? "1.75rem" : "1.25rem",
+    "--theme-radius": config.components.productCard === "minimal" ? "1.25rem" : config.components.productCard === "detailed" ? "1.75rem" : "1.5rem",
+  };
 }
 
 export async function getHomePageData(tenant: TenantConfig | null) {
@@ -189,6 +213,74 @@ export async function getShopBySlug(slug: string) {
       String(shop._id || "") === slug ||
       String(shop.id || "") === slug
     )) || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getStorefrontThemeByHost(hostname: string, cookieVariant?: string | null): Promise<StorefrontThemeState> {
+  try {
+    const host = String(hostname || "").split(":")[0].toLowerCase();
+    const baseUrl = getApiBaseUrl();
+    const response = await fetch(`${baseUrl}/shops/public`, { cache: "no-store" }).then((res) => res.json());
+    const shops = Array.isArray(response.data) ? response.data : [];
+    const matched = shops.find((shop: { domain?: string; slug?: string; theme?: StorefrontThemeState }) => {
+      const domain = String(shop.domain || "").toLowerCase();
+      const slug = String(shop.slug || "").toLowerCase();
+      return domain === host || `${slug}.localhost` === host || slug === host.split(".")[0];
+    });
+    const experiment = matched?.themeExperiment as
+      | {
+          isEnabled?: boolean;
+          experimentId?: string;
+          name?: string;
+          variants?: Array<{ id?: string; themeId?: string; config?: StorefrontThemeState["config"] }>;
+        }
+      | undefined;
+    const requestedVariant = String(cookieVariant || "").trim().toUpperCase();
+
+    if (experiment?.isEnabled && Array.isArray(experiment.variants) && experiment.variants.length >= 2) {
+      const fallbackVariant = experiment.variants[0];
+      const selectedVariant =
+        experiment.variants.find((variant) => String(variant?.id || "").toUpperCase() === requestedVariant) || fallbackVariant;
+
+      if (selectedVariant?.themeId && selectedVariant?.config) {
+        return {
+          ...((matched?.theme as StorefrontThemeState) || DEFAULT_STOREFRONT_THEME),
+          themeId: String(selectedVariant.themeId),
+          config: selectedVariant.config,
+          cssVariables: buildThemeCssVariables({
+            ...((matched?.theme as StorefrontThemeState) || DEFAULT_STOREFRONT_THEME),
+            config: selectedVariant.config,
+          }),
+          experiment: {
+            experimentId: String(experiment.experimentId || ""),
+            name: String(experiment.name || "Theme experiment"),
+            assignedVariantId: String(selectedVariant.id || "A"),
+            isEnabled: true,
+            trafficSplit: Number(experiment.trafficSplit || 50),
+          },
+        };
+      }
+    }
+
+    return (matched?.theme as StorefrontThemeState) || DEFAULT_STOREFRONT_THEME;
+  } catch {
+    return DEFAULT_STOREFRONT_THEME;
+  }
+}
+
+export async function getStorefrontShopByHost(hostname: string) {
+  try {
+    const host = String(hostname || "").split(":")[0].toLowerCase();
+    const baseUrl = getApiBaseUrl();
+    const response = await fetch(`${baseUrl}/shops/public`, { cache: "no-store" }).then((res) => res.json());
+    const shops = Array.isArray(response.data) ? response.data : [];
+    return shops.find((shop: { _id?: string; id?: string; name?: string; domain?: string; slug?: string }) => {
+      const domain = String(shop.domain || "").toLowerCase();
+      const slug = String(shop.slug || "").toLowerCase();
+      return domain === host || `${slug}.localhost` === host || slug === host.split(".")[0];
+    }) || null;
   } catch {
     return null;
   }

@@ -20,9 +20,37 @@ const OutboxSchema = new mongoose.Schema({
     index: true,
   },
 
+  processedAt: {
+    type: Date,
+    default: null,
+    index: true,
+  },
+
+  processingAt: {
+    type: Date,
+    default: null,
+    index: true,
+  },
+
+  processingBy: {
+    type: String,
+    default: null,
+  },
+
+  retryCount: {
+    type: Number,
+    default: 0,
+  },
+
+  lastError: {
+    type: String,
+    default: null,
+  },
+
   createdAt: {
     type: Date,
     default: Date.now,
+    index: true,
   },
 });
 

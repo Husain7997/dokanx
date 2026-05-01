@@ -98,19 +98,38 @@ export function PosCartSummary({
               <h4 className="font-medium">{shop?.name || "Unknown Shop"}</h4>
               <div className="mt-2 space-y-2">
                 {items.map((item) => (
-                  <div key={item.product.id} className="flex items-center justify-between text-sm">
-                    <div className="flex-1">
-                      <span>{item.product.name}</span>
-                      <span className="ml-2 text-muted-foreground">x{item.quantity}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span>৳{(item.product.price * item.quantity).toFixed(2)}</span>
+                  <div key={item.product.id} className="space-y-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span>{item.product.name}</span>
+                        <span className="ml-2 text-muted-foreground">x{item.quantity}</span>
+                      </div>
                       <button
                         onClick={() => onRemoveItem(item.product.id)}
                         className="text-destructive hover:text-destructive/80"
                       >
                         ×
                       </button>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onUpdateQuantity(item.product.id, item.quantity - 1)}
+                          className="rounded border border-border bg-background px-2 text-sm"
+                        >
+                          −
+                        </button>
+                        <span className="min-w-[28px] text-center">{item.quantity}</span>
+                        <button
+                          type="button"
+                          onClick={() => onUpdateQuantity(item.product.id, item.quantity + 1)}
+                          className="rounded border border-border bg-background px-2 text-sm"
+                        >
+                          +
+                        </button>
+                      </div>
+                      <span>৳{(item.product.price * item.quantity).toFixed(2)}</span>
                     </div>
                   </div>
                 ))}

@@ -17,7 +17,9 @@ type MerchantScreenName =
 
 type MerchantNavigationValue = {
   currentScreen: MerchantScreenName;
+  canGoBack: boolean;
   navigate: (screen: MerchantScreenName) => void;
+  goBack: () => void;
   resetTo: (screen: MerchantScreenName) => void;
 };
 
@@ -27,15 +29,28 @@ export function MerchantNavigationProvider({
   initialScreen,
   children,
 }: React.PropsWithChildren<{ initialScreen: MerchantScreenName }>) {
-  const [currentScreen, setCurrentScreen] = useState<MerchantScreenName>(initialScreen);
+  const [history, setHistory] = useState<MerchantScreenName[]>([initialScreen]);
+  const currentScreen = history[history.length - 1] || initialScreen;
 
   const value = useMemo(
     () => ({
       currentScreen,
-      navigate: (screen: MerchantScreenName) => setCurrentScreen(screen),
-      resetTo: (screen: MerchantScreenName) => setCurrentScreen(screen),
+      canGoBack: history.length > 1,
+      navigate: (screen: MerchantScreenName) => {
+        setHistory((current) => {
+          const active = current[current.length - 1];
+          if (active === screen) {
+            return current;
+          }
+          return [...current, screen];
+        });
+      },
+      goBack: () => {
+        setHistory((current) => (current.length > 1 ? current.slice(0, -1) : current));
+      },
+      resetTo: (screen: MerchantScreenName) => setHistory([screen]),
     }),
-    [currentScreen],
+    [currentScreen, history],
   );
 
   return <MerchantNavigationContext.Provider value={value}>{children}</MerchantNavigationContext.Provider>;

@@ -11,17 +11,21 @@ const { dispatchWebhooks } = require("../services/webhook.service");
 const { resolveShopId } = require("../utils/order-normalization.util");
 const { simulatePaymentAttempt, enqueueSandboxLifecycle } = require("../modules/sandbox-engine/sandbox.service");
 const { recordPlatformAudit } = require("../modules/platform-hardening/platform-audit.service");
+const {
+  createReadQuery,
+  createReadOneQuery,
+} = require("../infrastructure/database/mongo.client");
 
 exports.listProducts = async (req, res) => {
   const shopId = req.platformContext?.shopId || req.query.shopId;
   const filter = {};
   if (shopId) filter.shopId = shopId;
-  const products = await Product.find(filter).lean();
+  const products = await createReadQuery(Product, filter).lean();
   res.json({ data: products });
 };
 
 exports.getProduct = async (req, res) => {
-  const product = await Product.findById(req.params.productId).lean();
+  const product = await createReadOneQuery(Product, { _id: req.params.productId }).lean();
   if (!product) return res.status(404).json({ message: "Product not found" });
   res.json({ data: product });
 };
@@ -76,14 +80,14 @@ exports.createOrder = async (req, res) => {
 exports.listCustomers = async (req, res) => {
   const shopId = req.platformContext?.shopId || req.query.shopId;
   if (!shopId) return res.status(400).json({ message: "shopId required" });
-  const users = await User.find({ role: "CUSTOMER", shopId }).select("name email phone").lean();
+  const users = await createReadQuery(User, { role: "CUSTOMER", shopId }).select("name email phone").lean();
   res.json({ data: users });
 };
 
 exports.listOrders = async (req, res) => {
   const shopId = req.platformContext?.shopId || req.query.shopId;
   if (!shopId) return res.status(400).json({ message: "shopId required" });
-  const orders = await Order.find({ shopId }).sort({ createdAt: -1 }).limit(100).lean();
+  const orders = await createReadQuery(Order, { shopId }).sort({ createdAt: -1 }).limit(100).lean();
   res.json({ data: orders });
 };
 
@@ -92,14 +96,14 @@ exports.listShops = async (req, res) => {
   const filter = {};
   const shopId = req.platformContext?.shopId || req.query.shopId;
   if (shopId) filter._id = shopId;
-  const shops = await Shop.find(filter).select("name slug domain isActive commissionRate").lean();
+  const shops = await createReadQuery(Shop, filter).select("name slug domain isActive commissionRate").lean();
   res.json({ data: shops });
 };
 
 exports.listInventory = async (req, res) => {
   const shopId = req.platformContext?.shopId || req.query.shopId;
   if (!shopId) return res.status(400).json({ message: "shopId required" });
-  const items = await Inventory.find({ shopId }).lean();
+  const items = await createReadQuery(Inventory, { shopId }).lean();
   res.json({ data: items });
 };
 
@@ -107,7 +111,7 @@ exports.getWalletSummary = async (req, res) => {
   const shopId = req.platformContext?.shopId || req.query.shopId;
   if (!shopId) return res.status(400).json({ message: "shopId required" });
 
-  const wallet = await Wallet.findOne({ shopId }).lean();
+  const wallet = await createReadOneQuery(Wallet, { shopId }).lean();
   if (!wallet) return res.status(404).json({ message: "Wallet not found" });
 
   res.json({ data: wallet });
@@ -179,7 +183,7 @@ exports.initiatePayment = async (req, res) => {
   if (!order) return res.status(404).json({ message: "Order not found" });
   const shopId = resolveShopId(order);
 
-  const attempt = await PaymentAttempt.findOne({
+  const attempt = await createReadOneQuery(PaymentAttempt, {
     order: orderId,
     status: "PENDING",
   });

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
-import * as XLSX from "xlsx";
 
 import {
   createMerchantFinanceEntryRequest,
@@ -51,6 +50,17 @@ function formatMoney(value: number) {
 
 function normalizeCategory(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, "_");
+}
+
+function rowsToCsv(rows: Array<Record<string, unknown>>) {
+  if (!rows.length) return "";
+  const headers = Object.keys(rows[0]);
+  const escapeValue = (value: unknown) => {
+    const text = value == null ? "" : String(value);
+    const escaped = text.replace(/"/g, '""');
+    return /[",\r\n]/.test(text) ? `"${escaped}"` : escaped;
+  };
+  return [headers.join(","), ...rows.map((row) => headers.map((header) => escapeValue(row[header])).join(","))].join("\r\n");
 }
 
 function toTitle(value: string) {
@@ -194,7 +204,7 @@ export function MerchantFinanceScreen() {
     setError(null);
   }
 
-  async function handleExportReport(format: "CSV" | "XLSX") {
+  async function handleExportReport(format: "CSV") {
     const rows = filteredEntries.map((entry: any) => ({
       createdAt: entry.createdAt,
       scope: entry.scope,
@@ -208,17 +218,9 @@ export function MerchantFinanceScreen() {
       setError("No finance rows were found in the selected filter window.");
       return;
     }
-    const sheet = XLSX.utils.json_to_sheet(rows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, sheet, "Finance");
-    if (format === "CSV") {
-      const csv = XLSX.utils.sheet_to_csv(sheet);
-      await Share.share({ title: "Finance CSV", url: `data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`, message: "Finance export CSV" });
-    } else {
-      const base64 = XLSX.write(workbook, { type: "base64", bookType: "xlsx" });
-      await Share.share({ title: "Finance Excel", url: `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${base64}`, message: "Finance export Excel" });
-    }
-    setStatus(`${format} export opened in share options.`);
+    const csv = rowsToCsv(rows);
+    await Share.share({ title: "Finance CSV", url: `data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`, message: "Finance export CSV" });
+    setStatus("CSV export opened in share options.");
     setError(null);
   }
 
@@ -303,10 +305,9 @@ export function MerchantFinanceScreen() {
           </View>
           <View style={styles.pillRow}>
             <Pressable style={styles.secondaryButton} onPress={() => void handleExportReport("CSV")}><Text style={styles.secondaryButtonText}>Export CSV</Text></Pressable>
-            <Pressable style={styles.secondaryButton} onPress={() => void handleExportReport("XLSX")}><Text style={styles.secondaryButtonText}>Export Excel</Text></Pressable>
             <Pressable style={styles.secondaryButton} onPress={() => void handlePrintReport()}><Text style={styles.secondaryButtonText}>Print report</Text></Pressable>
           </View>
-          <Text style={styles.helperText}>{filteredEntries.length} filtered rows ready for CSV, Excel, or printer output.</Text>
+          <Text style={styles.helperText}>{filteredEntries.length} filtered rows ready for CSV or printer output.</Text>
         </View>
 
         <View style={styles.section}>

@@ -120,7 +120,7 @@ exports.updateApp = async (req, res) => {
       ...(typeof rateLimitPerMinute === "number" ? { rateLimitPerMinute } : {}),
       ...(typeof rateLimitPerDay === "number" ? { rateLimitPerDay } : {}),
     },
-    { new: true }
+    { returnDocument: "after" }
   );
 
   if (!app) return res.status(404).json({ message: "OAuth app not found" });
@@ -309,3 +309,4 @@ exports.refreshToken = async (req, res) => {
     scope: existing.scopes.join(" "),
   });
 };
+

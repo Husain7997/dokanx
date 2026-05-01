@@ -5,6 +5,7 @@ const { protect, allowRoles } = require('../../middlewares');
 // const allowRoles = require('../../middlewares/rbac.middleware');
 const financeLock = require('../../middlewares/financeLock.middleware');
 const rateLimit = require('../../middlewares/rateLimit');
+const { requireSensitiveOtp } = require('../../middlewares/requireSensitiveOtp.middleware');
 
 // 🔐 Global guards
 router.use(protect);
@@ -33,6 +34,10 @@ router.post(
  */
 router.post(
   '/:id/approve',
+  requireSensitiveOtp({
+    action: 'PAYOUT_APPROVE',
+    targetId: (req) => req.params.id,
+  }),
   payoutController.approve
 );
 
@@ -41,6 +46,10 @@ router.post(
  */
 router.post(
   '/:id/execute',
+  requireSensitiveOtp({
+    action: 'PAYOUT_EXECUTE',
+    targetId: (req) => req.params.id,
+  }),
   payoutController.execute
 );
 
@@ -49,6 +58,10 @@ router.post(
  */
 router.post(
   '/manual',
+  requireSensitiveOtp({
+    action: 'PAYOUT_MANUAL',
+    targetId: (req) => req.body?.referenceId || req.body?.walletId,
+  }),
   payoutController.manualPayout
 );
 
@@ -56,7 +69,11 @@ router.post(
  * 🔹 Retry payout
  */
 router.post(
-  '/retry',
+  '/:id/retry',
+  requireSensitiveOtp({
+    action: 'PAYOUT_RETRY',
+    targetId: (req) => req.params.id,
+  }),
   payoutController.retryPayout
 );
 

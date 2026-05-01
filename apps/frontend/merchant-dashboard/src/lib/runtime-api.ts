@@ -41,6 +41,91 @@ type ThemeResponse = {
   data?: Array<Record<string, unknown>>;
 };
 
+type ThemeStateResponse = {
+  message?: string;
+  data?: Record<string, unknown>;
+};
+
+type ThemeDraftResponse = {
+  message?: string;
+  data?: {
+    draft?: Record<string, unknown> | null;
+    published?: Record<string, unknown> | null;
+    draftUpdatedAt?: string | null;
+    publishedAt?: string | null;
+    history?: Array<Record<string, unknown>>;
+    access?: Record<string, unknown>;
+    mediaAssets?: Array<Record<string, unknown>>;
+    customThemes?: Array<Record<string, unknown>>;
+    catalog?: Array<Record<string, unknown>>;
+    marketplace?: Record<string, unknown>;
+    experiment?: Record<string, unknown>;
+  };
+};
+
+type ThemeMediaResponse = {
+  message?: string;
+  data?: {
+    asset?: Record<string, unknown>;
+    assets?: Array<Record<string, unknown>>;
+    access?: Record<string, unknown>;
+  };
+};
+
+type CustomThemeResponse = {
+  message?: string;
+  data?: {
+    themes?: Array<Record<string, unknown>>;
+    catalog?: Array<Record<string, unknown>>;
+    access?: Record<string, unknown>;
+    theme?: Record<string, unknown>;
+  };
+};
+
+type ThemeMarketplaceResponse = {
+  message?: string;
+  data?: {
+    marketplace?: Record<string, unknown>;
+    catalog?: Array<Record<string, unknown>>;
+    access?: Record<string, unknown>;
+  };
+};
+
+type ThemeHistoryResponse = {
+  message?: string;
+  data?: {
+    history?: Array<Record<string, unknown>>;
+    publishedAt?: string | null;
+    experiment?: Record<string, unknown>;
+  };
+};
+
+type ThemeExperimentResponse = {
+  message?: string;
+  data?: {
+    experiment?: Record<string, unknown>;
+    catalog?: Array<Record<string, unknown>>;
+  };
+};
+
+type TeamActivityResponse = {
+  data?: Array<{
+    id?: string;
+    action?: string;
+    actorId?: string | null;
+    actorName?: string;
+    actorRole?: string;
+    createdAt?: string | null;
+    targetType?: string;
+    targetId?: string | null;
+    permissionsMode?: string;
+    permissionOverrides?: string[];
+    before?: JsonValue | null;
+    after?: JsonValue | null;
+    inviteIssued?: boolean;
+  } & JsonValue>;
+};
+
 type TeamMemberResponse = {
   message?: string;
   data?: Array<{
@@ -84,6 +169,8 @@ type ShopSettingsResponse = {
     country?: string;
     vatRate?: number;
     defaultDiscountRate?: number;
+    merchantTier?: string;
+    themeAccess?: Record<string, unknown>;
   } & JsonValue;
 };
 
@@ -329,6 +416,94 @@ type AgentMeResponse = {
   } & JsonValue;
 };
 
+type MerchantAiCopilotResponse = {
+  data?: {
+    generatedAt?: string;
+    rangeDays?: number;
+    summary?: {
+      currentRevenue?: number;
+      previousRevenue?: number;
+      revenueTrend?: number;
+      projectedNext7Days?: number;
+      paymentFailureRate?: number;
+      lowStockCount?: number;
+      riskyCreditCustomers?: number;
+      fulfillmentBacklog?: number;
+    };
+    cards?: Array<{
+      id?: string;
+      title?: string;
+      severity?: string;
+      metric?: string;
+      message?: string;
+    }>;
+    salesSeries?: Array<{
+      label?: string;
+      value?: number;
+    }>;
+    inventoryActions?: Array<{
+      productId?: string;
+      name?: string;
+      currentStock?: number;
+      reorderPoint?: number;
+      suggestedRestock?: number;
+      demandPerDay?: number;
+      estimatedDaysLeft?: number | null;
+      urgency?: string;
+      reason?: string;
+    }>;
+    customerSegments?: Array<{
+      segment?: string;
+      count?: number;
+      ratio?: number;
+      description?: string;
+    }>;
+    creditInsights?: Array<{
+      customerId?: string;
+      customerName?: string;
+      phone?: string;
+      creditScore?: number;
+      decision?: string;
+      status?: string;
+      creditLimit?: number;
+      outstandingBalance?: number;
+      availableCredit?: number;
+      utilizationRate?: number;
+      recommendedLimit?: number;
+      riskLabel?: string;
+      reasons?: string[];
+    }>;
+    paymentIntelligence?: {
+      totalAttempts?: number;
+      failedAttempts?: number;
+      pendingAttempts?: number;
+      failureRate?: number;
+      gatewayBreakdown?: Array<{
+        gateway?: string;
+        total?: number;
+        failed?: number;
+        success?: number;
+        pending?: number;
+        failureRate?: number;
+      }>;
+      anomalies?: Array<{
+        gateway?: string;
+        severity?: string;
+        message?: string;
+      }>;
+    };
+    fulfillmentActions?: Array<{
+      orderId?: string;
+      status?: string;
+      paymentStatus?: string;
+      ageHours?: number;
+      totalAmount?: number;
+      priority?: string;
+      suggestion?: string;
+    }>;
+  };
+};
+
 function getHeaders() {
   const store = useAuthStore.getState();
   return {
@@ -394,6 +569,7 @@ export function adjustInventory(payload: {
   product: string;
   quantity: number;
   note?: string;
+  source?: string;
 }) {
   return request<InventoryAdjustResponse>("/inventory/adjust", {
     method: "POST",
@@ -403,6 +579,30 @@ export function adjustInventory(payload: {
 
 export function listThemes() {
   return request<ThemeResponse>("/themes");
+}
+
+export function getThemeCatalog() {
+  return request<ThemeResponse>("/themes");
+}
+
+export function getThemeState() {
+  return request<ThemeStateResponse>("/themes/current");
+}
+
+export function getThemeDraft() {
+  return request<ThemeDraftResponse>("/themes/draft");
+}
+
+export function getThemeHistory() {
+  return request<ThemeHistoryResponse>("/themes/history");
+}
+
+export function getThemeMedia() {
+  return request<ThemeMediaResponse>("/themes/media");
+}
+
+export function getCustomThemes() {
+  return request<CustomThemeResponse>("/themes/custom");
 }
 
 export function applyTheme(themeId: string) {
@@ -419,6 +619,94 @@ export function applyThemeWithOverrides(payload: {
   return request<MutationResponse>("/themes/apply", {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+export function updateThemeConfig(payload: {
+  themeId: string;
+  themeConfig: JsonValue;
+  mode?: "draft" | "publish";
+}) {
+  return request<ThemeStateResponse>("/themes/update", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function rollbackThemeSnapshot(snapshotId: string) {
+  return request<ThemeDraftResponse>("/themes/rollback", {
+    method: "POST",
+    body: JSON.stringify({ snapshotId }),
+  });
+}
+
+export function updateThemeExperiment(payload: {
+  experiment: {
+    isEnabled?: boolean;
+    name?: string;
+    trafficSplit?: number;
+    variants?: Array<{
+      id?: string;
+      label?: string;
+      themeId?: string;
+      config?: Record<string, unknown>;
+    }>;
+  };
+}) {
+  return request<ThemeExperimentResponse>("/themes/experiment", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function createThemeMediaAsset(payload: {
+  name: string;
+  dataUrl: string;
+  alt?: string;
+  tags?: string[];
+}) {
+  return request<ThemeMediaResponse>("/themes/media", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteThemeMediaAsset(assetId: string) {
+  return request<ThemeMediaResponse>(`/themes/media/${encodeURIComponent(assetId)}`, {
+    method: "DELETE",
+  });
+}
+
+export function createCustomTheme(payload: {
+  theme: Record<string, unknown>;
+}) {
+  return request<CustomThemeResponse>("/themes/custom", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteCustomTheme(themeId: string) {
+  return request<CustomThemeResponse>(`/themes/custom/${encodeURIComponent(themeId)}`, {
+    method: "DELETE",
+  });
+}
+
+export function exportCustomTheme(themeId: string) {
+  return request<CustomThemeResponse>(`/themes/custom/${encodeURIComponent(themeId)}/export`);
+}
+
+export function installMarketplaceTheme(themeId: string) {
+  return request<ThemeMarketplaceResponse>("/themes/marketplace/install", {
+    method: "POST",
+    body: JSON.stringify({ themeId }),
+  });
+}
+
+export function toggleFavoriteTheme(themeId: string) {
+  return request<ThemeMarketplaceResponse>("/themes/marketplace/favorite", {
+    method: "POST",
+    body: JSON.stringify({ themeId }),
   });
 }
 
@@ -497,8 +785,19 @@ export function searchAISuggestions(query: string, limit = 8) {
   return request<SearchSuggestionResponse>(`/search/suggestions?q=${encodeURIComponent(query)}&limit=${limit}`);
 }
 
+export function getMerchantAiCopilot(params: { range?: string } = {}) {
+  const query = new URLSearchParams();
+  if (params.range) query.set("range", params.range);
+  const search = query.toString();
+  return request<MerchantAiCopilotResponse>(`/ai/merchant-copilot${search ? `?${search}` : ""}`);
+}
+
 export function listTeamMembers() {
   return request<TeamMemberResponse>("/shops/me/team");
+}
+
+export function listTeamActivity() {
+  return request<TeamActivityResponse>("/shops/me/team/activity");
 }
 
 export function listCustomers() {
@@ -511,6 +810,7 @@ export function addTeamMember(payload: {
   phone?: string;
   role: string;
   permissions: string[];
+  permissionsMode?: "replace" | "merge" | "remove";
 }) {
   return request<MutationResponse>("/shops/me/team", {
     method: "POST",
@@ -521,6 +821,7 @@ export function addTeamMember(payload: {
 export function updateTeamMember(userId: string, payload: {
   role?: string;
   permissions?: string[];
+  permissionsMode?: "replace" | "merge" | "remove";
   resendInvite?: boolean;
 }) {
   return request<MutationResponse>(`/shops/me/team/${userId}`, {
@@ -596,6 +897,8 @@ export function closePosSession(sessionId: string, payload: { closingBalance?: n
 
 export function createPosOrder(payload: {
   items: Array<{ product: string; quantity: number }>;
+  paymentType?: "cash" | "wallet" | "online" | "credit";
+  customerId?: string;
 }) {
   return request<MutationResponse>("/pos/orders", {
     method: "POST",
@@ -674,6 +977,19 @@ export function createCreditSale(payload: {
   amount: number;
 }) {
   return request<MutationResponse>("/credit/sales", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function upsertCreditPolicy(payload: {
+  customerId: string;
+  shopId?: string;
+  creditLimit: number;
+  status?: "ACTIVE" | "BLOCKED";
+  source?: string;
+}) {
+  return request<MutationResponse>("/credit/limits", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -822,6 +1138,13 @@ export function updateOrderStatus(orderId: string, status: string) {
   return request<{ message?: string; order?: JsonValue }>(`/orders/${orderId}/status`, {
     method: "PATCH",
     body: JSON.stringify({ status }),
+  });
+}
+
+export function retryPayment(orderId: string, source?: string) {
+  return request<{ message?: string; paymentId?: string; attemptNo?: number; amount?: number }>("/payments/retry", {
+    method: "POST",
+    body: JSON.stringify({ orderId, source }),
   });
 }
 

@@ -1,0 +1,115 @@
+name: Database Operations
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: 'Database operation to perform'
+        required: true
+        default: 'backup'
+        type: choice
+        options:
+        - backup
+        - restore
+        - migrate
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+
+jobs:
+  database-operation:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure kubectl
+      uses: azure/k8s-set-context@v3
+      with:
+        method: kubeconfig
+        kubeconfig: ${{ secrets.KUBE_CONFIG_STAGING }}
+        if: inputs.environment == 'staging'
+      with:
+        method: kubeconfig
+        kubeconfig: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
+        if: inputs.environment == 'production'
+
+    - name: Set namespace
+      run: |
+        if [ "${{ inputs.environment }}" = "production" ]; then
+          echo "NAMESPACE=dokanx" >> $GITHUB_ENV
+        else
+          echo "NAMESPACE=dokanx-staging" >> $GITHUB_ENV
+        fi
+
+    - name: Database Backup
+      if: inputs.operation == 'backup'
+      run: |
+        TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+
+        # MongoDB backup
+        kubectl exec -n ${{ env.NAMESPACE }} dokanx-mongodb-0 -- mongodump --out /tmp/backup_$TIMESTAMP
+
+        # Copy backup to local
+        kubectl cp ${{ env.NAMESPACE }}/dokanx-mongodb-0:/tmp/backup_$TIMESTAMP ./mongodb_backup_$TIMESTAMP
+
+        # Redis backup
+        kubectl exec -n ${{ env.NAMESPACE }} dokanx-redis-0 -- redis-cli save
+        kubectl cp ${{ env.NAMESPACE }}/dokanx-redis-0:/data/dump.rdb ./redis_backup_$TIMESTAMP.rdb
+
+        # Upload backups to storage (configure your preferred storage)
+        # aws s3 cp ./mongodb_backup_$TIMESTAMP s3://dokanx-backups/mongodb/$TIMESTAMP/ --recursive
+        # aws s3 cp ./redis_backup_$TIMESTAMP.rdb s3://dokanx-backups/redis/$TIMESTAMP.rdb
+
+    - name: Database Restore
+      if: inputs.operation == 'restore'
+      run: |
+        # This would need to be implemented based on your backup storage
+        # For now, this is a placeholder for restore operations
+        echo "Database restore operation selected"
+        echo "Please provide backup timestamp to restore from"
+
+    - name: Database Migration
+      if: inputs.operation == 'migrate'
+      run: |
+        # Run database migrations
+        kubectl exec -n ${{ env.NAMESPACE }} deployment/dokanx-backend -- npm run migrate
+
+        # Verify migration success
+        kubectl logs -n ${{ env.NAMESPACE }} deployment/dokanx-backend --tail=50
+
+  scheduled-backup:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure kubectl for production
+      uses: azure/k8s-set-context@v3
+      with:
+        method: kubeconfig
+        kubeconfig: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
+
+    - name: Daily production backup
+      run: |
+        TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+
+        # MongoDB backup
+        kubectl exec -n dokanx dokanx-mongodb-0 -- mongodump --out /tmp/backup_$TIMESTAMP
+        kubectl cp dokanx/dokanx-mongodb-0:/tmp/backup_$TIMESTAMP ./mongodb_backup_$TIMESTAMP
+
+        # Redis backup
+        kubectl exec -n dokanx dokanx-redis-0 -- redis-cli save
+        kubectl cp dokanx/dokanx-redis-0:/data/dump.rdb ./redis_backup_$TIMESTAMP.rdb
+
+        # Upload to cloud storage
+        # Configure your preferred backup storage solution here

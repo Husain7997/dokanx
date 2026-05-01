@@ -1,0 +1,149 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dokanx-backend-worker
+  namespace: dokanx
+  labels:
+    app: dokanx-backend-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: dokanx-backend-worker
+  template:
+    metadata:
+      labels:
+        app: dokanx-backend-worker
+    spec:
+      containers:
+      - name: backend-worker
+        image: dokanx/backend:latest
+        command: ["node", "src/worker-server.js"]
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: MONGODB_URI
+          value: "mongodb://mongodb:27017/dokanx"
+        - name: REDIS_URL
+          value: "redis://redis:6379"
+        - name: RUN_QUEUE_WORKERS
+          value: "true"
+        - name: RUN_SCHEDULED_JOBS
+          value: "false"
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: dokanx-secrets
+              key: jwt-secret
+        - name: SESSION_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: dokanx-secrets
+              key: session-secret
+        - name: GOOGLE_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: dokanx-secrets
+              key: google-client-id
+        - name: GOOGLE_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: dokanx-secrets
+              key: google-client-secret
+        - name: TWILIO_ACCOUNT_SID
+          valueFrom:
+            secretKeyRef:
+              name: dokanx-secrets
+              key: twilio-account-sid
+        - name: TWILIO_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: dokanx-secrets
+              key: twilio-auth-token
+        - name: FIREBASE_PROJECT_ID
+          valueFrom:
+            secretKeyRef:
+              name: dokanx-secrets
+              key: firebase-project-id
+        resources:
+          requests:
+            memory: "384Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dokanx-backend-scheduler
+  namespace: dokanx
+  labels:
+    app: dokanx-backend-scheduler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dokanx-backend-scheduler
+  template:
+    metadata:
+      labels:
+        app: dokanx-backend-scheduler
+    spec:
+      containers:
+      - name: backend-scheduler
+        image: dokanx/backend:latest
+        command: ["node", "src/worker-server.js"]
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: MONGODB_URI
+          value: "mongodb://mongodb:27017/dokanx"
+        - name: REDIS_URL
+          value: "redis://redis:6379"
+        - name: RUN_QUEUE_WORKERS
+          value: "false"
+        - name: RUN_SCHEDULED_JOBS
+          value: "true"
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: dokanx-secrets
+              key: jwt-secret
+        - name: SESSION_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: dokanx-secrets
+              key: session-secret
+        - name: GOOGLE_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: dokanx-secrets
+              key: google-client-id
+        - name: GOOGLE_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: dokanx-secrets
+              key: google-client-secret
+        - name: TWILIO_ACCOUNT_SID
+          valueFrom:
+            secretKeyRef:
+              name: dokanx-secrets
+              key: twilio-account-sid
+        - name: TWILIO_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: dokanx-secrets
+              key: twilio-auth-token
+        - name: FIREBASE_PROJECT_ID
+          valueFrom:
+            secretKeyRef:
+              name: dokanx-secrets
+              key: firebase-project-id
+        resources:
+          requests:
+            memory: "384Mi"
+            cpu: "200m"
+          limits:
+            memory: "768Mi"
+            cpu: "700m"

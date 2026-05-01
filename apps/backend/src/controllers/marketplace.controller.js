@@ -28,7 +28,7 @@ exports.publishApp = async (req, res) => {
       categories: Array.isArray(categories) ? categories : [],
       status: "PUBLISHED",
     },
-    { new: true, upsert: true }
+    { returnDocument: "after", upsert: true }
   );
 
   res.json({ message: "App published", data: listing });
@@ -77,8 +77,9 @@ exports.addReview = async (req, res) => {
   const review = await AppReview.findOneAndUpdate(
     { appId, shopId, userId: req.user._id },
     { rating, comment: comment || "" },
-    { new: true, upsert: true }
+    { returnDocument: "after", upsert: true }
   );
 
   res.json({ message: "Review saved", data: review });
 };
+

@@ -14,7 +14,7 @@ async function installApp({ appId, shopId, installedBy, sandboxMode = false, req
       uninstalledAt: null,
       sandboxMode: Boolean(sandboxMode),
     },
-    { new: true, upsert: true }
+    { returnDocument: "after", upsert: true }
   );
   if (req) {
     await createAudit({
@@ -49,7 +49,7 @@ async function uninstallApp({ appId, shopId, req = null, installedBy = null }) {
       status: "UNINSTALLED",
       uninstalledAt: new Date(),
     },
-    { new: true }
+    { returnDocument: "after" }
   );
   if (installation && req) {
     await createAudit({
@@ -113,3 +113,4 @@ module.exports = {
   uninstallApp,
   listAdminApps,
 };
+

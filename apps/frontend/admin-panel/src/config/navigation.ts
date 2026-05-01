@@ -1,132 +1,34 @@
-export const adminNavigation = [
-  {
-    label: "Dashboard",
-    href: "/dashboard",
-    description: "Platform overview"
-  },
-  {
-    label: "Tenants",
-    href: "/tenants",
-    description: "Manage tenant onboarding"
-  },
-  {
-    label: "System Health",
-    href: "/system-health",
-    description: "Live platform readiness"
-  },
-  {
-    label: "Shops",
-    href: "/shops",
-    description: "Storefront approvals"
-  },
-  {
-    label: "Settlements",
-    href: "/settlements",
-    description: "Payout cycles"
-  },
-  {
-    label: "Products",
-    href: "/products",
-    description: "Catalog moderation"
-  },
-  {
-    label: "Fraud",
-    href: "/orders",
-    description: "Fraud review queue"
-  },
-  {
-    label: "Notifications",
-    href: "/notifications",
-    description: "Real-time alerts"
-  },
-  {
-    label: "Logistics",
-    href: "/logistics",
-    description: "Courier orchestration"
-  },
-  {
-    label: "Payments",
-    href: "/payments",
-    description: "Gateway monitoring"
-  },
-  {
-    label: "Finance",
-    href: "/finance",
-    description: "Revenue and ledger"
-  },
-  {
-    label: "Integrations",
-    href: "/integrations",
-    description: "Payment and carrier credentials"
-  },
-  {
-    label: "Marketing",
-    href: "/marketing",
-    description: "Platform campaigns"
-  },
-  {
-    label: "CMS",
-    href: "/cms",
-    description: "Content management"
-  },
-  {
-    label: "Risk",
-    href: "/risk",
-    description: "Security & compliance"
-  },
-  {
-    label: "Analytics",
-    href: "/analytics",
-    description: "Insights and KPIs"
-  },
-  {
-    label: "Disputes",
-    href: "/analytics/disputes",
-    description: "Dispute SLA trends"
-  },
-  {
-    label: "Search",
-    href: "/search",
-    description: "Search index controls"
-  },
-  {
-    label: "Couriers",
-    href: "/couriers",
-    description: "Delivery partners"
-  },
-  {
-    label: "Apps",
-    href: "/apps",
-    description: "Marketplace apps"
-  },
-  {
-    label: "Merchants",
-    href: "/merchants",
-    description: "Merchant lifecycle"
-  },
-  {
-    label: "Agents",
-    href: "/agents",
-    description: "Lead funnel and referrals"
-  },
-  {
-    label: "Users",
-    href: "/users",
-    description: "Platform users"
-  },
-  {
-    label: "Reviews",
-    href: "/reviews",
-    description: "Product review moderation"
-  },
-  {
-    label: "Settings",
-    href: "/settings",
-    description: "Platform ETA thresholds"
-  },
-  {
-    label: "Security",
-    href: "/security",
-    description: "Login logs and IP blocks"
-  }
+import type { AdminNavigationItem } from "@/lib/permissions";
+
+export const adminNavigation: AdminNavigationItem[] = [
+  { label: "Dashboard", href: "/dashboard", description: "Platform overview", permission: "ADMIN_VIEW_DASHBOARD" },
+  { label: "Tenants", href: "/tenants", description: "Manage tenant onboarding", permission: "ADMIN_VIEW_OPERATIONS" },
+  { label: "System Health", href: "/system-health", description: "Live platform readiness", permission: "ADMIN_VIEW_OPERATIONS" },
+  { label: "Shops", href: "/shops", description: "Storefront approvals", permission: "ADMIN_VIEW_OPERATIONS" },
+  { label: "Settlements", href: "/settlements", description: "Payout cycles", permission: "ADMIN_VIEW_FINANCE" },
+  { label: "Products", href: "/products", description: "Catalog moderation", permission: "ADMIN_VIEW_OPERATIONS" },
+  { label: "Fraud", href: "/orders", description: "Fraud review queue", permission: "ADMIN_VIEW_RISK" },
+  { label: "Notifications", href: "/notifications", description: "Real-time alerts", permission: "ADMIN_VIEW_OPERATIONS" },
+  { label: "Logistics", href: "/logistics", description: "Courier orchestration", permission: "ADMIN_VIEW_OPERATIONS" },
+  { label: "Payments", href: "/payments", description: "Gateway monitoring", permission: "ADMIN_VIEW_FINANCE" },
+  { label: "Finance", href: "/finance", description: "Revenue and ledger", permission: "ADMIN_VIEW_FINANCE" },
+  { label: "Integrations", href: "/integrations", description: "Payment and carrier credentials", permission: "ADMIN_VIEW_SETTINGS" },
+  { label: "Marketing", href: "/marketing", description: "Platform campaigns", permission: "ADMIN_VIEW_OPERATIONS" },
+  { label: "CMS", href: "/cms", description: "Content management", permission: "ADMIN_VIEW_OPERATIONS" },
+  { label: "Risk", href: "/risk", description: "Security & compliance", permission: "ADMIN_VIEW_RISK" },
+  { label: "AI Ops", href: "/ai-ops", description: "AI actions and signals", permission: "ADMIN_VIEW_RISK" },
+  { label: "Analytics", href: "/analytics", description: "Insights and KPIs", permission: "ADMIN_VIEW_DASHBOARD" },
+  { label: "Disputes", href: "/analytics/disputes", description: "Dispute SLA trends", permission: "ADMIN_VIEW_RISK" },
+  { label: "Search", href: "/search", description: "Search index controls", permission: "ADMIN_VIEW_OPERATIONS" },
+  { label: "Couriers", href: "/couriers", description: "Delivery partners", permission: "ADMIN_VIEW_OPERATIONS" },
+  { label: "Apps", href: "/apps", description: "Marketplace apps", permission: "ADMIN_VIEW_OPERATIONS" },
+  { label: "Themes", href: "/themes", description: "Theme marketplace curation", permission: "ADMIN_VIEW_OPERATIONS" },
+  { label: "Merchants", href: "/merchants", description: "Merchant lifecycle", permission: "ADMIN_VIEW_OPERATIONS" },
+  { label: "Agents", href: "/agents", description: "Lead funnel and referrals", permission: "ADMIN_VIEW_OPERATIONS" },
+  { label: "Services", href: "/services", description: "Service packages and merchant plans", permission: "ADMIN_VIEW_OPERATIONS" },
+  { label: "Users", href: "/users", description: "Platform users", permission: "ADMIN_VIEW_USERS" },
+  { label: "Permissions", href: "/permissions", description: "Super-admin role and permission governance", permission: "ADMIN_VIEW_USERS" },
+  { label: "Reviews", href: "/reviews", description: "Product review moderation", permission: "ADMIN_VIEW_OPERATIONS" },
+  { label: "Settings", href: "/settings", description: "Platform ETA thresholds", permission: "ADMIN_VIEW_SETTINGS" },
+  { label: "Security", href: "/security", description: "Login logs and IP blocks", permission: "ADMIN_VIEW_RISK" }
 ];

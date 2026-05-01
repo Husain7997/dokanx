@@ -6,6 +6,9 @@ const bwipjs = require("bwip-js");
 const Shop = require("../models/shop.model");
 const User = require("../models/user.model");
 const AuditLog = require("../models/audit.model");
+const { createAudit } = require("../utils/audit.util");
+const { resolveShopTheme, getThemeEditorCapabilities } = require("../utils/theme.util");
+const { listCuratedMarketplaceThemes } = require("../utils/theme-marketplace.util");
 
 const DEFAULT_MERCHANT_FEATURES = {
   posScannerEnabled: true,
@@ -45,6 +48,30 @@ function invitePayload(token) {
   };
 }
 
+function normalizePermissions(values = []) {
+  return [...new Set(
+    (Array.isArray(values) ? values : [])
+      .map((value) => String(value || "").trim().toUpperCase())
+      .filter(Boolean)
+  )];
+}
+
+function resolvePermissionOverrides(current = [], incoming = [], mode = "replace") {
+  const existing = normalizePermissions(current);
+  const next = normalizePermissions(incoming);
+  const normalizedMode = String(mode || "replace").toLowerCase();
+
+  if (normalizedMode === "merge") {
+    return normalizePermissions([...existing, ...next]);
+  }
+
+  if (normalizedMode === "remove") {
+    return existing.filter((permission) => !next.includes(permission));
+  }
+
+  return next;
+}
+
 function normalizeMerchantFeatures(input) {
   const source = input && typeof input === "object" ? input : {};
   return {
@@ -69,7 +96,8 @@ function normalizePricingSafety(input) {
   };
 }
 
-function buildSettingsPayload(shop) {
+function buildSettingsPayload(shop, curatedThemes = []) {
+  const themeAccess = getThemeEditorCapabilities(shop.merchantTier);
   return {
     name: shop.name,
     supportEmail: shop.supportEmail || "",
@@ -100,6 +128,10 @@ function buildSettingsPayload(shop) {
     vatRate: shop.vatRate ?? 0,
     defaultDiscountRate: shop.defaultDiscountRate ?? 0,
     commissionRate: shop.commissionRate ?? 0,
+    merchantTier: shop.merchantTier || "STANDARD",
+    themeId: shop.themeId || "merchant-theme",
+    themeConfig: resolveShopTheme(shop, curatedThemes).config,
+    themeAccess,
     merchantFeatures: normalizeMerchantFeatures(shop.merchantFeatures || DEFAULT_MERCHANT_FEATURES),
     pricingSafety: normalizePricingSafety(shop.pricingSafety || DEFAULT_PRICING_SAFETY),
     kyc: {
@@ -121,8 +153,9 @@ function buildSettingsPayload(shop) {
 exports.getShopSettings = async (req, res) => {
   const shop = await resolveShop(req);
   if (!shop) return res.status(404).json({ message: "Shop not found" });
+  const curatedThemes = await listCuratedMarketplaceThemes();
 
-  res.json({ data: buildSettingsPayload(shop) });
+  res.json({ data: buildSettingsPayload(shop, curatedThemes) });
 };
 
 exports.getShopQrCode = async (req, res) => {
@@ -281,10 +314,11 @@ exports.addTeamMember = async (req, res) => {
   const shop = await resolveShop(req);
   if (!shop) return res.status(404).json({ message: "Shop not found" });
 
-  const { name, email, phone, role, permissions } = req.body || {};
+  const { name, email, phone, role, permissions, permissionsMode } = req.body || {};
   if (!email) return res.status(400).json({ message: "Email is required" });
 
   const normalizedRole = String(role || "STAFF").toUpperCase();
+  const normalizedPermissions = resolvePermissionOverrides([], permissions, permissionsMode);
   const inviteToken = createInviteToken();
 
   const existing = await User.findOne({ email: String(email).toLowerCase() }).select("+password");
@@ -295,12 +329,28 @@ exports.addTeamMember = async (req, res) => {
 
     existing.shopId = shop._id;
     existing.role = normalizedRole;
-    existing.permissionOverrides = Array.isArray(permissions) ? permissions : [];
+    existing.permissionOverrides = resolvePermissionOverrides(existing.permissionOverrides || [], normalizedPermissions, permissionsMode);
     existing.phone = phone ?? existing.phone;
     existing.name = name ?? existing.name;
     existing.invitationToken = inviteToken;
     existing.invitationExpiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24);
     await existing.save();
+
+    await createAudit({
+      action: "TEAM_MEMBER_UPDATED",
+      performedBy: req.user?._id || null,
+      targetType: "User",
+      targetId: existing._id,
+      req,
+      meta: {
+        shopId: String(shop._id),
+        email: existing.email,
+        role: existing.role,
+        permissionsMode: String(permissionsMode || "replace").toLowerCase(),
+        permissionOverrides: normalizePermissions(existing.permissionOverrides || []),
+        inviteIssued: true,
+      },
+    });
 
     return res.json({
       message: "Team member updated",
@@ -319,9 +369,25 @@ exports.addTeamMember = async (req, res) => {
     password: hashedPassword,
     role: normalizedRole,
     shopId: shop._id,
-    permissionOverrides: Array.isArray(permissions) ? permissions : [],
+    permissionOverrides: normalizedPermissions,
     invitationToken: inviteToken,
     invitationExpiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24),
+  });
+
+  await createAudit({
+    action: "TEAM_MEMBER_INVITED",
+    performedBy: req.user?._id || null,
+    targetType: "User",
+    targetId: member._id,
+    req,
+    meta: {
+      shopId: String(shop._id),
+      email: member.email,
+      role: member.role,
+      permissionsMode: String(permissionsMode || "replace").toLowerCase(),
+      permissionOverrides: normalizedPermissions,
+      inviteIssued: true,
+    },
   });
 
   res.status(201).json({
@@ -352,13 +418,27 @@ exports.listTeamActivity = async (req, res) => {
   res.json({
     data: activity.map((entry) => {
       const actor = memberMap.get(String(entry.performedBy || ""));
+      const meta = entry.meta && typeof entry.meta === "object" ? entry.meta : {};
       return {
         id: String(entry._id || ""),
         action: String(entry.action || "ACTION"),
+        actorId: actor?._id ? String(actor._id) : null,
         actorName: String(actor?.name || "Team member"),
         actorRole: String(actor?.role || "STAFF"),
         createdAt: entry.createdAt || null,
         targetType: String(entry.targetType || "System"),
+        targetId: entry.targetId ? String(entry.targetId) : null,
+        permissionsMode: String(meta.permissionsMode || "replace"),
+        permissionOverrides: Array.isArray(meta.permissionOverrides)
+          ? meta.permissionOverrides.map((value) => String(value))
+          : [],
+        before: meta.before && typeof meta.before === "object" ? meta.before : null,
+        after: meta.after && typeof meta.after === "object" ? meta.after : null,
+        inviteIssued: Boolean(meta.inviteIssued),
+        source: meta.source ? String(meta.source) : null,
+        note: meta.note ? String(meta.note) : null,
+        amount: typeof meta.amount === "number" ? meta.amount : null,
+        quantity: typeof meta.quantity === "number" ? meta.quantity : null,
       };
     }),
   });
@@ -369,13 +449,24 @@ exports.updateTeamMember = async (req, res) => {
   if (!shop) return res.status(404).json({ message: "Shop not found" });
 
   const { userId } = req.params;
-  const { role, permissions, resendInvite } = req.body || {};
+  const { role, permissions, permissionsMode, resendInvite } = req.body || {};
 
   const member = await User.findOne({ _id: userId, shopId: shop._id });
   if (!member) return res.status(404).json({ message: "Team member not found" });
 
+  const before = {
+    role: String(member.role || "STAFF"),
+    permissionOverrides: normalizePermissions(member.permissionOverrides || []),
+  };
+
   if (role) member.role = String(role).toUpperCase();
-  if (Array.isArray(permissions)) member.permissionOverrides = permissions;
+  if (Array.isArray(permissions)) {
+    member.permissionOverrides = resolvePermissionOverrides(
+      member.permissionOverrides || [],
+      permissions,
+      permissionsMode
+    );
+  }
 
   let inviteToken = null;
   if (resendInvite) {
@@ -385,6 +476,24 @@ exports.updateTeamMember = async (req, res) => {
   }
 
   await member.save();
+
+  await createAudit({
+    action: resendInvite ? "TEAM_MEMBER_INVITE_REFRESHED" : "TEAM_MEMBER_ACCESS_UPDATED",
+    performedBy: req.user?._id || null,
+    targetType: "User",
+    targetId: member._id,
+    req,
+    meta: {
+      shopId: String(shop._id),
+      before,
+      after: {
+        role: String(member.role || "STAFF"),
+        permissionOverrides: normalizePermissions(member.permissionOverrides || []),
+      },
+      permissionsMode: String(permissionsMode || "replace").toLowerCase(),
+      inviteIssued: Boolean(inviteToken),
+    },
+  });
 
   res.json({
     message: "Team member updated",

@@ -41,6 +41,19 @@ type RecommendationMetrics = {
   ctr?: number;
   productViews?: number;
   sectionBreakdown?: Array<{ section?: string; impressions?: number; clicks?: number; ctr?: number }>;
+  storefrontSections?: {
+    impressions?: number;
+    ctaClicks?: number;
+    ctr?: number;
+    breakdown?: Array<{
+      sectionId?: string;
+      sectionType?: string;
+      themeId?: string;
+      impressions?: number;
+      ctaClicks?: number;
+      ctr?: number;
+    }>;
+  };
   topClickedProducts?: Array<{ productId?: string; name?: string; slug?: string; clicks?: number }>;
 };
 
@@ -327,6 +340,47 @@ export default function Page() {
               ))
             ) : (
               <p className="text-sm text-muted-foreground">Recommendation clicks have not been recorded in this window yet. Fresh traffic will populate this list.</p>
+            )}
+          </div>
+        </Card>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardTitle>Theme section engagement</CardTitle>
+          <CardDescription className="mt-2">Published storefront section impressions and CTA click-through.</CardDescription>
+          <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
+            <div className="flex items-center justify-between rounded-2xl border border-border/60 px-4 py-3">
+              <span>Section impressions</span>
+              <span>{recommendationMetrics?.storefrontSections?.impressions ?? 0}</span>
+            </div>
+            <div className="flex items-center justify-between rounded-2xl border border-border/60 px-4 py-3">
+              <span>CTA clicks</span>
+              <span>{recommendationMetrics?.storefrontSections?.ctaClicks ?? 0}</span>
+            </div>
+            <div className="flex items-center justify-between rounded-2xl border border-border/60 px-4 py-3">
+              <span>Section CTR</span>
+              <span>{((recommendationMetrics?.storefrontSections?.ctr ?? 0) * 100).toFixed(2)}%</span>
+            </div>
+          </div>
+        </Card>
+        <Card>
+          <CardTitle>Top theme sections</CardTitle>
+          <CardDescription className="mt-2">Best-performing homepage sections across published storefronts.</CardDescription>
+          <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
+            {recommendationMetrics?.storefrontSections?.breakdown?.length ? (
+              recommendationMetrics.storefrontSections.breakdown.slice(0, 6).map((row) => (
+                <div
+                  key={`${row.sectionId}:${row.themeId}`}
+                  className="grid grid-cols-[minmax(0,1fr)_110px_100px_90px] items-center gap-3 rounded-2xl border border-border/60 px-4 py-3"
+                >
+                  <span>{row.sectionId || row.sectionType || "section"}</span>
+                  <span>{row.impressions ?? 0} views</span>
+                  <span>{row.ctaClicks ?? 0} clicks</span>
+                  <span>{((row.ctr ?? 0) * 100).toFixed(1)}%</span>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">Theme section analytics will appear here once live storefront traffic hits tracked sections.</p>
             )}
           </div>
         </Card>

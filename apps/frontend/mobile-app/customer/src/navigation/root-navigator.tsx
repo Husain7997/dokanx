@@ -12,6 +12,8 @@ export type RootStackParamList = {
   LiveChat: undefined;
   Cart: undefined;
   Checkout: undefined;
+  Notifications: undefined;
+  Tasks: undefined;
   OrderTracking:
     | {
         orderId?: string;
@@ -36,6 +38,8 @@ export function RootNavigator() {
       <Stack.Screen name="LiveChat" getComponent={() => require("../screens/live-chat-screen").LiveChatScreen} />
       <Stack.Screen name="Cart" getComponent={() => require("../screens/cart-screen").CartScreen} />
       <Stack.Screen name="Checkout" getComponent={() => require("../screens/checkout-screen").CheckoutScreen} />
+      <Stack.Screen name="Notifications" getComponent={() => require("../screens/notifications-screen").default} />
+      <Stack.Screen name="Tasks" getComponent={() => require("../screens/tasks-screen").default} />
       <Stack.Screen name="OrderTracking" getComponent={() => require("../screens/order-tracking-screen").OrderTrackingScreen} />
     </Stack.Navigator>
   );

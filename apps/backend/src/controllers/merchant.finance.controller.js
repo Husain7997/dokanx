@@ -1,6 +1,10 @@
 const AccountingEntry = require("../modules/wallet-engine/accountingEntry.model");
 const FraudCase = require("../models/fraudCase.model");
 const Shop = require("../models/shop.model");
+const {
+  createReadQuery,
+  createReadOneQuery,
+} = require("../infrastructure/database/mongo.client");
 
 function scopeOf(entry) {
   return String(entry?.metadata?.scope || "BUSINESS").toUpperCase() === "PERSONAL" ? "PERSONAL" : "BUSINESS";
@@ -36,9 +40,9 @@ exports.getMerchantFinanceOverview = async (req, res, next) => {
     }
 
     const [shop, rows, fraudCases] = await Promise.all([
-      Shop.findById(shopId).select("name vatRate").lean(),
-      AccountingEntry.find({ shopId }).sort({ createdAt: -1 }).limit(120).lean(),
-      FraudCase.find({ shopId }).sort({ updatedAt: -1 }).limit(20).lean(),
+      createReadOneQuery(Shop, { _id: shopId }).select("name vatRate").lean(),
+      createReadQuery(AccountingEntry, { shopId }).sort({ createdAt: -1 }).limit(120).lean(),
+      createReadQuery(FraudCase, { shopId }).sort({ updatedAt: -1 }).limit(20).lean(),
     ]);
 
     const summary = summarizeRows(rows);

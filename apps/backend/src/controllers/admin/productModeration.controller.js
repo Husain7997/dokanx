@@ -16,9 +16,10 @@ exports.updateProductModeration = async (req, res) => {
       moderationNote: note || "",
       isActive: status === "APPROVED",
     },
-    { new: true }
+    { returnDocument: "after" }
   );
 
   if (!product) return res.status(404).json({ message: "Product not found" });
   res.json({ message: "Product moderation updated", data: product });
 };
+

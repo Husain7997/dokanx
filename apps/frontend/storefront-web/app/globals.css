@@ -37,6 +37,35 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+.dx-storefront-theme {
+  background:
+    radial-gradient(circle at 15% 20%, color-mix(in srgb, var(--theme-secondary) 18%, transparent), transparent 28%),
+    radial-gradient(circle at 85% 10%, color-mix(in srgb, var(--theme-primary) 12%, transparent), transparent 24%),
+    linear-gradient(180deg, var(--theme-background) 0%, color-mix(in srgb, var(--theme-background) 92%, white) 58%, color-mix(in srgb, var(--theme-background) 84%, #dbeafe) 100%);
+  color: var(--theme-text);
+}
+
+.dx-storefront-theme,
+.dx-storefront-theme .dx-shell,
+.dx-storefront-theme .dx-shell-main,
+.dx-storefront-theme .dx-shell-content {
+  color: var(--theme-text);
+}
+
+.dx-storefront-theme .dx-shell {
+  background: transparent;
+}
+
+.dx-storefront-theme .dx-shell-link:hover {
+  background: color-mix(in srgb, var(--theme-secondary) 12%, transparent);
+}
+
+.dx-storefront-theme button,
+.dx-storefront-theme input,
+.dx-storefront-theme select {
+  font-family: var(--theme-font-family);
+}
+
 h1,
 h2,
 h3,

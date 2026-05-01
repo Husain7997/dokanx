@@ -11,6 +11,7 @@ const { getTopCustomerSnapshots, getRiskyCustomerSnapshots } = require("../modul
 const { registerRealtimeFeedback } = require("../modules/ai-engine/realtime-feature.service");
 const recommendationService = require("../services/recommendation.service");
 const fraudService = require("../services/fraud.service");
+const merchantAiService = require("../services/merchantAi.service");
 
 exports.withContext = aiContext;
 
@@ -181,4 +182,66 @@ exports.recordFeedback = async (req, res) => {
     eventType,
   });
   res.status(201).json({ data: created });
+};
+
+function resolveScopedShopId(req) {
+  return req.query.shopId || req.shop?._id || req.user?.shopId || null;
+}
+
+exports.getMerchantCopilot = async (req, res) => {
+  const shopId = resolveScopedShopId(req);
+  if (!shopId) {
+    return res.status(400).json({ message: "Shop context required" });
+  }
+  const data = await merchantAiService.getMerchantCopilot({
+    shopId,
+    range: req.query.range || "30",
+  });
+  res.json({ data });
+};
+
+exports.getInventoryActions = async (req, res) => {
+  const shopId = resolveScopedShopId(req);
+  if (!shopId) {
+    return res.status(400).json({ message: "Shop context required" });
+  }
+  const data = await merchantAiService.getInventoryActions({
+    shopId,
+    limit: Number(req.query.limit || 8),
+    rangeDays: Number(req.query.range || 30),
+  });
+  res.json({ data });
+};
+
+exports.getCustomerSegments = async (req, res) => {
+  const shopId = resolveScopedShopId(req);
+  if (!shopId) {
+    return res.status(400).json({ message: "Shop context required" });
+  }
+  const data = await merchantAiService.getCustomerSegments({ shopId });
+  res.json({ data });
+};
+
+exports.getCreditInsights = async (req, res) => {
+  const shopId = resolveScopedShopId(req);
+  if (!shopId) {
+    return res.status(400).json({ message: "Shop context required" });
+  }
+  const data = await merchantAiService.getCreditInsights({
+    shopId,
+    limit: Number(req.query.limit || 8),
+  });
+  res.json({ data });
+};
+
+exports.getPaymentIntelligence = async (req, res) => {
+  const shopId = resolveScopedShopId(req);
+  if (!shopId) {
+    return res.status(400).json({ message: "Shop context required" });
+  }
+  const data = await merchantAiService.getPaymentIntelligence({
+    shopId,
+    rangeDays: Number(req.query.range || 30),
+  });
+  res.json({ data });
 };

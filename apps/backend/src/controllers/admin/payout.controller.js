@@ -3,8 +3,10 @@ const payoutService = require('../../services/payout.service');
 const {
   approvePayout,
   executePayout,
+  retryPayout,
+  createAdminPayout,
+  processPayout,
 } = require('../../services/payout.service');
-const { processPayout } = require('../../services/payout.service');
 const Shop = require('../../models/shop.model');
 const { addJob } = require("@/core/infrastructure");
 const walletAdapter = require("../../services/wallet/walletAdapter.service");
@@ -45,58 +47,82 @@ await addJob("settlement", { walletId: wallet._id });
 };
 
 exports.createAdminPayout = async (req, res) => {
-  const { shopId, amount } = req.body;
+  try {
+    const { shopId, amount } = req.body;
 
-  const payout = await payoutService.createAdminPayout({
-    shopId,
-    amount,
-    adminId: req.user.id,
-  });
+    const payout = await payoutService.createAdminPayout({
+      shopId,
+      amount,
+      adminId: req.user.id,
+    });
 
-  res.status(201).json(payout);
+    return res.status(201).json(payout);
+  } catch (err) {
+    return res.status(err.statusCode || 400).json({
+      success: false,
+      message: err.message,
+    });
+  }
 };
 
 exports.manualPayout = async (req, res) => {
-  const { walletId, amount, type, referenceId } = req.body;
+  try {
+    const { walletId, amount, type, referenceId } = req.body;
 
-  const ledgerEntry = await triggerPayout({
-    walletId,
-    amount,
-    type,
-    referenceId,
-    idempotencyKey: `${referenceId}_${type}`
-  });
+    const ledgerEntry = await triggerPayout({
+      walletId,
+      amount,
+      type,
+      referenceId,
+      idempotencyKey: `${referenceId}_${type}`
+    });
 
-  res.json({ message: 'Payout triggered', data: ledgerEntry });
+    return res.json({ message: 'Payout triggered', data: ledgerEntry });
+  } catch (err) {
+    return res.status(err.statusCode || 400).json({
+      success: false,
+      message: err.message,
+    });
+  }
 };
 
 exports.retryPayout = async (req, res) => {
-  const { walletId, amount, type, referenceId } = req.body;
-
-  const ledgerEntry = await triggerPayout({
-    walletId,
-    amount,
-    type,
-    referenceId,
-    idempotencyKey: `${referenceId}_${type}`
-  });
-
-  res.json({ message: 'Retry triggered', data: ledgerEntry });
+  const payoutId = req.params.id;
+  try {
+    const payout = await retryPayout(payoutId);
+    return res.json(payout);
+  } catch (err) {
+    return res.status(err.statusCode || 400).json({
+      success: false,
+      message: err.message,
+    });
+  }
 };
 
-
-
-
 exports.approve = async (req, res) => {
-  const payout = await approvePayout(req.params.id, req.user._id);
-  res.json(payout);
+  try {
+    const payout = await approvePayout(req.params.id, req.user._id);
+    return res.json(payout);
+  } catch (err) {
+    return res.status(err.statusCode || 400).json({
+      success: false,
+      message: err.message,
+    });
+  }
 };
 
 exports.execute = async (req, res) => {
-  const payout = await executePayout(
-    req.params.id,
-    req.headers['idempotency-key']
-  );
-  res.json(payout);
+  try {
+    const payout = await executePayout(
+      req.params.id,
+      req.headers['idempotency-key']
+    );
+    return res.json(payout);
+  } catch (err) {
+    return res.status(err.statusCode || 400).json({
+      success: false,
+      message: err.message,
+    });
+  }
 };
 

@@ -18,7 +18,7 @@ exports.approveReview = async (req, res) => {
       approvedAt: new Date(),
       approvedBy: req.user?._id || null,
     },
-    { new: true }
+    { returnDocument: "after" }
   );
   if (!review) return res.status(404).json({ message: "Review not found" });
   res.json({ message: "Review approved", data: review });
@@ -32,8 +32,9 @@ exports.rejectReview = async (req, res) => {
       approvedAt: null,
       approvedBy: req.user?._id || null,
     },
-    { new: true }
+    { returnDocument: "after" }
   );
   if (!review) return res.status(404).json({ message: "Review not found" });
   res.json({ message: "Review rejected", data: review });
 };
+

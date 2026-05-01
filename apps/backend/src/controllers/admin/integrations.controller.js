@@ -38,7 +38,7 @@ exports.upsertCredential = async (req, res) => {
   const record = await ProviderCredential.findOneAndUpdate(
     { provider },
     { provider, ...update },
-    { new: true, upsert: true }
+    { returnDocument: "after", upsert: true }
   );
 
   res.json({
@@ -73,3 +73,4 @@ exports.testCredential = async (req, res) => {
     },
   });
 };
+

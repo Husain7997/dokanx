@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: dokanx
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
+    rule_files:
+      # - "first_rules.yml"
+      # - "second_rules.yml"
+
+    scrape_configs:
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+
+      - job_name: 'dokanx-backend'
+        static_configs:
+          - targets: ['dokanx-backend:3001']
+        scrape_interval: 10s
+        metrics_path: '/metrics'
+        params:
+          format: ['prometheus']
+
+      - job_name: 'dokanx-storefront'
+        static_configs:
+          - targets: ['dokanx-storefront:3000']
+
+      - job_name: 'dokanx-merchant-dashboard'
+        static_configs:
+          - targets: ['dokanx-merchant-dashboard:3000']
+
+      - job_name: 'dokanx-admin-panel'
+        static_configs:
+          - targets: ['dokanx-admin-panel:3000']
+
+      - job_name: 'dokanx-developer-portal'
+        static_configs:
+          - targets: ['dokanx-developer-portal:3000']
+
+      - job_name: 'mongodb'
+        static_configs:
+          - targets: ['dokanx-mongodb:27017']
+
+      - job_name: 'redis'
+        static_configs:
+          - targets: ['dokanx-redis:6379']

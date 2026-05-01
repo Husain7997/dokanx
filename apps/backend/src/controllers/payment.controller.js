@@ -32,6 +32,29 @@ console.log("✅ payment.controller.js LOADED");
 const ALLOWED_PAYMENT_PROVIDERS = new Set(["bkash", "nagad", "stripe"]);
 const DEFAULT_PAYMENT_PROVIDER = "bkash";
 
+function canAccessOrder(req, order, options = {}) {
+  const role = String(req.user?.role || "").toUpperCase();
+  if (["ADMIN", "SUPER_ADMIN", "FINANCE_ADMIN", "SUPPORT_ADMIN", "AUDIT_ADMIN"].includes(role)) {
+    return true;
+  }
+  if (!order) return false;
+
+  const userId = String(req.user?._id || req.user?.id || "");
+  const customerId = String(order.customerId || order.user || "");
+  const shopId = String(order.shopId || order.shop || "");
+  const actorShopId = String(req.user?.shopId || req.shop?._id || "");
+
+  if (options.allowCustomer !== false && role === "CUSTOMER" && userId && customerId === userId) {
+    return true;
+  }
+
+  if (["OWNER", "STAFF"].includes(role) && actorShopId && shopId === actorShopId) {
+    return true;
+  }
+
+  return false;
+}
+
 /* ================================
    INITIATE PAYMENT
 ================================ */
@@ -55,6 +78,9 @@ exports.initiatePayment = async (req, res, next) => {
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
+    if (!canAccessOrder(req, order)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
 
     const gateway = normalizedProvider;
 
@@ -71,8 +97,6 @@ let attempt = await PaymentAttempt.findOne({
 });
 
 if (!attempt) {
-  await addJob("settlement", { orderId: order._id });
-  
   attempt = await PaymentAttempt.create({
     order: order._id,
     shopId: resolveShopId(order),
@@ -196,6 +220,9 @@ exports.retryPayment = async (req, res) => {
 
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ message: "Order not found" });
+    if (!canAccessOrder(req, order)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
 
     if (order.status === "CONFIRMED") {
       return res

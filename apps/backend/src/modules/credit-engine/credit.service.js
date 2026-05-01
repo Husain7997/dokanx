@@ -125,7 +125,7 @@ async function createCreditSale({ orderId, customerId, shopId, amount }, request
             outstandingAmount: numericAmount,
             status: "OPEN",
           },
-          { upsert: true, new: true, session }
+          { upsert: true, returnDocument: "after", session }
         );
 
         await CreditAccount.findOneAndUpdate(
@@ -143,7 +143,7 @@ async function createCreditSale({ orderId, customerId, shopId, amount }, request
             },
             $inc: { outstandingBalance: numericAmount },
           },
-          { upsert: true, new: true, session }
+          { upsert: true, returnDocument: "after", session }
         );
 
         await CreditLedger.create([{
@@ -281,7 +281,7 @@ async function getShopCreditCustomers(requestUser) {
   }));
 }
 
-async function upsertCreditPolicy({ customerId, shopId, creditLimit, status }, requestUser) {
+async function upsertCreditPolicy({ customerId, shopId, creditLimit, status, source }, requestUser, req = null) {
   const resolvedCustomer = await resolveGlobalCustomerId(customerId);
   const resolvedShopId = shopId || getScopedShopId(requestUser);
   assertCreditAccess(requestUser, {
@@ -289,7 +289,12 @@ async function upsertCreditPolicy({ customerId, shopId, creditLimit, status }, r
     shopId: resolvedShopId,
   });
 
-  return CreditAccount.findOneAndUpdate(
+  const previous = await CreditAccount.findOne({
+    shopId: resolvedShopId,
+    customerId: resolvedCustomer.globalCustomerId,
+  }).lean();
+
+  const account = await CreditAccount.findOneAndUpdate(
     {
       shopId: resolvedShopId,
       customerId: resolvedCustomer.globalCustomerId,
@@ -306,8 +311,33 @@ async function upsertCreditPolicy({ customerId, shopId, creditLimit, status }, r
         status: String(status || "ACTIVE").toUpperCase() === "BLOCKED" ? "BLOCKED" : "ACTIVE",
       },
     },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: "after" }
   );
+
+  await createAudit({
+    action: "CREDIT_POLICY_UPDATED",
+    performedBy: requestUser?._id || null,
+    targetType: "CreditAccount",
+    targetId: account?._id || null,
+    req,
+    meta: {
+      customerId: resolvedCustomer.globalCustomerId,
+      shopId: String(resolvedShopId),
+      source: String(source || "manual_credit_console"),
+      before: previous
+        ? {
+            creditLimit: Number(previous.creditLimit || 0),
+            status: String(previous.status || "ACTIVE"),
+          }
+        : null,
+      after: {
+        creditLimit: Number(account?.creditLimit || 0),
+        status: String(account?.status || "ACTIVE"),
+      },
+    },
+  });
+
+  return account;
 }
 
 async function payDue({ creditSaleId, customerId, amount, referenceId, metadata = {}, paymentMode = "ONLINE", provider = null }, requestUser) {
@@ -779,4 +809,5 @@ module.exports = {
   failOnlineRepaymentByReference,
   upsertCreditPolicy,
 };
+
 

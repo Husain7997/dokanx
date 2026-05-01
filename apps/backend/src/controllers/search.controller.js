@@ -1,7 +1,7 @@
-const { rebuildIndex, searchIndex } = require("../services/searchIndex.service");
+const { addJob } = require("@/core/infrastructure");
+const { getOrSet } = require("../infrastructure/cache/versioned-cache.service");
+const { searchIndex } = require("../services/searchIndex.service");
 const {
-  logSearchQuery,
-  logSearchEvent,
   searchProductsAdvanced,
   searchShopsAdvanced,
   searchSuggestions,
@@ -13,14 +13,52 @@ const {
   searchBrands,
 } = require("../services/search.service");
 
+async function enqueueSearchQueryLog(payload) {
+  try {
+    await addJob("search-log-query", payload, {
+      attempts: 2,
+      backoff: { type: "exponential", delay: 1000 },
+      removeOnComplete: true,
+      removeOnFail: false,
+      queueName: "analytics",
+    });
+  } catch {
+    // Keep search responses fast even if telemetry enqueue fails.
+  }
+}
+
+async function enqueueSearchEvent(payload) {
+  try {
+    await addJob("search-log-event", payload, {
+      attempts: 2,
+      backoff: { type: "exponential", delay: 1000 },
+      removeOnComplete: true,
+      removeOnFail: false,
+      queueName: "analytics",
+    });
+  } catch {
+    // Keep search responses fast even if telemetry enqueue fails.
+  }
+}
+
 exports.searchProducts = async (req, res) => {
   const searchParams =
     req.traffic?.type === "direct" && req.traffic.scopeShopId
       ? { ...req.query, shopId: req.traffic.scopeShopId }
       : req.query;
   const searchId = req.headers["x-search-id"] ? String(req.headers["x-search-id"]) : null;
-  const result = await searchProductsAdvanced(searchParams);
-  await logSearchQuery({
+  const cached = await getOrSet({
+    namespace: "search",
+    key: {
+      scope: "search-products",
+      query: searchParams,
+      traffic: req.traffic?.type || "default",
+    },
+    ttlSeconds: 30,
+    resolver: () => searchProductsAdvanced(searchParams),
+  });
+  const result = cached.value;
+  await enqueueSearchQueryLog({
     query: req.query.q,
     entityTypes: ["product"],
     filters: searchParams,
@@ -29,7 +67,7 @@ exports.searchProducts = async (req, res) => {
     shopId: searchParams.shopId || null,
     searchId,
   });
-  await logSearchEvent({
+  await enqueueSearchEvent({
     searchId,
     query: req.query.q,
     eventType: "SEARCH",
@@ -48,7 +86,16 @@ exports.searchAll = async (req, res) => {
       : req.query;
 
   if (req.traffic?.type === "direct") {
-    const products = await searchProductsAdvanced(searchParams);
+    const cached = await getOrSet({
+      namespace: "search",
+      key: {
+        scope: "search-all-direct",
+        query: searchParams,
+      },
+      ttlSeconds: 30,
+      resolver: () => searchProductsAdvanced(searchParams),
+    });
+    const products = cached.value;
     return res.json({
       products: products.data || [],
       shops: [],
@@ -56,29 +103,54 @@ exports.searchAll = async (req, res) => {
     });
   }
 
-  const [products, shops, categories] = await Promise.all([
-    searchProductsAdvanced(searchParams),
-    searchShopsAdvanced(searchParams),
-    searchCategories(query ? String(query) : "", 12),
-  ]);
-  await logSearchQuery({
+  const cached = await getOrSet({
+    namespace: "search",
+    key: {
+      scope: "search-all",
+      query: searchParams,
+    },
+    ttlSeconds: 30,
+    resolver: async () => {
+      const [products, shops, categories] = await Promise.all([
+        searchProductsAdvanced(searchParams),
+        searchShopsAdvanced(searchParams),
+        searchCategories(query ? String(query) : "", 12),
+      ]);
+
+      return {
+        products: products.data || [],
+        shops: shops.data || [],
+        categories: categories || [],
+        _meta: {
+          productsCount: products.count || 0,
+          shopsCount: shops.count || 0,
+          categoriesCount: categories.length,
+        },
+      };
+    },
+  });
+  const payload = cached.value;
+  await enqueueSearchQueryLog({
     query,
     entityTypes: ["product", "shop", "category"],
     filters: searchParams,
-    resultsCount: (products.count || 0) + (shops.count || 0) + categories.length,
+    resultsCount:
+      Number(payload._meta?.productsCount || 0) +
+      Number(payload._meta?.shopsCount || 0) +
+      Number(payload._meta?.categoriesCount || 0),
     userId: req.user?._id || null,
     searchId,
   });
-  await logSearchEvent({
+  await enqueueSearchEvent({
     searchId,
     query,
     eventType: "SEARCH",
     userId: req.user?._id || null,
   });
   res.json({
-    products: products.data || [],
-    shops: shops.data || [],
-    categories: categories || [],
+    products: payload.products || [],
+    shops: payload.shops || [],
+    categories: payload.categories || [],
   });
 };
 
@@ -87,8 +159,17 @@ exports.searchShops = async (req, res) => {
     return res.json({ data: [], count: 0 });
   }
   const searchId = req.headers["x-search-id"] ? String(req.headers["x-search-id"]) : null;
-  const result = await searchShopsAdvanced(req.query);
-  await logSearchQuery({
+  const cached = await getOrSet({
+    namespace: "search",
+    key: {
+      scope: "search-shops",
+      query: req.query,
+    },
+    ttlSeconds: 30,
+    resolver: () => searchShopsAdvanced(req.query),
+  });
+  const result = cached.value;
+  await enqueueSearchQueryLog({
     query: req.query.q,
     entityTypes: ["shop"],
     filters: req.query,
@@ -96,7 +177,7 @@ exports.searchShops = async (req, res) => {
     userId: req.user?._id || null,
     searchId,
   });
-  await logSearchEvent({
+  await enqueueSearchEvent({
     searchId,
     query: req.query.q,
     eventType: "SEARCH",
@@ -106,8 +187,13 @@ exports.searchShops = async (req, res) => {
 };
 
 exports.rebuildSearchIndex = async (_req, res) => {
-  const result = await rebuildIndex();
-  res.json({ message: "Search index rebuilt", data: result });
+  await addJob("search-reindex-full", { triggeredAt: new Date().toISOString() }, {
+    attempts: 1,
+    removeOnComplete: true,
+    removeOnFail: false,
+    queueName: "analytics",
+  });
+  res.status(202).json({ queued: true, mode: "full" });
 };
 
 exports.searchIndex = async (req, res) => {
@@ -134,9 +220,13 @@ exports.searchStatus = async (_req, res) => {
 };
 
 exports.reindexDelta = async (_req, res) => {
-  const { updateIncrementalIndex } = require("../services/searchIndex.service");
-  const result = await updateIncrementalIndex();
-  res.json({ message: "Search delta indexed", data: result });
+  await addJob("search-reindex-delta", { triggeredAt: new Date().toISOString() }, {
+    attempts: 1,
+    removeOnComplete: true,
+    removeOnFail: false,
+    queueName: "analytics",
+  });
+  res.status(202).json({ queued: true, mode: "delta" });
 };
 
 exports.searchSuggestions = async (req, res) => {
@@ -158,13 +248,27 @@ exports.searchSuggestions = async (req, res) => {
     return res.json({ data: suggestions, count: suggestions.length });
   }
 
-  const suggestions = await searchAISuggestions(
-    String(q),
-    parsedLimit,
-    req.user?._id || null,
-    shopId || null,
-    req.headers["x-session-id"] || req.headers["x-device-id"] || req.ip,
-  );
+  const cached = await getOrSet({
+    namespace: "search",
+    key: {
+      scope: "search-suggestions",
+      query: req.query,
+      userId: req.user?._id || null,
+      shopId: shopId || null,
+      sessionId: req.headers["x-session-id"] || req.headers["x-device-id"] || req.ip,
+      traffic: req.traffic?.type || "default",
+    },
+    ttlSeconds: req.user ? 15 : 30,
+    resolver: () =>
+      searchAISuggestions(
+        String(q),
+        parsedLimit,
+        req.user?._id || null,
+        shopId || null,
+        req.headers["x-session-id"] || req.headers["x-device-id"] || req.ip,
+      ),
+  });
+  const suggestions = cached.value;
   res.json({ data: suggestions, count: suggestions.length });
 };
 
@@ -173,7 +277,17 @@ exports.searchTrending = async (req, res) => {
     return res.json({ data: [], count: 0 });
   }
   const { days, limit } = req.query;
-  const results = await searchTrending({ days: Number(days || 7), limit: Number(limit || 10) });
+  const cached = await getOrSet({
+    namespace: "search",
+    key: {
+      scope: "search-trending",
+      days: Number(days || 7),
+      limit: Number(limit || 10),
+    },
+    ttlSeconds: 120,
+    resolver: () => searchTrending({ days: Number(days || 7), limit: Number(limit || 10) }),
+  });
+  const results = cached.value;
   res.json({ data: results, count: results.length });
 };
 
@@ -191,12 +305,32 @@ exports.searchConversion = async (req, res) => {
 
 exports.searchCategories = async (req, res) => {
   const { q, limit } = req.query;
-  const results = await searchCategories(q ? String(q) : "", Number(limit || 20));
+  const cached = await getOrSet({
+    namespace: "search",
+    key: {
+      scope: "search-categories",
+      q: q ? String(q) : "",
+      limit: Number(limit || 20),
+    },
+    ttlSeconds: 300,
+    resolver: () => searchCategories(q ? String(q) : "", Number(limit || 20)),
+  });
+  const results = cached.value;
   res.json({ data: results, count: results.length });
 };
 
 exports.searchBrands = async (req, res) => {
   const { q, limit } = req.query;
-  const results = await searchBrands(q ? String(q) : "", Number(limit || 20));
+  const cached = await getOrSet({
+    namespace: "search",
+    key: {
+      scope: "search-brands",
+      q: q ? String(q) : "",
+      limit: Number(limit || 20),
+    },
+    ttlSeconds: 300,
+    resolver: () => searchBrands(q ? String(q) : "", Number(limit || 20)),
+  });
+  const results = cached.value;
   res.json({ data: results, count: results.length });
 };

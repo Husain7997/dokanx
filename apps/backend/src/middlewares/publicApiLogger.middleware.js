@@ -12,7 +12,7 @@ async function publicApiLogger(req, _res, next) {
         date,
       },
       { $inc: { count: 1 } },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: "after" }
     );
     return next();
   } catch (error) {
@@ -21,3 +21,4 @@ async function publicApiLogger(req, _res, next) {
 }
 
 module.exports = publicApiLogger;
+

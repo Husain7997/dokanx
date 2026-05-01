@@ -3,23 +3,55 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, AnalyticsCards, Badge, Button, Card, CardDescription, CardTitle, SalesChart } from "@dokanx/ui";
 
-import { getAdminAnalyticsOverview, getAdminKpi, getAdminMetrics, getAiMerchantInsights, getAiTrending, getFinanceKpis, getRevenueVsPayout, getSystemHealth, listAdminUsers, listMerchants, listOrders } from "@/lib/admin-runtime-api";
+import { AdminOpsPageHeader } from "@/components/admin-ops-page-header";
+import { AdminOpsPressure } from "@/components/admin-ops-pressure";
+import { AdminOpsThresholds } from "@/components/admin-ops-thresholds";
+import { formatOpsLag } from "@/lib/admin-ops-health";
+import { getAdminAnalyticsOverview, getAdminKpi, getAdminMetrics, getAiMerchantInsights, getAiTrending, getFinanceKpis, getRevenueVsPayout, getSystemHealth, listAdminUsers, listMerchants, listOrders, getFraudOverview } from "@/lib/admin-runtime-api";
+import { getOpsSettings } from "@/lib/admin-runtime-api";
+import type { OpsThresholdSettings } from "@/config/ops-thresholds";
 
 type MetricsState = {
   shops?: number;
   orders?: number;
+  users?: number;
+  gmv?: number;
 };
 
 type KpiState = {
   totalOrders?: number;
   revenue?: number;
   settled?: number;
+  paymentSuccessRate?: number;
+  paymentFailureRate?: number;
 };
 
 type HealthState = {
   status?: string;
   uptime?: number;
   timestamp?: string;
+};
+
+type LiveTransaction = {
+  id?: string;
+  amount?: number;
+  status?: string;
+  gateway?: string;
+  timestamp?: string;
+};
+
+type AiInsight = {
+  id?: string;
+  title?: string;
+  message?: string;
+  badge?: "warning" | "info" | "success";
+};
+
+type AiTrendingItem = {
+  name?: string;
+  velocity?: number;
+  location?: string;
+  changeLabel?: string;
 };
 
 export default function DashboardPage() {
@@ -38,8 +70,13 @@ export default function DashboardPage() {
     inventory?: { lowStockCount?: number };
     categorySplit?: Array<{ category?: string; revenue?: number }>;
   } | null>(null);
-  const [aiInsights, setAiInsights] = useState<Array<{ id?: string; title?: string; message?: string; badge?: string }>>([]);
-  const [aiTrending, setAiTrending] = useState<Array<{ name?: string; velocity?: number; changeLabel?: string }>>([]);
+  const [liveTransactions, setLiveTransactions] = useState<LiveTransaction[]>([]);
+  const [creditOutstanding, setCreditOutstanding] = useState<number>(0);
+  const [systemWalletBalance, setSystemWalletBalance] = useState<number>(0);
+  const [fraudOverview, setFraudOverview] = useState<{ summary?: { fraudRate?: number; paymentFailureRate?: number } } | null>(null);
+  const [aiInsights, setAiInsights] = useState<AiInsight[]>([]);
+  const [aiTrending, setAiTrending] = useState<AiTrendingItem[]>([]);
+  const [opsSettings, setOpsSettings] = useState<Partial<OpsThresholdSettings> | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -58,6 +95,8 @@ export default function DashboardPage() {
           overviewResponse,
           aiInsightsResponse,
           aiTrendingResponse,
+          fraudResponse,
+          opsResponse,
         ] = await Promise.all([
           getAdminMetrics(),
           getAdminKpi(),
@@ -70,6 +109,8 @@ export default function DashboardPage() {
           getAdminAnalyticsOverview(),
           getAiMerchantInsights(),
           getAiTrending({ limit: 5 }),
+          getFraudOverview(),
+          getOpsSettings(),
         ]);
         if (!active) return;
         setMetrics(metricsResponse || null);
@@ -98,6 +139,8 @@ export default function DashboardPage() {
         );
         setAiInsights(Array.isArray(aiInsightsResponse.data) ? aiInsightsResponse.data : []);
         setAiTrending(Array.isArray(aiTrendingResponse.data) ? aiTrendingResponse.data : []);
+        setFraudOverview(fraudResponse.data || null);
+        setOpsSettings(opsResponse?.data || null);
       } catch (err) {
         if (!active) return;
         setError(err instanceof Error ? err.message : "Unable to load dashboard.");
@@ -112,30 +155,29 @@ export default function DashboardPage() {
   const cards = useMemo(() => {
     const topCategory = overview?.categorySplit?.[0]?.category || "N/A";
     return [
-      { label: "Total users", value: String(usersCount), meta: "Platform accounts" },
+      { label: "Total GMV", value: `${metrics?.gmv ?? 0} BDT`, meta: "Gross merchandise value" },
       { label: "Total merchants", value: String(merchantsCount), meta: "Verified sellers" },
-      { label: "Total orders", value: String(metrics?.orders ?? 0), meta: "Marketplace volume" },
-      { label: "Total revenue", value: `${kpis?.revenue ?? 0} BDT`, meta: "Gross sales" },
-      { label: "Wallet txns", value: String(finance?.totalSettlements ?? 0), meta: "Settlement cycles" },
+      { label: "Active users", value: String(metrics?.users ?? 0), meta: "Platform accounts" },
+      { label: "Wallet balance", value: `${systemWalletBalance} BDT`, meta: "System-wide balance" },
+      { label: "Credit outstanding", value: `${creditOutstanding} BDT`, meta: "Unpaid credit" },
+      { label: "Payment success rate", value: `${kpis?.paymentSuccessRate ?? 0}%`, meta: "Successful transactions" },
+      { label: "Payment failure rate", value: `${kpis?.paymentFailureRate ?? 0}%`, meta: "Failed attempts" },
+      { label: "Live transactions", value: String(liveTransactions.length), meta: "Recent activity" },
       { label: "Active stores", value: String(metrics?.shops ?? 0), meta: "Active storefronts" },
-      { label: "Wallet net", value: `${overview?.wallet?.net ?? 0} BDT`, meta: "Credits minus debits" },
-      { label: "Courier success", value: `${Math.round((overview?.shipments?.successRate ?? 0) * 100)}%`, meta: "Delivered vs shipments" },
-      { label: "Low stock", value: String(overview?.inventory?.lowStockCount ?? 0), meta: "Inventory watch" },
-      { label: "Top category", value: topCategory, meta: "By revenue" },
       { label: "System health", value: String(health?.status || "Unknown"), meta: "Runtime status" },
     ];
   }, [
-    finance?.totalSettlements,
-    health?.status,
-    kpis?.revenue,
-    merchantsCount,
-    metrics?.orders,
+    metrics?.gmv,
+    metrics?.users,
     metrics?.shops,
+    merchantsCount,
+    systemWalletBalance,
+    creditOutstanding,
+    kpis?.paymentSuccessRate,
+    kpis?.paymentFailureRate,
+    liveTransactions.length,
+    health?.status,
     overview?.categorySplit,
-    overview?.inventory?.lowStockCount,
-    overview?.shipments?.successRate,
-    overview?.wallet?.net,
-    usersCount,
   ]);
 
   const pendingOrders = useMemo(
@@ -148,15 +190,18 @@ export default function DashboardPage() {
       <Card className="overflow-hidden border-border/70 bg-card/92">
         <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="p-6 sm:p-8">
-            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Admin</p>
-            <h1 className="dx-display mt-2 text-3xl">Platform dashboard</h1>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Monitor marketplace health, revenue flow, merchant risk, and operational pressure from one calmer command view.</p>
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Button onClick={() => window.location.reload()}>Refresh workspace</Button>
-              <Button asChild variant="secondary">
-                <a href="/system-health">Open system health</a>
-              </Button>
-            </div>
+            <AdminOpsPageHeader
+              title="Platform dashboard"
+              description="Monitor marketplace health, revenue flow, merchant risk, and operational pressure from one calmer command view."
+              refreshLabel="Refresh workspace"
+              onRefresh={() => window.location.reload()}
+              actions={[
+                { href: "/system-health", label: "Open system health", variant: "secondary" },
+                { href: "/risk", label: "Open risk desk", variant: "outline" },
+                { href: "/ai-ops", label: "Open AI ops", variant: "outline" },
+                { href: "/security", label: "Open security", variant: "outline" },
+              ]}
+            />
           </div>
           <div className="border-t border-border/60 bg-background/70 p-6 sm:p-8 lg:border-l lg:border-t-0">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Operator snapshot</p>
@@ -182,6 +227,15 @@ export default function DashboardPage() {
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">Current verified merchants represented in the admin surface.</p>
               </div>
+              <div className="rounded-2xl border border-border/60 bg-card/90 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-foreground">Ops thresholds</span>
+                  <Badge variant="neutral">{formatOpsLag(opsSettings?.lagCriticalMs)}</Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Watch {formatOpsLag(opsSettings?.lagWatchMs)} · Queue wait {opsSettings?.queueWaitingWatch ?? 20} · Outbox {opsSettings?.outboxPendingWatch ?? 50}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -192,6 +246,9 @@ export default function DashboardPage() {
       {error ? (
         <Alert variant="error">{error}</Alert>
       ) : null}
+
+      <AdminOpsThresholds />
+      <AdminOpsPressure />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
@@ -209,22 +266,22 @@ export default function DashboardPage() {
           </div>
         </Card>
         <Card>
-          <CardTitle>Recent orders</CardTitle>
-          <CardDescription className="mt-2">Latest platform transactions needing operational attention first.</CardDescription>
+          <CardTitle>Live transaction feed</CardTitle>
+          <CardDescription className="mt-2">Real-time payment activity across all gateways.</CardDescription>
           <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
-            {orders.slice(0, 6).map((order) => (
-              <div key={String(order._id)} className="rounded-2xl border border-border/60 px-4 py-3">
+            {liveTransactions.slice(0, 8).map((txn) => (
+              <div key={String(txn.id)} className="rounded-2xl border border-border/60 px-4 py-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-medium text-foreground">#{String(order._id || "").slice(-6)}</span>
-                  <Badge variant={String(order.status || "").toUpperCase() === "DELIVERED" ? "success" : "warning"}>{order.status || "PLACED"}</Badge>
+                  <span className="font-medium text-foreground">#{String(txn.id || "").slice(-6)}</span>
+                  <Badge variant={txn.status === "SUCCESS" ? "success" : "warning"}>{txn.status || "PENDING"}</Badge>
                 </div>
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <span>{order.totalAmount ?? 0} BDT</span>
-                  <span>{order.createdAt ? new Date(order.createdAt).toLocaleString() : "Pending"}</span>
+                  <span>{txn.amount ?? 0} BDT via {txn.gateway || "Unknown"}</span>
+                  <span>{txn.timestamp ? new Date(txn.timestamp).toLocaleTimeString() : "Now"}</span>
                 </div>
               </div>
             ))}
-            {!orders.length ? <p className="text-sm text-muted-foreground">No live platform orders have landed yet. New marketplace activity will appear here first.</p> : null}
+            {!liveTransactions.length ? <p className="text-sm text-muted-foreground">No live transactions detected. Activity will appear here in real-time.</p> : null}
           </div>
         </Card>
         <Card>

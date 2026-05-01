@@ -53,11 +53,21 @@ async function startServer() {
     assertLockManagerHealthy();
     logger.info("Lock manager self-test passed");
 
+    await connectMongo({ reason: "startup" });
+    logger.info("Mongo connection established");
+
     /* ---------- EVENTS ---------- */
     loadEvents();
 
+    /* ---------- JOBS ---------- */
+    require("./loaders/job.loader");
+
     /* ---------- WORKERS ---------- */
-    registerWorkers();
+    if (process.env.RUN_BACKGROUND_WORKERS !== "false") {
+      registerWorkers();
+    } else {
+      logger.info("Background workers disabled for this web process");
+    }
 
     /* ---------- HTTP SERVER ---------- */
     const server = http.createServer(app);
@@ -73,9 +83,6 @@ async function startServer() {
     server.listen(PORT, () => {
       logger.info("DokanX running on " + PORT);
     });
-
-    void connectMongo({ reason: "startup", background: true });
-    logger.info("Mongo connection bootstrap scheduled");
 
     require("./infrastructure/graceful/shutdown")(server);
 

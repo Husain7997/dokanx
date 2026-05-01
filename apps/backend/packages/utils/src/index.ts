@@ -9,7 +9,7 @@ export const storageKeys = {
 export function toRole(value: string | undefined | null): AuthRole {
   const normalized = String(value || "").toLowerCase();
   if (normalized === "owner") return "merchant";
-  if (normalized === "admin") return "admin";
+  if (["admin", "finance_admin", "support_admin", "audit_admin"].includes(normalized)) return normalized as AuthRole;
   if (normalized === "staff") return "staff";
   if (normalized === "developer") return "developer";
   if (normalized === "agent") return "agent";

@@ -41,9 +41,10 @@ exports.updatePage = async (req, res) => {
   const page = await Page.findOneAndUpdate(
     { _id: pageId, shopId },
     { ...(title ? { title } : {}), ...(body ? { body } : {}), ...(status ? { status } : {}) },
-    { new: true }
+    { returnDocument: "after" }
   );
 
   if (!page) return res.status(404).json({ message: "Page not found" });
   res.json({ data: page });
 };
+

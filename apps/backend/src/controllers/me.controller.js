@@ -1,4 +1,5 @@
 const { randomUUID } = require("crypto");
+const { getEffectivePermissions } = require("../core/access/permissions");
 
 function normalizeAddresses(rows = []) {
   return rows.map((row, index) => ({
@@ -24,11 +25,23 @@ function normalizePaymentMethods(rows = []) {
 
 exports.getMe = async (req, res) => {
   const user = req.user?.toObject ? req.user.toObject() : req.user;
+  const effectivePermissions = getEffectivePermissions(req.user);
 
   res.json({
     success: true,
-    user,
-    shopId: req.shop || null,
+    user: {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      shopId: user.shopId || null,
+      language: user.language || "en",
+      addresses: user.addresses || [],
+      savedPaymentMethods: user.savedPaymentMethods || [],
+      effectivePermissions,
+    },
+    shopId: req.shop?._id || req.user?.shopId || null,
     lang: req.lang,
   });
 };

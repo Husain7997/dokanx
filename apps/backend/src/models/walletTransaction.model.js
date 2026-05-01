@@ -22,13 +22,18 @@ const walletTransactionSchema = new mongoose.Schema(
     source: {
       type: String,
       enum: ["ORDER_PAYMENT", "SMS_PACKAGE", "SUBSCRIPTION",
-        "PAYMENT", "REFUND", "ADJUSTMENT"],
+        "PAYMENT", "REFUND", "ADJUSTMENT", "ADMIN_ADJUSTMENT"],
       required: true,
     },
 
     referenceId: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,
+    },
+
+    performedBy: {
+      adminId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      name: String
     },
 
     status: {

@@ -176,7 +176,7 @@ async function storeSnapshot(featureType, entityId, features, { snapshotWindow =
       features,
       explanations,
     },
-    { new: true, upsert: true }
+    { returnDocument: "after", upsert: true }
   );
 }
 
@@ -296,3 +296,4 @@ module.exports = {
   getTopCustomerSnapshots,
   getRiskyCustomerSnapshots,
 };
+

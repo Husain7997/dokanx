@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pressable, View, StyleSheet, Text, TextInput } from "react-native";
 
-import { probeMerchantLoginEndpoint } from "../lib/api-client";
+import { getApiBaseUrl, probeMerchantLoginEndpoint } from "../lib/api-client";
 import { useMerchantAuthStore } from "../store/auth-store";
 
 const DEFAULT_MERCHANT_EMAIL = "merchant@dokanx.local";
@@ -14,6 +14,7 @@ export function MerchantAuthScreen() {
   const [email, setEmail] = useState(DEFAULT_MERCHANT_EMAIL);
   const [password, setPassword] = useState(DEFAULT_MERCHANT_PASSWORD);
   const [apiStatus, setApiStatus] = useState<string>("Checking merchant API...");
+  const currentApiUrl = useMemo(() => getApiBaseUrl("1.0.0"), []);
 
   useEffect(() => {
     let active = true;
@@ -25,11 +26,11 @@ export function MerchantAuthScreen() {
       }
 
       if (result.ok) {
-        setApiStatus(`Backend ready (status ${result.status})`);
+        setApiStatus(`Backend ready (status ${result.status}) at ${result.url}`);
         return;
       }
 
-      setApiStatus(result.message || "Merchant login API unreachable");
+      setApiStatus(result.message || `Merchant login API unreachable at ${currentApiUrl}`);
     }
 
     void runProbe();
@@ -37,7 +38,7 @@ export function MerchantAuthScreen() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [currentApiUrl]);
 
   async function handleSignIn() {
     await signIn({ email, password });
@@ -74,6 +75,7 @@ export function MerchantAuthScreen() {
             onChangeText={setPassword}
             placeholderTextColor="#9ca3af"
           />
+          <Text style={styles.helperText}>API base URL: {currentApiUrl}</Text>
           <Text style={styles.statusText}>{apiStatus}</Text>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
           <Pressable style={styles.button} onPress={handleSignIn} disabled={isLoading}>
@@ -112,6 +114,7 @@ const styles = StyleSheet.create({
     borderColor: "#e5e7eb",
     gap: 12,
   },
+  helperText: { color: "#6b7280", fontSize: 12 },
   input: {
     backgroundColor: "#f9fafb",
     borderRadius: 12,

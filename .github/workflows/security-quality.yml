@@ -1,0 +1,186 @@
+name: Security & Quality Gates
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run security scans daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  dependency-check:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Audit backend dependencies
+      run: |
+        cd apps/backend
+        npm audit --audit-level=moderate --json > audit-results.json || true
+
+    - name: Audit frontend dependencies
+      run: |
+        for dir in apps/frontend/*/; do
+          if [ -f "$dir/package.json" ]; then
+            echo "Auditing $dir"
+            cd "$dir"
+            npm audit --audit-level=moderate --json > audit-results.json || true
+            cd ../../../..
+          fi
+        done
+
+    - name: Upload dependency audit results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: dependency-audit-results
+        path: |
+          apps/backend/audit-results.json
+          apps/frontend/*/audit-results.json
+
+  code-quality:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Run ESLint on backend
+      run: |
+        cd apps/backend
+        npm ci
+        npm run lint -- --format=json --output-file=lint-results.json || true
+
+    - name: Run ESLint on frontend apps
+      run: |
+        for dir in apps/frontend/*/; do
+          if [ -f "$dir/package.json" ]; then
+            echo "Linting $dir"
+            cd "$dir"
+            npm ci
+            npm run lint -- --format=json --output-file=lint-results.json || true
+            cd ../../../..
+          fi
+        done
+
+    - name: Upload linting results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: lint-results
+        path: |
+          apps/backend/lint-results.json
+          apps/frontend/*/lint-results.json
+
+  sonarcloud:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install backend dependencies
+      run: |
+        cd apps/backend
+        npm ci
+
+    - name: Run SonarCloud scan on backend
+      uses: SonarSource/sonarcloud-github-action@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      with:
+        projectBaseDir: apps/backend
+        args: >
+          -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
+          -Dsonar.projectKey=dokanx-backend
+          -Dsonar.sources=src
+          -Dsonar.tests=src
+          -Dsonar.test.inclusions=**/*.test.js,**/*.spec.js
+          -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+
+  performance-test:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install backend dependencies
+      run: |
+        cd apps/backend
+        npm ci
+
+    - name: Run Lighthouse CI
+      run: |
+        npm install -g lighthouse
+        lighthouse https://dokanx.com --output=json --output-path=./lighthouse-results.json || true
+
+    - name: Upload Lighthouse results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: lighthouse-results
+        path: lighthouse-results.json
+
+  notify:
+    needs: [security-scan, dependency-check, code-quality, sonarcloud]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+    - name: Notify on failure
+      if: needs.security-scan.result == 'failure' || needs.dependency-check.result == 'failure' || needs.code-quality.result == 'failure'
+      run: |
+        echo "Quality gates failed. Please review the security scans, dependency audits, and code quality checks."
+        # Add notification logic here (Slack, Teams, etc.)

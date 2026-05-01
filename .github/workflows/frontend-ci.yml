@@ -1,0 +1,300 @@
+name: Frontend CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'apps/frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'apps/frontend/**'
+
+env:
+  NODE_VERSION: '18'
+  REGISTRY: ghcr.io
+
+jobs:
+  test-storefront:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/frontend/storefront-web
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: apps/frontend/storefront-web/package-lock.json
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run linting
+      run: npm run lint
+
+    - name: Run type checking
+      run: npm run type-check
+
+    - name: Run tests
+      run: npm test -- --coverage --watchAll=false
+      env:
+        CI: true
+
+    - name: Build application
+      run: npm run build
+
+  test-merchant-dashboard:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/frontend/merchant-dashboard
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: apps/frontend/merchant-dashboard/package-lock.json
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run linting
+      run: npm run lint
+
+    - name: Run type checking
+      run: npm run type-check
+
+    - name: Run tests
+      run: npm test -- --coverage --watchAll=false
+      env:
+        CI: true
+
+    - name: Build application
+      run: npm run build
+
+  test-admin-panel:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/frontend/admin-panel
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: apps/frontend/admin-panel/package-lock.json
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run linting
+      run: npm run lint
+
+    - name: Run type checking
+      run: npm run type-check
+
+    - name: Run tests
+      run: npm test -- --coverage --watchAll=false
+      env:
+        CI: true
+
+    - name: Build application
+      run: npm run build
+
+  test-developer-portal:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/frontend/developer-portal
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: apps/frontend/developer-portal/package-lock.json
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run linting
+      run: npm run lint
+
+    - name: Run type checking
+      run: npm run type-check
+
+    - name: Run tests
+      run: npm test -- --coverage --watchAll=false
+      env:
+        CI: true
+
+    - name: Build application
+      run: npm run build
+
+  build-and-deploy:
+    needs: [test-storefront, test-merchant-dashboard, test-admin-panel, test-developer-portal]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+
+    strategy:
+      matrix:
+        app: [storefront-web, merchant-dashboard, admin-panel, developer-portal]
+        include:
+        - app: storefront-web
+          name: storefront
+          port: 3000
+        - app: merchant-dashboard
+          name: merchant-dashboard
+          port: 3000
+        - app: admin-panel
+          name: admin-panel
+          port: 3000
+        - app: developer-portal
+          name: developer-portal
+          port: 3000
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.name }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./apps/frontend/${{ matrix.app }}
+        file: ./infrastructure/docker/frontend.Dockerfile
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        build-args: |
+          APP_DIR=${{ matrix.app }}
+
+  deploy-staging:
+    needs: build-and-deploy
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+
+    strategy:
+      matrix:
+        app: [storefront, merchant-dashboard, admin-panel, developer-portal]
+        include:
+        - app: storefront
+          deployment: dokanx-storefront
+        - app: merchant-dashboard
+          deployment: dokanx-merchant-dashboard
+        - app: admin-panel
+          deployment: dokanx-admin-panel
+        - app: developer-portal
+          deployment: dokanx-developer-portal
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure kubectl
+      uses: azure/k8s-set-context@v3
+      with:
+        method: kubeconfig
+        kubeconfig: ${{ secrets.KUBE_CONFIG_STAGING }}
+
+    - name: Deploy to staging
+      run: |
+        # Update deployment image
+        kubectl set image deployment/${{ matrix.deployment }} ${{ matrix.app }}=${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.app }}:develop -n dokanx-staging
+
+        # Wait for rollout
+        kubectl rollout status deployment/${{ matrix.deployment }} -n dokanx-staging --timeout=300s
+
+  deploy-production:
+    needs: build-and-deploy
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+
+    strategy:
+      matrix:
+        app: [storefront, merchant-dashboard, admin-panel, developer-portal]
+        include:
+        - app: storefront
+          deployment: dokanx-storefront
+        - app: admin-panel
+          deployment: dokanx-admin-panel
+        - app: merchant-dashboard
+          deployment: dokanx-merchant-dashboard
+        - app: developer-portal
+          deployment: dokanx-developer-portal
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure kubectl
+      uses: azure/k8s-set-context@v3
+      with:
+        method: kubeconfig
+        kubeconfig: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
+
+    - name: Deploy to production
+      run: |
+        # Update deployment image
+        kubectl set image deployment/${{ matrix.deployment }} ${{ matrix.app }}=${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.app }}:latest -n dokanx
+
+        # Wait for rollout
+        kubectl rollout status deployment/${{ matrix.deployment }} -n dokanx --timeout=300s
+
+    - name: Run smoke tests
+      run: |
+        # Wait for services to be ready
+        sleep 30
+
+        # Run basic health checks
+        curl -f https://dokanx.com || exit 1
+        curl -f https://merchant.dokanx.com || exit 1
+        curl -f https://admin.dokanx.com || exit 1
+        curl -f https://dev.dokanx.com || exit 1

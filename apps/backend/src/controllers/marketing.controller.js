@@ -50,9 +50,10 @@ exports.updateCampaign = async (req, res) => {
   const campaign = await Campaign.findOneAndUpdate(
     { _id: campaignId, shopId },
     updates,
-    { new: true }
+    { returnDocument: "after" }
   );
 
   if (!campaign) return res.status(404).json({ message: "Campaign not found" });
   res.json({ data: campaign });
 };
+

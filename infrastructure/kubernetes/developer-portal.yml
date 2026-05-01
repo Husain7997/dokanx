@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dokanx-developer-portal
+  namespace: dokanx
+  labels:
+    app: dokanx-developer-portal
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: dokanx-developer-portal
+  template:
+    metadata:
+      labels:
+        app: dokanx-developer-portal
+    spec:
+      containers:
+      - name: developer-portal
+        image: dokanx/developer-portal:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NEXT_PUBLIC_API_URL
+          value: "https://api.dokanx.com"
+        - name: NEXT_PUBLIC_ENVIRONMENT
+          value: "production"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dokanx-developer-portal
+  namespace: dokanx
+  labels:
+    app: dokanx-developer-portal
+spec:
+  selector:
+    app: dokanx-developer-portal
+  ports:
+  - port: 3000
+    targetPort: 3000
+    protocol: TCP
+  type: ClusterIP

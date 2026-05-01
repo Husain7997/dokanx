@@ -68,7 +68,7 @@ async function addTransaction({
         affectsShopWallet: applyWalletBalance,
       },
     },
-    { upsert: true, new: true, session }
+    { upsert: true, returnDocument: "after", session }
   );
 
   if (applyWalletBalance) {
@@ -90,7 +90,7 @@ async function addTransaction({
     await walletAdapter.findOneAndUpdate(
       { shopId },
       { $inc: inc },
-      { new: true, session }
+      { returnDocument: "after", session }
     );
   }
 
@@ -141,3 +141,4 @@ module.exports = {
   generateReport,
   getLedger,
 };
+

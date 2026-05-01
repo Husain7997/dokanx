@@ -4,6 +4,7 @@ import { Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 
 import { getMerchantOrdersRequest, updateMerchantOrderStatusRequest } from "../lib/api-client";
 import { DokanXLogo } from "../components/dokanx-logo";
 import { useMerchantAuthStore } from "../store/auth-store";
+import { useMerchantOrdersHandoffStore } from "../store/orders-handoff-store";
 import { MerchantTopNav } from "./merchant-top-nav";
 
 type MerchantOrderItem = {
@@ -121,6 +122,12 @@ function matchesView(order: MerchantOrder, view: OrderViewTab) {
   return isTransactionOrder(order);
 }
 
+function needsPosFollowUp(order: MerchantOrder) {
+  const paymentPending = ["PENDING", "PAYMENT_PENDING"].includes(normalizeStatus(order.paymentStatus));
+  const orderPending = ["PLACED", "PENDING", "PAYMENT_PENDING"].includes(normalizeStatus(order.status));
+  return isOnlineOrder(order) && (paymentPending || orderPending);
+}
+
 function getFulfillmentLabel(action: FulfillmentAction) {
   if (action === "READY") return "Ready in POS";
   if (action === "HANDOVER") return "Give now";
@@ -184,15 +191,22 @@ function buildFulfillmentSequence(order: MerchantOrder, action: FulfillmentActio
 
 export function MerchantOrdersScreen() {
   const accessToken = useMerchantAuthStore((state) => state.accessToken);
+  const preferOnlineTab = useMerchantOrdersHandoffStore((state) => state.preferOnlineTab);
+  const preferFollowUpOnly = useMerchantOrdersHandoffStore((state) => state.preferFollowUpOnly);
+  const requestedOrderId = useMerchantOrdersHandoffStore((state) => state.requestedOrderId);
+  const clearOrderHandoff = useMerchantOrdersHandoffStore((state) => state.clearHandoff);
+  const markOrderReviewed = useMerchantOrdersHandoffStore((state) => state.markOrderReviewed);
   const [orders, setOrders] = useState<MerchantOrder[]>([]);
   const [viewTab, setViewTab] = useState<OrderViewTab>("DIRECT");
   const [statusFilter, setStatusFilter] = useState<typeof STATUS_FILTERS[number]>("ALL");
+  const [followUpOnly, setFollowUpOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [acknowledgedOrderIds, setAcknowledgedOrderIds] = useState<string[]>([]);
   const [receiptPreset, setReceiptPreset] = useState<ReceiptPreset>("THERMAL_58");
 
   const loadOrders = useCallback(async () => {
@@ -223,15 +237,36 @@ export function MerchantOrdersScreen() {
     void loadOrders();
   }, [loadOrders]);
 
+  useEffect(() => {
+    if (!preferOnlineTab && !preferFollowUpOnly && !requestedOrderId) return;
+    if (preferOnlineTab) {
+      setViewTab("ONLINE");
+    }
+    if (preferFollowUpOnly) {
+      setFollowUpOnly(true);
+    }
+    setStatusFilter("ALL");
+    if (requestedOrderId) {
+      setExpandedOrderId(requestedOrderId);
+      setSearchQuery(requestedOrderId.slice(-6));
+      setStatusMessage(`POS follow-up queue opened for order ${requestedOrderId.slice(-6)}.`);
+    } else {
+      setStatusMessage("POS follow-up queue opened.");
+    }
+    clearOrderHandoff();
+  }, [clearOrderHandoff, preferFollowUpOnly, preferOnlineTab, requestedOrderId]);
+
   const visibleOrders = useMemo(
-    () => orders.filter((order) => matchesView(order, viewTab) && matchesStatusFilter(order, statusFilter) && matchesSearch(order, searchQuery)),
-    [orders, viewTab, statusFilter, searchQuery],
+    () => orders.filter((order) => matchesView(order, viewTab) && matchesStatusFilter(order, statusFilter) && matchesSearch(order, searchQuery) && (!followUpOnly || (needsPosFollowUp(order) && !acknowledgedOrderIds.includes(order.id)))),
+    [acknowledgedOrderIds, followUpOnly, orders, viewTab, statusFilter, searchQuery],
   );
   const directCount = useMemo(() => orders.filter((order) => matchesView(order, "DIRECT")).length, [orders]);
   const onlineCount = useMemo(() => orders.filter((order) => matchesView(order, "ONLINE")).length, [orders]);
   const transactionCount = useMemo(() => orders.filter((order) => matchesView(order, "TRANSACTIONS")).length, [orders]);
   const totalVisibleAmount = useMemo(() => visibleOrders.reduce((sum, order) => sum + order.amount, 0), [visibleOrders]);
   const pendingVisibleCount = useMemo(() => visibleOrders.filter((order) => ["PLACED", "PAYMENT_PENDING", "PENDING"].includes(normalizeStatus(order.status))).length, [visibleOrders]);
+  const followUpVisibleCount = useMemo(() => visibleOrders.filter((order) => needsPosFollowUp(order) && !acknowledgedOrderIds.includes(order.id)).length, [acknowledgedOrderIds, visibleOrders]);
+  const followUpTotalCount = useMemo(() => orders.filter((order) => needsPosFollowUp(order) && !acknowledgedOrderIds.includes(order.id)).length, [acknowledgedOrderIds, orders]);
 
   async function runStatusSequence(orderId: string, nextStatuses: string[]) {
     if (!accessToken || !nextStatuses.length) return;
@@ -250,6 +285,12 @@ export function MerchantOrdersScreen() {
       setUpdatingOrderId(null);
     }
   }
+
+  const handleAcknowledgeFollowUp = useCallback((orderId: string) => {
+    setAcknowledgedOrderIds((current) => current.includes(orderId) ? current : [...current, orderId]);
+    markOrderReviewed(orderId);
+    setStatusMessage(`POS follow-up cleared for order ${orderId.slice(-6)}.`);
+  }, [markOrderReviewed]);
 
   async function handlePrintOrder(order: MerchantOrder) {
     try {
@@ -286,6 +327,7 @@ export function MerchantOrdersScreen() {
           <View style={styles.heroSignalRow}>
             <View style={styles.heroSignalCard}><Text style={styles.heroSignalLabel}>Visible volume</Text><Text style={styles.heroSignalValue}>{visibleOrders.length}</Text></View>
             <View style={styles.heroSignalCard}><Text style={styles.heroSignalLabel}>Pending now</Text><Text style={styles.heroSignalValue}>{pendingVisibleCount}</Text></View>
+            <View style={styles.heroSignalCard}><Text style={styles.heroSignalLabel}>POS follow-up</Text><Text style={styles.heroSignalValue}>{followUpVisibleCount}</Text></View>
             <View style={styles.heroSignalCard}><Text style={styles.heroSignalLabel}>Visible total</Text><Text style={styles.heroSignalValue}>BDT {totalVisibleAmount.toFixed(0)}</Text></View>
           </View>
         </View>
@@ -306,6 +348,9 @@ export function MerchantOrdersScreen() {
             ))}
           </View>
           <View style={styles.filterRow}>
+            <Pressable style={[styles.filterPill, followUpOnly ? styles.filterPillActive : styles.followUpPill]} onPress={() => setFollowUpOnly((current) => !current)}>
+              <Text style={[styles.filterText, followUpOnly ? styles.filterTextActive : styles.followUpPillText]}>POS follow-up {followUpOnly ? `(${followUpVisibleCount})` : `(${followUpTotalCount})`}</Text>
+            </Pressable>
             {STATUS_FILTERS.map((item) => (
               <Pressable key={item} style={[styles.filterPill, statusFilter === item ? styles.filterPillActive : null]} onPress={() => setStatusFilter(item)}>
                 <Text style={[styles.filterText, statusFilter === item ? styles.filterTextActive : null]}>{item}</Text>
@@ -332,8 +377,9 @@ export function MerchantOrdersScreen() {
           const shipSequence = buildFulfillmentSequence(order, "SHIP");
           const statusTone = getStatusTone(order.status);
           const paymentTone = getStatusTone(order.paymentStatus);
+          const needsPosAttention = needsPosFollowUp(order) && !acknowledgedOrderIds.includes(order.id);
           return (
-            <View key={order.id} style={styles.card}>
+            <View key={order.id} style={[styles.card, needsPosAttention ? styles.cardPriority : null]}>
               <Pressable style={styles.cardHeader} onPress={() => setExpandedOrderId((current) => current === order.id ? null : order.id)}>
                 <View style={styles.leftBlock}>
                   <Text style={styles.cardTitle}>{order.customer}</Text>
@@ -342,6 +388,7 @@ export function MerchantOrdersScreen() {
                     <Text style={[styles.badge, { backgroundColor: statusTone.bg, color: statusTone.fg }]}>{formatStatusLabel(order.status)}</Text>
                     <Text style={[styles.badge, { backgroundColor: paymentTone.bg, color: paymentTone.fg }]}>{formatStatusLabel(order.paymentStatus)}</Text>
                     <Text style={styles.modeBadge}>{order.paymentMode}</Text>
+                    {needsPosAttention ? <Text style={styles.priorityBadge}>POS follow-up</Text> : null}
                     <Text style={styles.expandHint}>{isExpanded ? "Hide" : "Details"}</Text>
                   </View>
                 </View>
@@ -367,6 +414,16 @@ export function MerchantOrdersScreen() {
                         <Pressable style={[styles.actionButton, (!readySequence.length || isUpdating) ? styles.actionButtonDisabled : null]} disabled={!readySequence.length || isUpdating} onPress={() => void runStatusSequence(order.id, readySequence)}><Text style={styles.actionButtonText}>{isUpdating ? "Updating..." : getFulfillmentLabel("READY")}</Text></Pressable>
                         <Pressable style={[styles.actionButton, (!handoverSequence.length || isUpdating) ? styles.actionButtonDisabled : null]} disabled={!handoverSequence.length || isUpdating} onPress={() => void runStatusSequence(order.id, handoverSequence)}><Text style={styles.actionButtonText}>{isUpdating ? "Updating..." : getFulfillmentLabel("HANDOVER")}</Text></Pressable>
                         <Pressable style={[styles.actionButton, (!shipSequence.length || isUpdating) ? styles.actionButtonDisabled : null]} disabled={!shipSequence.length || isUpdating} onPress={() => void runStatusSequence(order.id, shipSequence)}><Text style={styles.actionButtonText}>{isUpdating ? "Updating..." : getFulfillmentLabel("SHIP")}</Text></Pressable>
+                      </View>
+                    </View>
+                  ) : null}
+
+                  {needsPosAttention ? (
+                    <View style={styles.priorityCallout}>
+                      <Text style={styles.detailTitle}>Needs payment follow-up</Text>
+                      <Text style={styles.fulfillmentBody}>This online order still looks pending. Review payment status before shipping or handover.</Text>
+                      <View style={styles.actionRow}>
+                        <Pressable style={styles.priorityActionButton} onPress={() => handleAcknowledgeFollowUp(order.id)}><Text style={styles.priorityActionText}>Acknowledge</Text></Pressable>
                       </View>
                     </View>
                   ) : null}
@@ -432,6 +489,8 @@ const styles = StyleSheet.create({
   filterRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   filterPill: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: BRAND.border, backgroundColor: BRAND.surfaceSoft },
   filterPillActive: { backgroundColor: BRAND.navy, borderColor: BRAND.navy },
+  followUpPill: { backgroundColor: "#fff7ed", borderColor: "#fdba74" },
+  followUpPillText: { color: "#9a3412" },
   filterText: { fontSize: 12, fontWeight: "700", color: BRAND.ink },
   filterTextActive: { color: "#ffffff" },
   receiptRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
@@ -444,12 +503,14 @@ const styles = StyleSheet.create({
   alertTitle: { fontSize: 13, fontWeight: "700", color: "#991b1b" },
   alertBody: { fontSize: 12, color: BRAND.slate },
   card: { backgroundColor: BRAND.surface, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: BRAND.border, gap: 12 },
+  cardPriority: { borderColor: "#fdba74", backgroundColor: "#fffaf2" },
   cardHeader: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
   leftBlock: { flex: 1, gap: 4 },
   cardTitle: { fontSize: 14, fontWeight: "700", color: BRAND.ink },
   cardSubtitle: { fontSize: 12, color: BRAND.muted, lineHeight: 18 },
   metaRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 2, alignItems: "center" },
   badge: { fontSize: 10, fontWeight: "800", paddingHorizontal: 8, paddingVertical: 5, borderRadius: 999, overflow: "hidden" },
+  priorityBadge: { fontSize: 10, fontWeight: "800", color: "#9a3412", backgroundColor: "#ffedd5", paddingHorizontal: 8, paddingVertical: 5, borderRadius: 999, overflow: "hidden" },
   modeBadge: { fontSize: 10, fontWeight: "800", color: BRAND.slate, backgroundColor: BRAND.surfaceSoft, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 999, overflow: "hidden" },
   expandHint: { fontSize: 10, fontWeight: "800", color: "#9a3412" },
   amount: { fontSize: 13, fontWeight: "800", color: BRAND.ink },
@@ -459,6 +520,9 @@ const styles = StyleSheet.create({
   itemName: { flex: 1, fontSize: 12, color: BRAND.ink },
   itemMeta: { fontSize: 12, color: BRAND.muted },
   fulfillmentCard: { backgroundColor: BRAND.surfaceSoft, borderRadius: 14, padding: 12, gap: 8, borderWidth: 1, borderColor: BRAND.border },
+  priorityCallout: { backgroundColor: "#fff7ed", borderRadius: 14, padding: 12, gap: 8, borderWidth: 1, borderColor: "#fdba74" },
+  priorityActionButton: { alignSelf: "flex-start", backgroundColor: "#ffffff", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderColor: "#fdba74" },
+  priorityActionText: { color: "#9a3412", fontSize: 12, fontWeight: "800" },
   fulfillmentBody: { fontSize: 12, color: BRAND.slate, lineHeight: 18 },
   actionRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   actionButton: { backgroundColor: BRAND.navy, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
@@ -471,3 +535,9 @@ const styles = StyleSheet.create({
   completedText: { fontSize: 12, color: BRAND.muted },
   emptyText: { fontSize: 12, color: BRAND.muted, textAlign: "center", paddingVertical: 20 },
 });
+
+
+
+
+
+

@@ -21,6 +21,9 @@ const {
   buildShopRatings,
   buildShopDistances,
 } = require("./search.metrics");
+const {
+  createReadQuery,
+} = require("../../infrastructure/database/mongo.client");
 
 function escapeRegex(query) {
   return String(query).replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
@@ -87,7 +90,7 @@ async function searchProductsAdvanced(params) {
     }
   }
 
-  const products = await Product.find(filter).limit(limit).lean();
+  const products = await createReadQuery(Product, filter).limit(limit).lean();
   if (!products.length) return { data: [], count: 0 };
 
   const productIds = products.map((product) => product._id);
@@ -95,7 +98,7 @@ async function searchProductsAdvanced(params) {
 
   const [ratingsMap, shops, distanceMap] = await Promise.all([
     buildProductRatings(productIds),
-    Shop.find({ _id: { $in: shopIds } }).select("name trustScore popularityScore").lean(),
+    createReadQuery(Shop, { _id: { $in: shopIds } }).select("name trustScore popularityScore").lean(),
     buildShopDistances(shopIds, lat, lng),
   ]);
 
@@ -171,7 +174,7 @@ async function searchShopsAdvanced(params) {
     const locationFilter = { isActive: true };
     if (district) locationFilter.city = String(district);
     if (market) locationFilter.name = String(market);
-    const locations = await ShopLocation.find(locationFilter).select("shopId").lean();
+    const locations = await createReadQuery(ShopLocation, locationFilter).select("shopId").lean();
     const shopIds = locations.map((row) => row.shopId);
     if (shopIds.length) {
       filter._id = { $in: shopIds };
@@ -180,7 +183,7 @@ async function searchShopsAdvanced(params) {
     }
   }
 
-  const shops = await Shop.find(filter).select("name slug domain trustScore popularityScore").limit(limit).lean();
+  const shops = await createReadQuery(Shop, filter).select("name slug domain trustScore popularityScore").limit(limit).lean();
   if (!shops.length) return { data: [], count: 0 };
 
   const shopIds = shops.map((shop) => shop._id);

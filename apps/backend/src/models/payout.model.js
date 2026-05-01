@@ -23,15 +23,15 @@ const PayoutSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
- status: {
-  type: String,
-  enum: ['PENDING', 'PROCESSING', 'SUCCESS', 'FAILED'],
-  default: 'PENDING',
-},
+    status: {
+      type: String,
+      enum: ['PENDING', 'REQUESTED', 'PROCESSING', 'APPROVED', 'SUCCESS', 'FAILED'],
+      default: 'PENDING',
+    },
 
     type: {
       type: String,
-        enum: ['AUTO', 'MANUAL'],
+      enum: ['AUTO', 'MANUAL'],
       // enum: ['ADMIN_INITIATED', 'SHOP_REQUESTED'],
       required: true,
     },
@@ -49,6 +49,7 @@ const PayoutSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
     },
+    approvedAt: Date,
 
     reference: {
       type: String,

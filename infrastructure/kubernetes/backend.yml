@@ -1,0 +1,123 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dokanx-backend
+  namespace: dokanx
+  labels:
+    app: dokanx-backend
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: dokanx-backend
+  template:
+    metadata:
+      labels:
+        app: dokanx-backend
+    spec:
+      containers:
+      - name: backend
+        image: dokanx/backend:latest
+        ports:
+        - containerPort: 3001
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "3001"
+        - name: MONGODB_URI
+          value: "mongodb://mongodb:27017/dokanx"
+        - name: REDIS_URL
+          value: "redis://redis:6379"
+        - name: RUN_BACKGROUND_WORKERS
+          value: "false"
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: dokanx-secrets
+              key: jwt-secret
+        - name: SESSION_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: dokanx-secrets
+              key: session-secret
+        - name: GOOGLE_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: dokanx-secrets
+              key: google-client-id
+        - name: GOOGLE_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: dokanx-secrets
+              key: google-client-secret
+        - name: TWILIO_ACCOUNT_SID
+          valueFrom:
+            secretKeyRef:
+              name: dokanx-secrets
+              key: twilio-account-sid
+        - name: TWILIO_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: dokanx-secrets
+              key: twilio-auth-token
+        - name: FIREBASE_PROJECT_ID
+          valueFrom:
+            secretKeyRef:
+              name: dokanx-secrets
+              key: firebase-project-id
+        volumeMounts:
+        - name: logs-storage
+          mountPath: /app/logs
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health/readiness
+            port: 3001
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "300m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+      volumes:
+      - name: logs-storage
+        persistentVolumeClaim:
+          claimName: logs-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dokanx-backend
+  namespace: dokanx
+  labels:
+    app: dokanx-backend
+spec:
+  selector:
+    app: dokanx-backend
+  ports:
+  - port: 3001
+    targetPort: 3001
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-pvc
+  namespace: dokanx
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi

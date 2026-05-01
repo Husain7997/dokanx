@@ -1,11 +1,11 @@
 // src/app.js
 
 const express = require("express");
-const cors = require("cors");
 const passport = require("passport");
 
 const routes = require("./routes");
 const healthRoutes = require("./routes/health.routes");
+const adminMetricsController = require("./controllers/admin.metrics.controller");
 
 const errorHandler =
   require("./middlewares/errorHandler.middleware");
@@ -30,6 +30,15 @@ const languageMiddleware =
 
 const httpLogger =
   require("./middlewares/httpLogger");
+const {
+  corsMiddleware,
+  parseCookies,
+  enforceHttps,
+  securityHeaders,
+  sanitizeInput,
+} = require("./middlewares/security.middleware");
+const ipBlockMiddleware = require("./middlewares/ipBlock.middleware");
+const securityTelemetry = require("./middlewares/securityTelemetry.middleware");
 
 require("@/core/transaction/transaction.audit");
 
@@ -56,12 +65,21 @@ const app = express();
 |--------------------------------------------------------------------------
 */
 
-app.use(cors());
+app.set("trust proxy", 1);
+app.use(corsMiddleware);
+app.use(parseCookies);
+app.use(enforceHttps);
+app.use(securityHeaders);
 app.use(express.json({
   verify: (req, _res, buf) => {
     req.rawBody = buf ? buf.toString("utf8") : "";
   },
+  limit: process.env.JSON_BODY_LIMIT || "1mb",
 }));
+app.use(express.urlencoded({ extended: false, limit: process.env.JSON_BODY_LIMIT || "1mb" }));
+app.use(sanitizeInput);
+app.use(ipBlockMiddleware);
+app.use(securityTelemetry);
 
 app.use(requestContext);
 app.use(languageMiddleware);
@@ -82,7 +100,10 @@ app.use((req, res, next) => {
 |--------------------------------------------------------------------------
 */
 
+// Keep both legacy and infrastructure-friendly probe paths alive.
 app.use("/", healthRoutes);
+app.use("/health", healthRoutes);
+app.get("/metrics", adminMetricsController.metrics);
 
 /*
 |--------------------------------------------------------------------------

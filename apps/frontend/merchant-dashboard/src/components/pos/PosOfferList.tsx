@@ -21,6 +21,14 @@ export function PosOfferList({ products, onProductSelect, selectedShop }: PosOff
     ? products.filter(p => p.shopId === selectedShop)
     : products;
 
+  if (filteredProducts.length === 0) {
+    return (
+      <div className="rounded-xl border border-border bg-surface p-6 text-center text-sm text-muted-foreground">
+        No products available for the selected shop.
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
       {filteredProducts.map((product) => (
@@ -42,7 +50,7 @@ export function PosOfferList({ products, onProductSelect, selectedShop }: PosOff
             <CardTitle className="mb-2 text-sm">{product.name}</CardTitle>
             <div className="flex items-center justify-between">
               <span className="font-semibold text-primary">৳{product.price}</span>
-              <Badge variant={product.stock > 0 ? "default" : "destructive"}>
+              <Badge variant={product.stock > 0 ? "success" : "danger"}>
                 {product.stock > 0 ? `${product.stock} left` : "Out of stock"}
               </Badge>
             </div>

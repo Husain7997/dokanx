@@ -1,5 +1,5 @@
 const Settlement = require("../../models/settlement.model");
-const { triggerPayout } = require("../../services/payout.service");
+const { triggerSettlementPayout } = require("../../services/payout.service");
 const { addJob } = require("@/core/infrastructure");
 
 exports.listSettlements = async (req, res) => {
@@ -11,17 +11,17 @@ exports.triggerManualPayout = async (req, res) => {
   const { settlementId } = req.params;
   const settlement = await Settlement.findById(settlementId);
   if (!settlement) return res.status(404).json({ message: "Settlement not found" });
-  if (settlement.payoutStatus === "SUCCESS") return res.status(400).json({ message: "Already paid out" });
+  if (settlement.status === "COMPLETED") return res.status(400).json({ message: "Already paid out" });
   
 await addJob("settlement", { settlementId: settlement._id });
 
-  await triggerPayout(settlement._id);
+  await triggerSettlementPayout(settlement._id);
   res.json({ message: "Payout triggered" });
 };
 
 exports.retryPayout = async (req, res) => {
   const { settlementId } = req.params;
-  await triggerPayout(settlementId, { forceRetry: true });
+  await triggerSettlementPayout(settlementId, { forceRetry: true });
   res.json({ message: "Retry initiated" });
 };
 

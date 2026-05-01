@@ -16,7 +16,7 @@ exports.createAudit = async ({
       targetId,
       meta: meta || null,
       ip: req?.ip || "SYSTEM",
-      userAgent: req.headers["user-agent"]
+      userAgent: req?.headers?.["user-agent"] || "SYSTEM"
     });
   } catch (err) {
     console.error("AUDIT ERROR:", err.message);

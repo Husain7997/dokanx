@@ -9,6 +9,9 @@ const { t } =
   require("@/core/infrastructure");
 const walletAdapter =
   require("../../services/wallet/walletAdapter.service");
+const {
+  createReadQuery,
+} = require("../../infrastructure/database/mongo.client");
 
 exports.topupWallet =
 async (req, res, next) => {
@@ -110,7 +113,7 @@ async (req, res, next) => {
       }
     }
 
-    const entries = await Ledger.find(filter)
+    const entries = await createReadQuery(Ledger, filter)
       .sort({ createdAt: -1 })
       .limit(limit)
       .lean();

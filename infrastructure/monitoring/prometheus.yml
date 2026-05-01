@@ -1,0 +1,51 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'dokanx-backend'
+    static_configs:
+      - targets: ['backend:3001']
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+    params:
+      format: ['prometheus']
+
+  - job_name: 'dokanx-storefront'
+    static_configs:
+      - targets: ['storefront-web:3000']
+    scrape_interval: 30s
+
+  - job_name: 'dokanx-merchant-dashboard'
+    static_configs:
+      - targets: ['merchant-dashboard:3000']
+    scrape_interval: 30s
+
+  - job_name: 'dokanx-admin-panel'
+    static_configs:
+      - targets: ['admin-panel:3000']
+    scrape_interval: 30s
+
+  - job_name: 'mongodb'
+    static_configs:
+      - targets: ['mongodb:27017']
+    scrape_interval: 30s
+
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    scrape_interval: 15s
+
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx:80']
+    scrape_interval: 30s

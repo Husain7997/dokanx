@@ -1,0 +1,131 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-config
+  namespace: dokanx
+data:
+  datasources.yml: |
+    apiVersion: 1
+    datasources:
+    - name: Prometheus
+      type: prometheus
+      access: proxy
+      url: http://prometheus:9090
+      isDefault: true
+    - name: Loki
+      type: loki
+      access: proxy
+      url: http://loki:3100
+
+  dashboards.yml: |
+    apiVersion: 1
+    providers:
+    - name: 'default'
+      orgId: 1
+      folder: ''
+      type: file
+      disableDeletion: false
+      updateIntervalSeconds: 10
+      allowUiUpdates: true
+      options:
+        path: /var/lib/grafana/dashboards
+
+  dokanx-overview.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "DokanX Platform Overview",
+        "tags": ["dokanx", "platform"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Queue Waiting Jobs",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum by (queue) (dokanx_queue_jobs{state=\"waiting\",job=\"dokanx-backend\"})",
+                "legendFormat": "{{queue}} waiting"
+              }
+            ],
+            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 }
+          },
+          {
+            "id": 2,
+            "title": "Queue Active Jobs",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum by (queue) (dokanx_queue_jobs{state=\"active\",job=\"dokanx-backend\"})",
+                "legendFormat": "{{queue}} active"
+              }
+            ],
+            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 }
+          },
+          {
+            "id": 3,
+            "title": "Oldest Queue Lag",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "dokanx_queue_oldest_waiting_ms{job=\"dokanx-backend\"}",
+                "legendFormat": "{{queue}} lag ms"
+              }
+            ],
+            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 }
+          },
+          {
+            "id": 4,
+            "title": "Outbox Health",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "dokanx_outbox_pending{job=\"dokanx-backend\"}",
+                "legendFormat": "pending"
+              },
+              {
+                "expr": "dokanx_outbox_in_flight{job=\"dokanx-backend\"}",
+                "legendFormat": "in flight"
+              },
+              {
+                "expr": "dokanx_outbox_errored{job=\"dokanx-backend\"}",
+                "legendFormat": "errored"
+              }
+            ],
+            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 }
+          },
+          {
+            "id": 5,
+            "title": "Outbox Oldest Pending Lag",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "dokanx_outbox_oldest_pending_lag_ms{job=\"dokanx-backend\"}",
+                "legendFormat": "outbox lag ms"
+              }
+            ],
+            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 }
+          },
+          {
+            "id": 6,
+            "title": "Mongo Connections",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "mongodb_connections_current{job=\"mongodb\"}",
+                "legendFormat": "mongo connections"
+              }
+            ],
+            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 }
+          }
+        ],
+        "time": { "from": "now-1h", "to": "now" },
+        "timepicker": {},
+        "templating": { "list": [] },
+        "annotations": { "list": [] },
+        "refresh": "10s",
+        "schemaVersion": 27,
+        "version": 0,
+        "links": []
+      }
+    }

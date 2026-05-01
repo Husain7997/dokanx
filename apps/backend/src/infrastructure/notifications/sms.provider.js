@@ -28,6 +28,25 @@ async function sendSms(to, body) {
   return { provider: "twilio", sid: result.sid };
 }
 
+async function sendWhatsApp(to, message) {
+  const from = process.env.TWILIO_WHATSAPP_NUMBER;
+  if (!to || !message) return { skipped: true };
+
+  const client = resolveTwilioClient();
+  if (!client || !from) {
+    console.log("WHATSAPP_SEND", { to, message });
+    return { skipped: true };
+  }
+
+  const result = await client.messages.create({
+    from: `whatsapp:${from}`,
+    to: `whatsapp:${to}`,
+    body: message
+  });
+  return { provider: "twilio-whatsapp", sid: result.sid };
+}
+
 module.exports = {
   sendSms,
+  sendWhatsApp,
 };

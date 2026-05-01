@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { BackHandler, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { MerchantNavigationProvider, MerchantScreenName, useMerchantNavigation } from "./merchant-navigation";
 import { useMerchantAuthStore } from "../store/auth-store";
@@ -71,9 +71,27 @@ function MerchantBottomDock() {
 }
 
 function MerchantShell() {
-  const { currentScreen } = useMerchantNavigation();
+  const { currentScreen, canGoBack, goBack, resetTo } = useMerchantNavigation();
   const scannerActive = useMerchantPosStore((state) => state.scannerActive);
   const hideDock = currentScreen === "MerchantPos" && scannerActive;
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (canGoBack) {
+        goBack();
+        return true;
+      }
+
+      if (currentScreen !== "MerchantDashboard") {
+        resetTo("MerchantDashboard");
+        return true;
+      }
+
+      return false;
+    });
+
+    return () => subscription.remove();
+  }, [canGoBack, currentScreen, goBack, resetTo]);
 
   return (
     <View style={styles.shell}>

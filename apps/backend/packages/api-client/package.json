@@ -7,10 +7,7 @@
   "types": "./src/index.ts",
   "dependencies": {
     "@dokanx/types": "file:../types",
-    "@dokanx/utils": "file:../utils",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3",
-    "react-test-renderer": "^19.2.3"
+    "@dokanx/utils": "file:../utils"
   },
   "peerDependencies": {
     "typescript": "^5.8.0"

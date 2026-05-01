@@ -7,6 +7,11 @@ const Wallet = require("../../models/wallet.model");
 const { createAudit } = require("../../utils/audit.util");
 const fraudAiService = require("../../modules/ai-engine/fraud-ai.service");
 const {
+  createReadOneQuery,
+  createReadCountQuery,
+  createReadQuery,
+} = require("../../infrastructure/database/mongo.client");
+const {
   resolveCustomerId,
   resolveShopId,
 } = require("../../utils/order-normalization.util");
@@ -114,7 +119,7 @@ async function evaluateTransaction({ orderId, paymentAttemptId = null, source = 
     aiFraudScore: aiAssessment.score,
   };
 
-  const previousCase = await FraudCase.findOne({ caseKey }).lean();
+  const previousCase = await createReadOneQuery(FraudCase, { caseKey }).lean();
   const fraudCase = await FraudCase.findOneAndUpdate(
     { caseKey },
     {
@@ -141,7 +146,7 @@ async function evaluateTransaction({ orderId, paymentAttemptId = null, source = 
         reviewActions: [],
       },
     },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: "after" }
   ).lean();
 
   if (level === LEVELS.HIGH) {
@@ -166,13 +171,13 @@ async function evaluateTransaction({ orderId, paymentAttemptId = null, source = 
 async function getOverview() {
   const [cases, totalOrders, totalAttempts, failedAttempts, blockedUsers, suspendedMerchants, frozenWallets] =
     await Promise.all([
-      FraudCase.find().sort({ updatedAt: -1 }).limit(250).lean(),
-      Order.countDocuments(),
-      PaymentAttempt.countDocuments(),
-      PaymentAttempt.countDocuments({ status: "FAILED" }),
-      User.countDocuments({ isBlocked: true }),
-      Shop.countDocuments({ isActive: false }),
-      Wallet.countDocuments({ isFrozen: true }),
+      createReadQuery(FraudCase, {}).sort({ updatedAt: -1 }).limit(250).lean(),
+      createReadCountQuery(Order),
+      createReadCountQuery(PaymentAttempt),
+      createReadCountQuery(PaymentAttempt, { status: "FAILED" }),
+      createReadCountQuery(User, { isBlocked: true }),
+      createReadCountQuery(Shop, { isActive: false }),
+      createReadCountQuery(Wallet, { isFrozen: true }),
     ]);
 
   const orderCases = cases.filter((item) => item.entityType === "order");
@@ -241,7 +246,7 @@ async function getOverview() {
 }
 
 async function getAlerts() {
-  return FraudCase.find({
+  return createReadQuery(FraudCase, {
     status: { $in: ["OPEN", "REVIEW_REQUIRED", "INVESTIGATING"] },
     level: { $in: [LEVELS.MEDIUM, LEVELS.HIGH] },
   })
@@ -349,7 +354,7 @@ async function evaluateWarrantyClaim({ orderId, productId, customerId, shopId, f
       },
       $setOnInsert: { reviewActions: [] },
     },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: "after" }
   ).lean();
 }
 
@@ -361,3 +366,4 @@ module.exports = {
   getReports,
   reviewCase,
 };
+

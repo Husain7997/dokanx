@@ -59,7 +59,7 @@ async function updateConfig(value, userId) {
   return SystemSetting.findOneAndUpdate(
     { key: "delivery_engine.config" },
     { value: { ...DEFAULT_CONFIG, ...(value || {}) }, updatedBy: userId || null },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: "after" }
   );
 }
 
@@ -174,3 +174,4 @@ module.exports = {
   optimizeRoute,
   updateConfig,
 };
+

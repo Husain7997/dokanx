@@ -94,7 +94,9 @@ class MerchantScannerActivity : AppCompatActivity() {
   }
 
   private fun applyOverlayWindow() {
-    val overlayHeight = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 280f, resources.displayMetrics).toInt()
+    val screenHeight = resources.displayMetrics.heightPixels
+    val minHeight = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 280f, resources.displayMetrics).toInt()
+    val overlayHeight = (screenHeight * 0.72).toInt().coerceAtLeast(minHeight)
     window.setLayout(WindowManager.LayoutParams.MATCH_PARENT, overlayHeight)
     window.setGravity(Gravity.TOP)
     window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)

@@ -38,7 +38,7 @@ exports.getShopCreditCustomers = async (req, res, next) => {
 
 exports.upsertCreditPolicy = async (req, res, next) => {
   try {
-    const data = await creditService.upsertCreditPolicy(req.body || {}, req.user);
+    const data = await creditService.upsertCreditPolicy(req.body || {}, req.user, req);
     res.json({ data });
   } catch (error) {
     next(error);

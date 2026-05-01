@@ -2,6 +2,20 @@ const Product = require("../models/product.model");
 const Inventory = require("../models/Inventory.model");
 const ProductReview = require("../models/productReview.model");
 const { t } = require("@/core/infrastructure");
+const { getOrSet, bumpNamespace } = require("../infrastructure/cache/versioned-cache.service");
+const {
+  createReadQuery,
+  createReadOneQuery,
+} = require("../infrastructure/database/mongo.client");
+
+async function invalidateProductCaches() {
+  await Promise.all([
+    bumpNamespace("products"),
+    bumpNamespace("product-reviews"),
+    bumpNamespace("public-shops"),
+    bumpNamespace("search"),
+  ]);
+}
 
 function normalizeProtectionConfig(value, fallbackType) {
   if (!value || typeof value !== "object") {
@@ -106,6 +120,7 @@ exports.createProduct = async (req, res) => {
       ownerId: req.user._id,
       source: req.body,
     });
+    await invalidateProductCaches();
 
     return res.status(201).json({ success: true, data: product });
   } catch (err) {
@@ -146,6 +161,10 @@ exports.bulkCreateProducts = async (req, res) => {
           message: error instanceof Error ? error.message : "Unable to create this row",
         });
       }
+    }
+
+    if (created.length) {
+      await invalidateProductCaches();
     }
 
     return res.status(created.length ? 201 : 400).json({
@@ -190,6 +209,7 @@ exports.updateProduct = async (req, res) => {
 
     await product.save();
     await syncInventory(req.shop._id, product._id, payload.stock);
+    await invalidateProductCaches();
 
     return res.status(200).json({ success: true, data: product });
   } catch (err) {
@@ -217,6 +237,7 @@ exports.deleteProduct = async (req, res) => {
       { shopId: req.shop._id, product: product._id },
       { $set: { isActive: false } }
     );
+    await invalidateProductCaches();
 
     return res.status(200).json({ success: true, message: "Product archived" });
   } catch (err) {
@@ -242,8 +263,25 @@ exports.getProductsByShop = async (req, res) => {
       ];
     }
 
-    const products = await Product.find(filter).sort({ createdAt: -1 }).lean();
-    return res.status(200).json({ message: t("common.updated", req.lang), count: products.length, data: products });
+    const cached = await getOrSet({
+      namespace: "products",
+      key: {
+        scope: "shop-products",
+        shopId,
+        query: req.query,
+      },
+      ttlSeconds: q ? 45 : 120,
+      resolver: async () => {
+        const products = await createReadQuery(Product, filter).sort({ createdAt: -1 }).lean();
+        return {
+          message: t("common.updated", req.lang),
+          count: products.length,
+          data: products,
+        };
+      },
+    });
+
+    return res.status(200).json(cached.value);
   } catch (error) {
     return res.status(500).json({ success: false, message: "Failed to fetch products" });
   }
@@ -264,11 +302,23 @@ exports.listProducts = async (req, res) => {
       ];
     }
 
-    const query = Product.find(filter);
-    if (limit) query.limit(Number(limit));
-    const products = await query.lean();
+    const cached = await getOrSet({
+      namespace: "products",
+      key: {
+        scope: "list-products",
+        query: req.query,
+      },
+      ttlSeconds: q ? 45 : 120,
+      resolver: async () => {
+        const queryRef = createReadQuery(Product, filter);
+        if (limit) queryRef.limit(Number(limit));
+        const products = await queryRef.lean();
 
-    return res.json({ count: products.length, data: products });
+        return { count: products.length, data: products };
+      },
+    });
+
+    return res.json(cached.value);
   } catch (error) {
     return res.status(500).json({ message: "Failed to fetch products" });
   }
@@ -276,9 +326,21 @@ exports.listProducts = async (req, res) => {
 
 exports.getProductDetail = async (req, res) => {
   try {
-    const product = await Product.findById(req.params.productId).lean();
-    if (!product) return res.status(404).json({ message: "Product not found" });
-    return res.json({ data: product });
+    const cached = await getOrSet({
+      namespace: "products",
+      key: {
+        scope: "product-detail",
+        productId: req.params.productId,
+      },
+      ttlSeconds: 180,
+      resolver: async () => {
+        const product = await createReadOneQuery(Product, { _id: req.params.productId }).lean();
+        return product ? { data: product } : null;
+      },
+    });
+
+    if (!cached.value) return res.status(404).json({ message: "Product not found" });
+    return res.json(cached.value);
   } catch (error) {
     return res.status(500).json({ message: "Failed to fetch product" });
   }
@@ -305,10 +367,22 @@ exports.getProductByBarcode = async (req, res) => {
       return res.status(400).json({ message: "barcode and shopId required" });
     }
 
-    const product = await Product.findOne({ shopId, barcode, isActive: { $ne: false } }).lean();
-    if (!product) return res.status(404).json({ message: "Product not found" });
+    const cached = await getOrSet({
+      namespace: "products",
+      key: {
+        scope: "barcode-product",
+        shopId: String(shopId),
+        barcode,
+      },
+      ttlSeconds: 180,
+      resolver: async () => {
+        const product = await createReadOneQuery(Product, { shopId, barcode, isActive: { $ne: false } }).lean();
+        return product ? { data: product } : null;
+      },
+    });
 
-    return res.json({ data: product });
+    if (!cached.value) return res.status(404).json({ message: "Product not found" });
+    return res.json(cached.value);
   } catch (err) {
     return res.status(500).json({ message: "Barcode lookup failed" });
   }
@@ -317,8 +391,20 @@ exports.getProductByBarcode = async (req, res) => {
 exports.listProductReviews = async (req, res) => {
   try {
     const { productId } = req.params;
-    const reviews = await ProductReview.find({ productId, status: "APPROVED" }).sort({ createdAt: -1 }).lean();
-    return res.json({ data: reviews });
+    const cached = await getOrSet({
+      namespace: "product-reviews",
+      key: {
+        scope: "product-reviews",
+        productId,
+      },
+      ttlSeconds: 120,
+      resolver: async () => {
+        const reviews = await createReadQuery(ProductReview, { productId, status: "APPROVED" }).sort({ createdAt: -1 }).lean();
+        return { data: reviews };
+      },
+    });
+
+    return res.json(cached.value);
   } catch (error) {
     return res.status(500).json({ message: "Failed to load reviews" });
   }
@@ -346,6 +432,7 @@ exports.createProductReview = async (req, res) => {
       message: String(message),
       status: "PENDING",
     });
+    await invalidateProductCaches();
 
     return res.status(201).json({ message: "Review submitted", data: entry });
   } catch (error) {

@@ -2,8 +2,16 @@ const crypto = require("crypto");
 
 const DEFAULT_KEY = "dokanx_default_secret_key_32bytes!!";
 
+function ensureSafeSecret(name, value) {
+  const isProduction = String(process.env.NODE_ENV || "").toLowerCase() === "production";
+  if (isProduction && (!value || value === DEFAULT_KEY || value === "dokanx_hash_key")) {
+    throw new Error(`${name} must be configured securely in production`);
+  }
+}
+
 function getKey() {
   const raw = process.env.SECRETS_ENCRYPTION_KEY || DEFAULT_KEY;
+  ensureSafeSecret("SECRETS_ENCRYPTION_KEY", raw);
   const keyBuffer = Buffer.from(raw);
   if (keyBuffer.length >= 32) {
     return keyBuffer.subarray(0, 32);
@@ -37,6 +45,7 @@ function decryptSecret(cipherText, ivText) {
 
 function hashSecret(value) {
   const secret = process.env.SECRETS_HASH_KEY || "dokanx_hash_key";
+  ensureSafeSecret("SECRETS_HASH_KEY", secret);
   return crypto.createHmac("sha256", secret).update(String(value)).digest("hex");
 }
 

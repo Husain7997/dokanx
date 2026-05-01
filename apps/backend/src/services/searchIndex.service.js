@@ -53,7 +53,7 @@ async function updateIncrementalIndex() {
   const state = await SearchSyncState.findOneAndUpdate(
     { key: "search" },
     { $setOnInsert: { lastRunAt: null } },
-    { new: true, upsert: true }
+    { returnDocument: "after", upsert: true }
   );
 
   const since = state.lastRunAt || new Date(0);
@@ -102,3 +102,4 @@ module.exports = {
   searchIndex,
   updateIncrementalIndex,
 };
+

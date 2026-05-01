@@ -1,0 +1,57 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: dokanx-backend
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: dokanx-backend
+          __path__: /var/log/dokanx/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="dokanx-backend"}'
+          stages:
+            - json:
+                expressions:
+                  level: level
+                  message: message
+                  timestamp: timestamp
+            - labels:
+                level:
+                service: backend
+            - timestamp:
+                source: timestamp
+                format: RFC3339
+
+  - job_name: system
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: varlogs
+          __path__: /var/log/*log
+    pipeline_stages:
+      - match:
+          selector: '{job="varlogs"}'
+          stages:
+            - multiline:
+                firstline: '^\w{3} \d{2} \d{2}:\d{2}:\d{2}'
+                max_wait_time: 3s
+            - regex:
+                expression: '^(?P<timestamp>\w{3} \d{2} \d{2}:\d{2}:\d{2}) (?P<hostname>\w+) (?P<process>\w+)\[(?P<pid>\d+)\]: (?P<message>.*)$'
+            - labels:
+                hostname:
+                process:
+                pid:
+            - timestamp:
+                source: timestamp
+                format: 'Jan 02 15:04:05'

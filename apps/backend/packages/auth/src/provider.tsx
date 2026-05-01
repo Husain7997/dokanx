@@ -20,15 +20,24 @@ type PersistedSession = {
   user: AuthUser;
 };
 
+function normalizePermissions(value: unknown) {
+  return Array.isArray(value)
+    ? value.map((item) => String(item || "").trim().toUpperCase()).filter(Boolean)
+    : [];
+}
+
 function sanitizeUser(user: Record<string, unknown>) {
   return {
     id: String(user.id || user._id || ""),
+    _id: user._id ? String(user._id) : undefined,
     name: String(user.name || ""),
     email: String(user.email || ""),
     role: String(user.role || "CUSTOMER"),
     roleName: toRole(String(user.role || "customer")),
     phone: user.phone ? String(user.phone) : null,
-    shopId: user.shopId ? String(user.shopId) : null
+    shopId: user.shopId ? String(user.shopId) : null,
+    permissionOverrides: normalizePermissions(user.permissionOverrides),
+    effectivePermissions: normalizePermissions(user.effectivePermissions)
   } satisfies AuthUser;
 }
 
@@ -146,7 +155,6 @@ export function AuthProvider({
 
   useEffect(() => {
     void restoreSession();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseUrl, storageKey]);
 
   const value = useMemo<AuthContextValue>(

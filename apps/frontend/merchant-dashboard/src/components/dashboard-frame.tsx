@@ -6,13 +6,18 @@ import { ProtectedRoute, RoleGuard, useAuth } from "@dokanx/auth";
 import { AppShell } from "@dokanx/ui";
 
 import { agentNavigation, navigation } from "@/config/navigation";
+import { filterNavigationByPermissions, getRequiredPermissionForPath, hasPermission } from "@/lib/permissions";
 
 export function DashboardFrame({ children }: { children: ReactNode }) {
   const auth = useAuth();
   const pathname = usePathname();
   const returnTo = encodeURIComponent(pathname || "/");
   const roleName = auth.user?.roleName;
-  const resolvedNavigation = roleName === "agent" ? agentNavigation : navigation;
+  const requiredPermission = getRequiredPermissionForPath(pathname || "/");
+  const baseNavigation = roleName === "agent" ? agentNavigation : navigation;
+  const resolvedNavigation = roleName === "agent"
+    ? baseNavigation.map(({ href, label }) => ({ href, label }))
+    : filterNavigationByPermissions(baseNavigation, auth.user);
 
   if (pathname.startsWith("/accept-invite") || pathname.startsWith("/sign-in")) {
     return <>{children}</>;
@@ -34,12 +39,16 @@ export function DashboardFrame({ children }: { children: ReactNode }) {
           </div>
         }
       >
-        <AppShell
-          appName={roleName === "agent" ? "Agent Panel" : "Merchant Dashboard"}
-          navigation={resolvedNavigation}
-        >
-          {children}
-        </AppShell>
+        {requiredPermission && !hasPermission(auth.user, requiredPermission) ? (
+          <div className="p-6 text-sm">You do not have permission to access this page.</div>
+        ) : (
+          <AppShell
+            appName={roleName === "agent" ? "Agent Panel" : "Merchant Dashboard"}
+            navigation={resolvedNavigation}
+          >
+            {children}
+          </AppShell>
+        )}
       </RoleGuard>
     </ProtectedRoute>
   );

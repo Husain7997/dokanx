@@ -1,8 +1,10 @@
 const express = require("express");
 const router = express.Router();
 
-const { protect } = require("../middlewares");
+const { protect, requirePermissions } = require("../middlewares");
 const allowRoles = require("../middlewares/allowRoles");
+const { validateRequest } = require("../middlewares/validateRequest.middleware");
+const { schemas } = require("../validation/security.schemas");
 
 const adminController = require("../controllers/admin.controller");
 const reviewController = require("../controllers/admin/review.controller");
@@ -17,54 +19,76 @@ const agentController = require("../modules/agent/agent.controller");
 // ❗❗ খুব গুরুত্বপূর্ণ: function হিসেবে পাঠাচ্ছি
 router.get("/users",
   protect,
-  allowRoles("ADMIN"),
+  allowRoles("ADMIN", "SUPPORT_ADMIN"),
+  requirePermissions("ADMIN_MANAGE_USERS"),
   adminController.getAllUsers
+);
+
+router.put("/users/:id",
+  protect,
+  allowRoles("ADMIN", "SUPPORT_ADMIN"),
+  requirePermissions("ADMIN_MANAGE_USERS"),
+  validateRequest(schemas.adminUserUpdate),
+  adminController.updateUser
 );
 
 router.put("/users/:id/block",
   protect,
-  allowRoles("ADMIN"),
+  allowRoles("ADMIN", "SUPPORT_ADMIN"),
+  requirePermissions("ADMIN_MANAGE_USERS"),
+  validateRequest(schemas.adminUserTarget),
   adminController.blockUser
 );
 router.put("/users/:id/unblock",
   protect,
-  allowRoles("ADMIN"),
+  allowRoles("ADMIN", "SUPPORT_ADMIN"),
+  requirePermissions("ADMIN_MANAGE_USERS"),
+  validateRequest(schemas.adminUserTarget),
   adminController.unblockUser
 );
 
 router.put("/shops/:id/approve",
   protect,
   allowRoles("ADMIN"),
+  requirePermissions("ADMIN_MANAGE_SHOPS"),
+  validateRequest(schemas.adminShopTarget),
   adminController.approveShop
 );
 
 router.put("/shops/:id/suspend",
   protect,
   allowRoles("ADMIN"),
+  requirePermissions("ADMIN_MANAGE_SHOPS"),
+  validateRequest(schemas.adminShopTarget),
   adminController.suspendShop
 );
 
 router.put("/shops/:shopId/commission",
   protect,
   allowRoles("ADMIN"),
+  requirePermissions("ADMIN_MANAGE_SHOPS"),
+  validateRequest(schemas.adminCommission),
   adminController.updateShopCommission
 );
 
 router.get("/orders",
   protect,
-  allowRoles("ADMIN"),
+  allowRoles("ADMIN", "FINANCE_ADMIN", "AUDIT_ADMIN", "SUPPORT_ADMIN"),
+  requirePermissions("ADMIN_VIEW_ORDERS"),
   adminController.getAllOrders
 );
 
 router.get("/audit-logs",
   protect,
-  allowRoles("ADMIN"),
+  allowRoles("ADMIN", "AUDIT_ADMIN"),
+  requirePermissions("ADMIN_VIEW_AUDIT"),
   adminController.getAuditLogs
 );
 
 router.get("/merchants",
   protect,
   allowRoles("ADMIN"),
+  requirePermissions("ADMIN_VIEW_SHOPS"),
   adminController.listMerchants
 );
 
@@ -106,8 +130,23 @@ router.post("/fraud/review",
 
 router.get("/shops",
   protect,
-  allowRoles("ADMIN"),
+  allowRoles("ADMIN", "AUDIT_ADMIN"),
+  requirePermissions("ADMIN_VIEW_SHOPS"),
   adminController.listShops
+);
+
+router.get("/themes",
+  protect,
+  allowRoles("ADMIN"),
+  requirePermissions("ADMIN_VIEW_SHOPS"),
+  adminController.listMarketplaceThemes
+);
+
+router.put("/themes/:shopId/:themeId/review",
+  protect,
+  allowRoles("ADMIN"),
+  requirePermissions("ADMIN_MANAGE_SHOPS"),
+  adminController.reviewMarketplaceTheme
 );
 
 router.get("/agents",
@@ -156,6 +195,12 @@ router.put("/settings/risk",
   protect,
   allowRoles("ADMIN"),
   settingsController.updateRiskSettings
+);
+
+router.put("/settings/ops",
+  protect,
+  allowRoles("ADMIN"),
+  settingsController.updateOpsSettings
 );
 
 router.put("/settings/thresholds",

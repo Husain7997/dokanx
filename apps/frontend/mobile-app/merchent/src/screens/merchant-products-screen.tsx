@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Image, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
-import * as XLSX from "xlsx";
 
 import {
   MerchantFeatureSettings,
@@ -18,6 +17,7 @@ import {
 } from "../lib/api-client";
 import { useMerchantNavigation } from "../navigation/merchant-navigation";
 import { useMerchantAuthStore } from "../store/auth-store";
+import { useMerchantPosStore } from "../store/pos-store";
 import { useMerchantUiStore } from "../store/ui-store";
 import { MerchantTopNav } from "./merchant-top-nav";
 
@@ -148,22 +148,17 @@ function parseBulkProductRows(input: string) {
     .filter((row) => row.name && row.price >= 0 && row.stock >= 0);
 }
 
-async function loadUriAsArrayBuffer(uri: string) {
-  return new Promise<ArrayBuffer>((resolve, reject) => {
-    const request = new XMLHttpRequest();
-    request.open("GET", uri, true);
-    request.responseType = "arraybuffer";
-    request.onload = () => {
-      if (request.status >= 200 && request.status < 300 || request.status === 0) {
-        resolve(request.response);
-        return;
-      }
-      reject(new Error(`Unable to read file (${request.status}).`));
-    };
-    request.onerror = () => reject(new Error("Unable to read the selected file."));
-    request.send();
-  });
+function rowsToCsv(rows: Array<Record<string, unknown>>) {
+  if (!rows.length) return "";
+  const headers = Object.keys(rows[0]);
+  const escapeValue = (value: unknown) => {
+    const text = value == null ? "" : String(value);
+    const escaped = text.replace(/"/g, '""');
+    return /[",\r\n]/.test(text) ? `"${escaped}"` : escaped;
+  };
+  return [headers.join(","), ...rows.map((row) => headers.map((header) => escapeValue(row[header])).join(","))].join("\r\n");
 }
+
 async function loadUriAsText(uri: string) {
   return new Promise<string>((resolve, reject) => {
     const request = new XMLHttpRequest();
@@ -230,6 +225,8 @@ export function MerchantProductsScreen() {
   const accessToken = useMerchantAuthStore((state) => state.accessToken);
   const profile = useMerchantAuthStore((state) => state.profile);
   const navigation = useMerchantNavigation();
+  const setScannerOpen = useMerchantPosStore((state) => state.setScannerOpen);
+  const setScannerActive = useMerchantPosStore((state) => state.setScannerActive);
   const language = useMerchantUiStore((state) => state.language);
   const [products, setProducts] = useState<MerchantProduct[]>([]);
   const [pricingHints, setPricingHints] = useState<PricingHint[]>([]);
@@ -642,14 +639,11 @@ export function MerchantProductsScreen() {
       setError(null);
       const DocumentPicker = getDocumentPickerModule();
       const file = await DocumentPicker.pickSingle({
-        type: [DocumentPicker.types.csv, DocumentPicker.types.xls, DocumentPicker.types.xlsx, DocumentPicker.types.plainText],
+        type: [DocumentPicker.types.csv, DocumentPicker.types.plainText],
         copyTo: "cachesDirectory",
       });
       const targetUri = file.fileCopyUri || file.uri;
-      const lowerName = String(file.name || "").toLowerCase();
-      const rows = lowerName.endsWith(".csv") || lowerName.endsWith(".txt")
-        ? parseBulkProductRows(await loadUriAsText(targetUri))
-        : parseWorkbookRows(await loadUriAsArrayBuffer(targetUri));
+      const rows = parseBulkProductRows(await loadUriAsText(targetUri));
       if (!rows.length) {
         setError("No valid product rows were found in the selected file or paste block.");
         return;
@@ -721,17 +715,11 @@ export function MerchantProductsScreen() {
       discountRate: item.discountRate,
       imageUrl: item.imageUrl,
     }));
-    const sheet = XLSX.utils.json_to_sheet(rows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, sheet, "Products");
 
     try {
       if (format === "CSV") {
-        const csv = XLSX.utils.sheet_to_csv(sheet);
+        const csv = rowsToCsv(rows);
         await Share.share({ title: `${shopLabel} CSV export`, url: `data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`, message: `${shopLabel} product export (CSV)` });
-      } else if (format === "XLSX") {
-        const base64 = XLSX.write(workbook, { type: "base64", bookType: "xlsx" });
-        await Share.share({ title: `${shopLabel} Excel export`, url: `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${base64}`, message: `${shopLabel} product export (Excel)` });
       } else {
         const htmlRows = rows.map((item) => `<tr><td style="padding:8px;border-bottom:1px solid #e5e7eb;">${item.name}</td><td style="padding:8px;border-bottom:1px solid #e5e7eb;">${item.category}</td><td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">${item.price}</td><td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">${item.stock}</td></tr>`).join("");
         const labelHtml = `<html><body style="font-family:Arial,sans-serif;padding:24px;color:#0f172a;"><div style="max-width:860px;margin:0 auto;"><h1 style="margin:0 0 4px;">${shopLabel}</h1><div style="color:#64748b;margin-bottom:16px;">${shopAddress || "Product export"}</div><table style="width:100%;border-collapse:collapse;"><thead><tr><th align="left">Product</th><th align="left">Category</th><th align="right">Price</th><th align="right">Stock</th></tr></thead><tbody>${htmlRows}</tbody></table></div></body></html>`;
@@ -839,8 +827,11 @@ export function MerchantProductsScreen() {
               <Pressable style={styles.refreshButton} onPress={() => void loadProducts(searchQuery)}>
                 <Text style={styles.refreshButtonText}>{isLoading ? `${copy.refresh}...` : copy.refresh}</Text>
               </Pressable>
-              <Pressable style={styles.posButton} onPress={() => navigation.navigate("MerchantPos")}>
+              <Pressable style={styles.posButton} onPress={() => navigation.navigate("MerchantPos") }>
                 <Text style={styles.posButtonText}>{copy.openPos}</Text>
+              </Pressable>
+              <Pressable style={styles.posButton} onPress={() => { setScannerOpen(true); setScannerActive(false); navigation.navigate("MerchantPos"); }}>
+                <Text style={styles.posButtonText}>Scan item</Text>
               </Pressable>
             </View>
             {features.productSearchEnabled ? (
@@ -977,7 +968,6 @@ export function MerchantProductsScreen() {
             <Pressable style={styles.secondaryButton} onPress={() => void handlePickImportFile()}><Text style={styles.secondaryButtonText}>{isPickingFile ? "Opening file..." : language === "bn" ? "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â«ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¾ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â² ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂªÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â²ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡" : "Upload file"}</Text></Pressable>
             <Pressable style={styles.secondaryButton} onPress={() => setBulkInput("name\tcategory\tprice\tcostPrice\tstock\tbarcode\tdiscountRate\tproductionDate\texpiryDate\nMilk\tDairy\t95\t75\t20\tDX1001\t0\t2026-03-29\t2026-09-29")}><Text style={styles.secondaryButtonText}>{copy.sample}</Text></Pressable>
             <Pressable style={styles.secondaryButton} onPress={() => void handleExportProducts("CSV")}><Text style={styles.secondaryButtonText}>Export CSV</Text></Pressable>
-            <Pressable style={styles.secondaryButton} onPress={() => void handleExportProducts("XLSX")}><Text style={styles.secondaryButtonText}>Export Excel</Text></Pressable>
             <Pressable style={styles.secondaryButton} onPress={() => void handleExportProducts("PDF")}><Text style={styles.secondaryButtonText}>Export PDF</Text></Pressable>
           </View>
         </View>

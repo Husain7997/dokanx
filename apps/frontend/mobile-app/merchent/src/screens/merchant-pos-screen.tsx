@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Image, NativeEventEmitter, NativeModules, PermissionsAndroid, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View, Vibration } from "react-native";
 
 import {
@@ -14,13 +14,17 @@ import {
   getMerchantPrintCodesRequest,
   getMerchantShopSettingsRequest,
   initiateMerchantPaymentRequest,
+  openMerchantPosSessionRequest,
+  closeMerchantPosSessionRequest,
   searchMerchantCustomersRequest,
   searchMerchantProductsRequest,
+  searchMerchantProductsAISuggestionsRequest,
 } from "../lib/api-client";
 import { useMerchantNavigation } from "../navigation/merchant-navigation";
 import { DokanXLogo } from "../components/dokanx-logo";
 import { useMerchantAuthStore } from "../store/auth-store";
 import { useMerchantPosStore } from "../store/pos-store";
+import { useMerchantOrdersHandoffStore } from "../store/orders-handoff-store";
 
 type ProductRow = {
   id: string;
@@ -47,6 +51,7 @@ type CartItem = {
 type SplitMode = "CASH" | "ONLINE" | "WALLET" | "CREDIT";
 type SplitBreakdown = Array<{ mode: SplitMode; amount: number }>;
 type ReceiptPreset = "THERMAL_58" | "THERMAL_80" | "A4";
+type ScanState = "idle" | "scanning" | "matched" | "not_found" | "error";
 
 const DEFAULT_FEATURES: Required<MerchantFeatureSettings> = {
   posScannerEnabled: true,
@@ -257,7 +262,6 @@ export function MerchantPosScreen() {
   const profile = useMerchantAuthStore((state) => state.profile);
   const hydratePosDraft = useMerchantPosStore((state) => state.hydrate);
   const persistPosDraft = useMerchantPosStore((state) => state.setDraft);
-  const resetPosDraft = useMerchantPosStore((state) => state.resetDraft);
   const setScannerActive = useMerchantPosStore((state) => state.setScannerActive);
   const draftIsHydrated = useMerchantPosStore((state) => state.isHydrated);
   const draftCart = useMerchantPosStore((state) => state.cart);
@@ -268,10 +272,15 @@ export function MerchantPosScreen() {
   const draftPaymentMode = useMerchantPosStore((state) => state.paymentMode);
   const draftSplitEnabled = useMerchantPosStore((state) => state.splitEnabled);
   const draftSplitAmounts = useMerchantPosStore((state) => state.splitAmounts);
+  const draftSessionId = useMerchantPosStore((state) => state.sessionId);
+  const draftSessionOpeningBalance = useMerchantPosStore((state) => state.sessionOpeningBalance);
+  const setPosFollowUpHandoff = useMerchantOrdersHandoffStore((state) => state.setPosFollowUpHandoff);
+  const lastReviewedOrderId = useMerchantOrdersHandoffStore((state) => state.lastReviewedOrderId);
   const { navigate } = useMerchantNavigation();
   const barcodeInputRef = useRef<TextInput | null>(null);
   const scrollRef = useRef<ScrollView | null>(null);
   const cartSectionYRef = useRef(0);
+  const paymentSectionYRef = useRef(0);
   const restoredDraftRef = useRef(false);
   const lastHandledScanRef = useRef<{ code: string; at: number }>({ code: "", at: 0 });
   const lastPersistedDraftRef = useRef("");
@@ -289,28 +298,44 @@ export function MerchantPosScreen() {
   const [customerId, setCustomerId] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerMatches, setCustomerMatches] = useState<Array<{ _id?: string; name?: string; phone?: string }>>([]);
+  const [customerLookupBusy, setCustomerLookupBusy] = useState(false);
   const [manualName, setManualName] = useState("");
   const [manualPrice, setManualPrice] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
   const [barcodeInput, setBarcodeInput] = useState("");
   const [globalDiscountRate, setGlobalDiscountRate] = useState("0");
   const [paymentMode, setPaymentMode] = useState<SplitMode>("CASH");
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [splitAmounts, setSplitAmounts] = useState<Record<SplitMode, string>>({ CASH: "", ONLINE: "", WALLET: "", CREDIT: "" });
+  const [sessionId, setSessionId] = useState("");
+  const [sessionOpeningBalance, setSessionOpeningBalance] = useState("0");
   const [generatedQrTarget, setGeneratedQrTarget] = useState<string | null>(null);
   const [lastReceiptText, setLastReceiptText] = useState<string | null>(null);
+  const [pendingOnlineOrderId, setPendingOnlineOrderId] = useState<string | null>(null);
+  const [pendingPaymentUrl, setPendingPaymentUrl] = useState<string | null>(null);
+  const [lastCompletedOrderId, setLastCompletedOrderId] = useState<string | null>(null);
   const [receiptPreset, setReceiptPreset] = useState<ReceiptPreset>("THERMAL_58");
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [scannerOpen, setScannerOpen] = useState(false);
+  const scannerOpen = useMerchantPosStore((state) => state.scannerOpen);
+  const scannerActive = useMerchantPosStore((state) => state.scannerActive);
+  const setScannerOpen = useMerchantPosStore((state) => state.setScannerOpen);
   const [scannerError, setScannerError] = useState<string | null>(null);
+  const [scanState, setScanState] = useState<ScanState>("idle");
+  const [scanMessage, setScanMessage] = useState("Scanner is ready. Point the camera at a barcode or paste a code below.");
+  const [scanMatchedName, setScanMatchedName] = useState("");
+  const [scanCartDelta, setScanCartDelta] = useState("");
+  const [recentCartItemId, setRecentCartItemId] = useState("");
   const [notificationChannels, setNotificationChannels] = useState<Record<string, boolean>>({});
   const [smsAutoEnabled, setSmsAutoEnabled] = useState(false);
   const [features, setFeatures] = useState(DEFAULT_FEATURES);
   const [pricingSafety, setPricingSafety] = useState(DEFAULT_SAFETY);
   const [lastScannedCode, setLastScannedCode] = useState("");
   const [manualEntryOpen, setManualEntryOpen] = useState(false);
+  const [scannerPreviewOpen, setScannerPreviewOpen] = useState(false);
   const [visibleProductCount, setVisibleProductCount] = useState<number>(10);
   const [shopName, setShopName] = useState("DokanX Merchant");
   const [shopAddress, setShopAddress] = useState("");
@@ -318,9 +343,20 @@ export function MerchantPosScreen() {
   const globalDiscount = Math.max(0, Math.min(100, toNumber(globalDiscountRate)));
   const totalAmount = useMemo(() => Number(cart.reduce((sum, item) => sum + buildCartAmount(item, globalDiscount), 0).toFixed(2)), [cart, globalDiscount]);
   const totalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
-  const miniCartItems = useMemo(() => cart.slice(-3).reverse(), [cart]);
-  const extraCartItems = Math.max(0, cart.length - miniCartItems.length);
   const latestCartItem = cart.length ? cart[cart.length - 1] : null;
+  const scanStatusTone = useMemo(() => {
+    if (scanState === "matched") return styles.scanMatchedCard;
+    if (scanState === "not_found" || scanState === "error") return styles.scanAlertCard;
+    if (scanState === "scanning") return styles.scanWorkingCard;
+    return styles.scanIdleCard;
+  }, [scanState]);
+  const scanStatusTitle = useMemo(() => {
+    if (scanState === "matched") return "Scanned and added";
+    if (scanState === "not_found") return "No product found";
+    if (scanState === "error") return "Scanner needs attention";
+    if (scanState === "scanning") return "Checking barcode";
+    return "Scanner ready";
+  }, [scanState]);
   const splitBreakdown = useMemo(
     () => (["CASH", "ONLINE", "WALLET", "CREDIT"] as SplitMode[])
       .map((mode) => ({ mode, amount: Number(splitAmounts[mode] || 0) }))
@@ -332,7 +368,7 @@ export function MerchantPosScreen() {
     ? splitBreakdown.some((item) => item.mode === "WALLET" || item.mode === "CREDIT")
     : paymentMode === "WALLET" || paymentMode === "CREDIT";
   const splitValid = !splitEnabled || (splitBreakdown.length > 0 && Math.abs(splitTotal - totalAmount) < 0.01);
-  const canCheckout = cart.length > 0 && splitValid && (!effectiveNeedsCustomer || !!customerId.trim());
+  const canCheckout = cart.length > 0 && !!sessionId.trim() && splitValid && (!effectiveNeedsCustomer || !!customerId.trim());
 
   const filteredProducts = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -343,8 +379,53 @@ export function MerchantPosScreen() {
   }, [products, searchQuery]);
 
   const quickSuggestions = useMemo(() => filteredProducts.slice(0, 4), [filteredProducts]);
+  const noMatchSuggestions = useMemo(() => {
+    const query = (lastScannedCode || searchQuery).trim().toLowerCase();
+    if (!query) return [] as ProductRow[];
+
+    const startsWithMatches = products.filter((product) => [product.name, product.category, product.barcode].some((value) => value.toLowerCase().startsWith(query)));
+    const containsMatches = products.filter((product) => [product.name, product.category, product.barcode].some((value) => value.toLowerCase().includes(query)));
+    const merged = [...startsWithMatches, ...containsMatches].filter((product, index, array) => array.findIndex((entry) => entry.id === product.id) === index);
+    return merged.slice(0, 4);
+  }, [lastScannedCode, products, searchQuery]);
   const merchantLabel = useMemo(() => profile?.name?.trim() || profile?.email?.trim() || "Merchant POS", [profile?.email, profile?.name]);
   const merchantInitial = useMemo(() => merchantLabel.charAt(0).toUpperCase() || "M", [merchantLabel]);
+  const pendingOrderReviewed = useMemo(() => !!pendingOnlineOrderId && lastReviewedOrderId === pendingOnlineOrderId, [lastReviewedOrderId, pendingOnlineOrderId]);
+  const recentOrderLabel = useMemo(() => lastCompletedOrderId ? lastCompletedOrderId.slice(-6) : null, [lastCompletedOrderId]);
+  const reviewedOrderLabel = useMemo(() => lastReviewedOrderId ? lastReviewedOrderId.slice(-6) : null, [lastReviewedOrderId]);
+  const draftReceiptText = useMemo(() => cart.length ? buildReceiptText("PREVIEW", cart, totalAmount, paymentMode, customerId.trim(), splitEnabled, splitBreakdown) : null, [cart, customerId, paymentMode, splitBreakdown, splitEnabled, totalAmount]);
+  const checkoutNeeds = useMemo(() => {
+    const items: Array<{ label: string; ready: boolean; detail: string }> = [
+      { label: "Cart", ready: cart.length > 0, detail: cart.length > 0 ? `${totalItems} items ready` : "Add at least one item" },
+      { label: "Session", ready: !!sessionId.trim(), detail: sessionId.trim() ? `Session ${sessionId.slice(-6)}` : "Open POS session" },
+      { label: "Customer", ready: !effectiveNeedsCustomer || !!customerId.trim(), detail: effectiveNeedsCustomer ? (customerId.trim() ? "Customer linked" : "Needed for wallet/credit") : "Walk-in allowed" },
+      { label: "Payment", ready: splitValid, detail: splitEnabled ? `Split ${splitTotal.toFixed(2)} / ${totalAmount.toFixed(2)}` : `${paymentMode} selected` },
+    ];
+    return items;
+  }, [cart.length, customerId, effectiveNeedsCustomer, paymentMode, sessionId, splitEnabled, splitTotal, splitValid, totalAmount, totalItems]);
+  const nextBestActionLabel = useMemo(() => {
+    if (!cart.length) return "Add or scan an item";
+    if (!sessionId.trim()) return "Open POS session";
+    if (effectiveNeedsCustomer && !customerId.trim()) return "Link customer";
+    if (!splitValid) return "Fix split amount";
+    return "Ready to checkout";
+  }, [cart.length, customerId, effectiveNeedsCustomer, sessionId, splitValid]);
+  const customerReadyLabel = useMemo(() => {
+    if (customerName.trim()) return customerName.trim();
+    if (customerPhone.trim()) return customerPhone.trim();
+    if (customerId.trim()) return customerId.trim();
+    return "Walk-in customer";
+  }, [customerId, customerName, customerPhone]);
+
+  const applyCustomerSelection = useCallback((customer: { _id?: string; name?: string; phone?: string }) => {
+    if (!customer?._id) return;
+    setCustomerId(String(customer._id));
+    setCustomerName(String(customer.name || ""));
+    setCustomerPhone(String(customer.phone || customerPhone || ""));
+    setCustomerMatches([]);
+    setStatus(`Customer linked: ${customer.name || customer.phone || customer._id}`);
+    setError(null);
+  }, [customerPhone]);
 
   const loadProducts = useCallback(async (query?: string) => {
     if (!profile?.shopId) {
@@ -354,11 +435,23 @@ export function MerchantPosScreen() {
     }
 
     try {
-      const [response, settingsResponse, notificationSettingsResponse] = await Promise.all([
+      const [productsResult, settingsResult, notificationSettingsResult] = await Promise.allSettled([
         query && query.trim() ? searchMerchantProductsRequest(profile.shopId, query.trim()) : getMerchantProductsRequest(profile.shopId),
         accessToken ? getMerchantShopSettingsRequest(accessToken) : Promise.resolve({ data: { merchantFeatures: DEFAULT_FEATURES, pricingSafety: DEFAULT_SAFETY } }),
         accessToken ? getMerchantNotificationSettingsRequest(accessToken) : Promise.resolve({ data: { channels: {} } }),
       ]);
+
+      if (productsResult.status !== "fulfilled") {
+        throw productsResult.reason instanceof Error ? productsResult.reason : new Error("Unable to load POS products.");
+      }
+
+      const response = productsResult.value;
+      const settingsResponse = settingsResult.status === "fulfilled"
+        ? settingsResult.value
+        : { data: { merchantFeatures: DEFAULT_FEATURES, pricingSafety: DEFAULT_SAFETY } };
+      const notificationSettingsResponse = notificationSettingsResult.status === "fulfilled"
+        ? notificationSettingsResult.value
+        : { data: { channels: {} } };
 
       const rows = (response.data || [])
         .map((item) => ({
@@ -400,16 +493,59 @@ export function MerchantPosScreen() {
       if (settingsResponse.data?.merchantFeatures?.splitPaymentEnabled === false) {
         setSplitEnabled(false);
       }
+      setAiSuggestions([]);
       setError(null);
+      if (settingsResult.status !== "fulfilled" || notificationSettingsResult.status !== "fulfilled") {
+        setStatus("POS loaded with fallback settings. You can keep scanning and billing while background settings recover.");
+      }
     } catch (loadError) {
       setProducts([]);
+      setAiSuggestions([]); // Clear AI suggestions on error
       setError(loadError instanceof Error ? loadError.message : "Unable to load POS products.");
     }
   }, [accessToken, profile?.name, profile?.shopId]);
 
+  const loadAISuggestions = useCallback(async (query: string) => {
+    if (!query.trim() || !profile?.shopId) {
+      setAiSuggestions([]);
+      return;
+    }
+
+    try {
+      const response = await searchMerchantProductsAISuggestionsRequest(query.trim());
+      const suggestions = (response.data || []).map((item) => String(item.name || "")).filter(Boolean);
+      setAiSuggestions(suggestions.slice(0, 5));
+    } catch (error) {
+      // Silently fail and clear suggestions on error
+      setAiSuggestions([]);
+    }
+  }, [profile?.shopId]);
+
   useEffect(() => {
     void loadProducts();
   }, [loadProducts]);
+
+  useEffect(() => {
+    if (!accessToken || !customerPhone.trim() || customerPhone.trim().length < 3) {
+      setCustomerMatches([]);
+      setCustomerLookupBusy(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setCustomerLookupBusy(true);
+        const response = await searchMerchantCustomersRequest(accessToken, customerPhone.trim());
+        setCustomerMatches((response.data || []).slice(0, 5));
+      } catch {
+        setCustomerMatches([]);
+      } finally {
+        setCustomerLookupBusy(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [accessToken, customerPhone]);
 
   useEffect(() => {
     if (draftIsHydrated) return;
@@ -427,6 +563,8 @@ export function MerchantPosScreen() {
     setPaymentMode(draftPaymentMode);
     setSplitEnabled(draftSplitEnabled);
     setSplitAmounts(draftSplitAmounts);
+    setSessionId(draftSessionId);
+    setSessionOpeningBalance(draftSessionOpeningBalance);
     lastPersistedDraftRef.current = JSON.stringify({
       cart: draftCart,
       customerId: draftCustomerId,
@@ -436,6 +574,8 @@ export function MerchantPosScreen() {
       paymentMode: draftPaymentMode,
       splitEnabled: draftSplitEnabled,
       splitAmounts: draftSplitAmounts,
+      sessionId: draftSessionId,
+      sessionOpeningBalance: draftSessionOpeningBalance,
     });
   }, [
     draftCart,
@@ -445,6 +585,8 @@ export function MerchantPosScreen() {
     draftGlobalDiscountRate,
     draftIsHydrated,
     draftPaymentMode,
+    draftSessionId,
+    draftSessionOpeningBalance,
     draftSplitAmounts,
     draftSplitEnabled,
   ]);
@@ -460,6 +602,8 @@ export function MerchantPosScreen() {
       paymentMode,
       splitEnabled,
       splitAmounts,
+      sessionId,
+      sessionOpeningBalance,
     });
     if (snapshot === lastPersistedDraftRef.current) return;
     lastPersistedDraftRef.current = snapshot;
@@ -472,6 +616,8 @@ export function MerchantPosScreen() {
       paymentMode,
       splitEnabled,
       splitAmounts,
+      sessionId,
+      sessionOpeningBalance,
     });
   }, [
     cart,
@@ -488,12 +634,17 @@ export function MerchantPosScreen() {
 
   const addProduct = useCallback((product: ProductRow) => {
     setError(null);
-    setStatus(`${product.name} added to cart.`);
+    Vibration.vibrate(50); // Add haptic feedback for product selection
+    let nextQuantity = 1;
+    let wasExisting = false;
     setCart((current) => {
       const existing = current.find((item) => item.id === product.id);
       if (existing) {
+        wasExisting = true;
+        nextQuantity = existing.quantity + 1;
         return current.map((item) => (item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item));
       }
+      nextQuantity = 1;
       return [
         ...current,
         {
@@ -508,6 +659,9 @@ export function MerchantPosScreen() {
         },
       ];
     });
+    setRecentCartItemId(product.id);
+    setScanCartDelta(wasExisting ? `${product.name} quantity is now ${nextQuantity}.` : `${product.name} added as a new cart line.`);
+    setStatus(wasExisting ? `${product.name} quantity updated to ${nextQuantity}.` : `${product.name} added to cart.`);
     setTimeout(() => {
       scrollRef.current?.scrollTo({ y: Math.max(0, cartSectionYRef.current - 24), animated: true });
     }, 120);
@@ -537,8 +691,15 @@ export function MerchantPosScreen() {
   const handleBarcodeLookup = useCallback(async (code: string) => {
     const candidates = extractBarcodeCandidates(code);
     if (!candidates.length) {
+      setScanState("error");
+      setScanMatchedName("");
+      setScanMessage("Enter or scan a barcode first.");
       return;
     }
+
+    setScanState("scanning");
+    setScanMatchedName("");
+    setScanMessage(`Looking up ${candidates[0]} in your POS catalog...`);
 
     const localMatch = products.find((product) => {
       const productBarcode = normalizeBarcodeValue(product.barcode || "");
@@ -556,6 +717,9 @@ export function MerchantPosScreen() {
       setBarcodeInput("");
       setLastScannedCode(candidates[0]);
       setSearchQuery(localMatch.name);
+      setScanState("matched");
+      setScanMatchedName(localMatch.name);
+      setScanMessage(`${localMatch.name} is now in the cart. You can keep scanning, review the cart, or go straight to checkout.`);
       setStatus(`${localMatch.name} scanned and added to cart.`);
       return;
     }
@@ -563,6 +727,8 @@ export function MerchantPosScreen() {
     console.log("[merchant-pos] barcode:lookup-start", JSON.stringify({ candidates, shopId: profile?.shopId || null, loadedProducts: products.length }));
     if (!profile?.shopId) {
       setError("Merchant shop is not ready for barcode lookup. Reload the POS once.");
+      setScanState("error");
+      setScanMessage("Shop session is not ready for scanner lookup. Reload POS and try again.");
       return;
     }
 
@@ -587,6 +753,12 @@ export function MerchantPosScreen() {
         setError(`No product found for scan ${candidates[0]}.`);
         setStatus("Scan did not match any product. Search, select, or add it manually.");
         updateScannerOverlayStatus(`Nothing matched ${candidates[0]}. Search or add it manually.`);
+        setSearchQuery(candidates[0]);
+        setManualEntryOpen(true);
+        setManualName((current) => current || `Item ${candidates[0]}`);
+        setScanState("not_found");
+        setScanMatchedName("");
+        setScanMessage(`Nothing matched ${candidates[0]}. Search nearby results or add it as a manual item without leaving the scanner flow.`);
         return;
       }
       console.log("[merchant-pos] barcode:lookup-success", JSON.stringify({ code: matchedCode, productId: product._id || product.id, name: product.name }));
@@ -603,13 +775,28 @@ export function MerchantPosScreen() {
       setBarcodeInput("");
       setLastScannedCode(matchedCode);
       setSearchQuery(String(product.name || ""));
+      setScanState("matched");
+      setScanMatchedName(String(product.name || "Product"));
+      setScanMessage(`${String(product.name || "Product")} matched and added. Keep scanning or jump to cart when ready.`);
       setStatus(`${String(product.name || "Product")} scanned and added to cart.`);
       updateScannerOverlayStatus(`${String(product.name || "Product")} added. Cart now has ${totalItems + 1} item${totalItems + 1 === 1 ? "" : "s"}.`);
     } catch (lookupError) {
       console.log("[merchant-pos] barcode:lookup-error", lookupError instanceof Error ? lookupError.message : String(lookupError));
       setError(lookupError instanceof Error ? lookupError.message : "Unable to scan this barcode.");
+      setScanState("error");
+      setScanMatchedName("");
+      setScanMessage("Scanner could not verify this barcode. Try again, paste the code, or use manual item.");
     }
   }, [addProduct, features.scannerFeedbackEnabled, products, profile?.shopId, totalItems, updateScannerOverlayStatus]);
+  const closeScanner = useCallback((reason?: string) => {
+    setScannerOpen(false);
+    setScannerActive(false);
+    setScanState("idle");
+    setScanMatchedName("");
+    setScanMessage(reason || "Scanner is closed. You can still search, paste a barcode, or add a manual item.");
+    setStatus(reason ? `${reason}.` : "Scanner closed.");
+    barcodeInputRef.current?.focus();
+  }, []);
   useEffect(() => {
     if (!scannerEmitter) return;
 
@@ -625,24 +812,25 @@ export function MerchantPosScreen() {
       console.log("[merchant-pos] scan:code", JSON.stringify({ code: nextCode }));
       setBarcodeInput(nextCode);
       setLastScannedCode(nextCode);
+      setScanState("scanning");
+      setScanMatchedName("");
+      setScanMessage(`Scanned ${nextCode}. Matching product now...`);
       setStatus(`Scanned ${nextCode}. Adding product to cart...`);
       void handleBarcodeLookup(nextCode);
     });
 
     const closedSub = scannerEmitter.addListener("merchantScannerClosed", ({ reason }: { reason?: string }) => {
-      setScannerOpen(false);
-      setScannerActive(false);
-      setStatus(reason === "manual-close" ? "Scanner closed. Search, select, or add manually." : "Scanner closed.");
-      barcodeInputRef.current?.focus();
+      closeScanner(reason === "manual-close" ? "Scanner closed. Search, select, or add manually" : "Scanner closed");
     });
 
     const errorSub = scannerEmitter.addListener("merchantScannerError", ({ message }: { message?: string }) => {
       const nextMessage = String(message || "Scanner could not start.");
       console.log("[merchant-pos] scan:error", nextMessage);
-      setScannerActive(false);
+      closeScanner("Live scanner is unavailable right now");
       setScannerError(nextMessage);
-      setStatus("Scanner assistant is ready with barcode and Bluetooth fallback.");
-      barcodeInputRef.current?.focus();
+      setScanState("error");
+      setScanMatchedName("");
+      setScanMessage("Live scanner is unavailable right now. Type or paste the barcode below to continue.");
     });
 
     return () => {
@@ -650,7 +838,7 @@ export function MerchantPosScreen() {
       closedSub.remove();
       errorSub.remove();
     };
-  }, [handleBarcodeLookup, scannerEmitter]);
+  }, [closeScanner, handleBarcodeLookup, scannerEmitter]);
 
   const handleCreateCustomer = useCallback(async () => {
     if (!accessToken || !customerPhone.trim()) {
@@ -662,10 +850,7 @@ export function MerchantPosScreen() {
       const existing = await searchMerchantCustomersRequest(accessToken, customerPhone.trim());
       const match = (existing.data || []).find((row) => row.phone === customerPhone.trim()) || (existing.data || [])[0];
       if (match?._id) {
-        setCustomerId(String(match._id));
-        setCustomerName(String(match.name || customerName || ""));
-        setStatus(`Customer linked: ${match.name || match.phone || match._id}`);
-        setError(null);
+        applyCustomerSelection(match);
         return;
       }
 
@@ -685,13 +870,16 @@ export function MerchantPosScreen() {
     } catch (customerError) {
       setError(customerError instanceof Error ? customerError.message : "Unable to handle customer right now.");
     }
-  }, [accessToken, customerName, customerPhone]);
+  }, [accessToken, applyCustomerSelection, customerName, customerPhone]);
 
   const openScanner = useCallback(async () => {
     setError(null);
     setScannerOpen(true);
     setScannerActive(true);
     setScannerError(null);
+    setScanState("idle");
+    setScanMatchedName("");
+    setScanMessage("Opening live scanner. Keep the barcode centered for a faster match.");
 
     try {
       const permission = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA, {
@@ -702,8 +890,11 @@ export function MerchantPosScreen() {
       });
 
       if (permission !== PermissionsAndroid.RESULTS.GRANTED) {
+        setScannerOpen(false);
         setScannerActive(false);
         setScannerError("Camera permission is required for live scanning. You can still use barcode input or a Bluetooth scanner.");
+        setScanState("error");
+        setScanMessage("Camera permission was not granted. Continue with typed barcode or Bluetooth scan.");
         setStatus("Scanner assistant is ready with barcode and Bluetooth fallback.");
         barcodeInputRef.current?.focus();
         return;
@@ -711,24 +902,39 @@ export function MerchantPosScreen() {
 
       const scannerModule = NativeModules.MerchantScanner as { openScanner?: () => Promise<unknown> } | undefined;
       if (!scannerModule?.openScanner) {
+        setScannerOpen(false);
         setScannerActive(false);
         setScannerError("Native scanner is not available in this build. Use barcode input or a Bluetooth scanner for now.");
+        setScanState("error");
+        setScanMessage("This app build does not include the native scanner. Typed barcode mode is ready below.");
         setStatus("Scanner assistant is ready with barcode and Bluetooth fallback.");
         barcodeInputRef.current?.focus();
         return;
       }
 
+      setScanState("idle");
+      setScanMessage("Live scanner is open. Scan continuously and watch the cart update below.");
       setStatus("Live scanner opened. Keep scanning to add products one by one.");
       await scannerModule.openScanner();
     } catch (scanError) {
       console.log("[merchant-pos] scan:error", scanError instanceof Error ? scanError.message : String(scanError));
       const message = scanError instanceof Error ? scanError.message : String(scanError || "Scanner could not start.");
+      setScannerOpen(false);
       setScannerActive(false);
       setScannerError(message);
+      setScanState("error");
+      setScanMatchedName("");
+      setScanMessage("Scanner could not start. Type the barcode below or add the item manually.");
       setStatus("Scanner assistant is ready with barcode and Bluetooth fallback.");
       barcodeInputRef.current?.focus();
     }
   }, []);
+
+  useEffect(() => {
+    if (scannerOpen && !scannerActive) {
+      void openScanner();
+    }
+  }, [openScanner, scannerActive, scannerOpen]);
 
 
   const toggleSmsAuto = useCallback(async () => {
@@ -792,6 +998,16 @@ export function MerchantPosScreen() {
     await Share.share({ message: lastReceiptText });
   }, [lastReceiptText, receiptPreset]);
 
+  const sharePendingPaymentLink = useCallback(async () => {
+    if (!pendingPaymentUrl) {
+      setError("Payment link is not ready yet.");
+      return;
+    }
+    await Share.share({ message: pendingPaymentUrl });
+    setStatus("Payment link opened in share options.");
+    setError(null);
+  }, [pendingPaymentUrl]);
+
   const shareQr = useCallback(async () => {
     if (!generatedQrTarget) {
       setError("Generate collection link first.");
@@ -854,6 +1070,49 @@ export function MerchantPosScreen() {
     await printReceiptWithData();
   }, [printReceiptWithData]);
 
+  const resetCurrentSale = useCallback(async (nextStatus?: string) => {
+    setCart([]);
+    setGeneratedQrTarget(null);
+    setSplitEnabled(false);
+    setSplitAmounts({ CASH: "", ONLINE: "", WALLET: "", CREDIT: "" });
+    setPaymentMode("CASH");
+    setCustomerId("");
+    setCustomerName("");
+    setCustomerPhone("");
+    setGlobalDiscountRate("0");
+    setPendingOnlineOrderId(null);
+    setPendingPaymentUrl(null);
+    setManualName("");
+    setManualPrice("");
+    setManualEntryOpen(false);
+    setRecentCartItemId("");
+    setBarcodeInput("");
+    setLastScannedCode("");
+    setScanMatchedName("");
+    setScanCartDelta("");
+    setScanState("idle");
+    setScanMessage("Scanner is ready. Point the camera at a barcode or paste a code below.");
+    setError(null);
+    if (nextStatus) {
+      setStatus(nextStatus);
+    }
+    await persistPosDraft({
+      cart: [],
+      customerId: "",
+      customerName: "",
+      customerPhone: "",
+      globalDiscountRate: "0",
+      paymentMode: "CASH",
+      splitEnabled: false,
+      splitAmounts: { CASH: "", ONLINE: "", WALLET: "", CREDIT: "" },
+      sessionId: sessionId.trim(),
+      sessionOpeningBalance,
+    });
+  }, [persistPosDraft, sessionId, sessionOpeningBalance]);
+
+  const handleCancelSale = useCallback(async () => {
+    await resetCurrentSale("Sale canceled. POS is ready for the next customer.");
+  }, [resetCurrentSale]);
   const handleCheckout = useCallback(async () => {
     if (!accessToken || !canCheckout) {
       setError("Checkout is not ready yet.");
@@ -875,6 +1134,7 @@ export function MerchantPosScreen() {
       const orderResponse = await createMerchantPosOrderRequest(accessToken, {
         customerId: customerId.trim() || undefined,
         paymentMode,
+        sessionId: sessionId.trim(),
         paymentBreakdown: breakdown,
         items,
       });
@@ -900,8 +1160,12 @@ export function MerchantPosScreen() {
       if ((splitEnabled && splitBreakdown.some((entry) => entry.mode === "ONLINE")) || (!splitEnabled && paymentMode === "ONLINE")) {
         const paymentInit = await initiateMerchantPaymentRequest(accessToken, orderId);
         const paymentUrl = paymentInit.data?.paymentUrl || paymentInit.paymentUrl;
+        setPendingOnlineOrderId(orderId);
+        setPendingPaymentUrl(paymentUrl || null);
         setStatus(paymentUrl ? `Online payment started. Wait for confirmation. ${paymentUrl}` : "Online payment started. Wait for webhook confirmation.");
       } else {
+        setPendingOnlineOrderId(null);
+        setPendingPaymentUrl(null);
         setStatus(`Order ${orderId} created successfully.${smsAutoEnabled && customerPhone.trim() ? " SMS channel is enabled for backend notification delivery." : ""}`);
       }
 
@@ -909,6 +1173,7 @@ export function MerchantPosScreen() {
       const checkoutCart = cart;
       const checkoutTotal = totalAmount;
       const receiptText = buildReceiptText(orderId, checkoutCart, checkoutTotal, paymentMode, customerId.trim(), splitEnabled, splitBreakdown);
+      setLastCompletedOrderId(orderId);
       setLastReceiptText(receiptText);
       await printReceiptWithData({
         receiptText,
@@ -918,25 +1183,111 @@ export function MerchantPosScreen() {
         splitEnabled,
         splitBreakdown,
       });
-      setCart([]);      setGeneratedQrTarget(null);
-      setSplitEnabled(false);
-      setSplitAmounts({ CASH: "", ONLINE: "", WALLET: "", CREDIT: "" });
-      setPaymentMode("CASH");
-      setCustomerId("");
-      setCustomerName("");
-      setCustomerPhone("");
-      await resetPosDraft();
+      await resetCurrentSale();
       await loadProducts(searchQuery.trim());
     } catch (checkoutError) {
       console.log("[merchant-pos] checkout:error", checkoutError instanceof Error ? checkoutError.message : String(checkoutError));
       setError(checkoutError instanceof Error ? checkoutError.message : "Unable to complete checkout.");
+      setStatus("Checkout paused. Review the bill and try again when ready.");
     } finally {
       setIsLoading(false);
     }
-  }, [accessToken, canCheckout, cart, customerId, globalDiscount, loadProducts, paymentMode, printReceiptWithData, resetPosDraft, searchQuery, splitBreakdown, splitEnabled, totalAmount]);
+  }, [accessToken, canCheckout, cart, customerId, globalDiscount, loadProducts, paymentMode, printReceiptWithData, resetCurrentSale, searchQuery, splitBreakdown, splitEnabled, totalAmount]);
+
+  const handleReviewPendingOrder = useCallback(() => {
+    if (!pendingOnlineOrderId) {
+      setError("No pending online order to review.");
+      return;
+    }
+    setStatus(pendingOrderReviewed ? `Reopening reviewed order ${pendingOnlineOrderId} in Orders.` : `Review order ${pendingOnlineOrderId} in Orders to confirm payment or fulfillment.`);
+    setError(null);
+    setPosFollowUpHandoff(pendingOnlineOrderId);
+    navigate("MerchantOrders");
+  }, [navigate, pendingOnlineOrderId, pendingOrderReviewed, setPosFollowUpHandoff]);
+
+  const handleResolvePendingPayment = useCallback(() => {
+    if (!pendingOnlineOrderId) {
+      setError("No pending online order to resolve.");
+      return;
+    }
+    setPendingOnlineOrderId(null);
+    setPendingPaymentUrl(null);
+    setStatus(`Pending payment note cleared for order ${pendingOnlineOrderId}.`);
+    setError(null);
+  }, [pendingOnlineOrderId]);
+
+  const handleDismissPendingPayment = useCallback(() => {
+    setPendingOnlineOrderId(null);
+    setPendingPaymentUrl(null);
+    setStatus("Pending payment note cleared from this screen.");
+    setError(null);
+  }, []);
 
   const handleOpenCartPreview = useCallback(() => {
     scrollRef.current?.scrollTo({ y: Math.max(0, cartSectionYRef.current - 24), animated: true });
+  }, []);
+
+  const handleOpenSession = useCallback(async () => {
+    if (!accessToken) {
+      setError("Sign in again to manage POS session.");
+      return;
+    }
+
+    if (sessionId.trim()) {
+      setStatus("POS session is already open.");
+      setError(null);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    setStatus(null);
+
+    try {
+      const openingBalance = Number(sessionOpeningBalance || 0);
+      const response = await openMerchantPosSessionRequest(accessToken, {
+        openingBalance: Number.isFinite(openingBalance) ? openingBalance : 0,
+      });
+      const nextSessionId = String(response.data?._id || "");
+      if (!nextSessionId) {
+        throw new Error("POS session could not be opened.");
+      }
+      setSessionId(nextSessionId);
+      setStatus(`POS session opened. Session ID: ${nextSessionId}`);
+    } catch (sessionError) {
+      setError(sessionError instanceof Error ? sessionError.message : "Unable to open POS session.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [accessToken, sessionId, sessionOpeningBalance]);
+
+  const handleCloseSession = useCallback(async () => {
+    if (!accessToken || !sessionId.trim()) {
+      setError("Open a POS session before trying to close it.");
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    setStatus(null);
+
+    try {
+      const closingBalance = Number(totalAmount.toFixed(2));
+      await closeMerchantPosSessionRequest(accessToken, sessionId.trim(), {
+        closingBalance: Number.isFinite(closingBalance) ? closingBalance : 0,
+      });
+      setSessionId("");
+      setSessionOpeningBalance("0");
+      setStatus("POS session closed. Start a new one when the counter opens again.");
+    } catch (sessionError) {
+      setError(sessionError instanceof Error ? sessionError.message : "Unable to close POS session.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [accessToken, sessionId, totalAmount]);
+
+  const handleOpenCheckoutPanel = useCallback(() => {
+    scrollRef.current?.scrollTo({ y: Math.max(0, paymentSectionYRef.current - 24), animated: true });
   }, []);
 
   return (
@@ -956,7 +1307,7 @@ export function MerchantPosScreen() {
             <View style={styles.avatar}><Text style={styles.avatarText}>{merchantInitial}</Text></View>
             <View style={styles.headerMeta}>
               <Text style={styles.headerName}>{merchantLabel}</Text>
-              <Text style={styles.headerHint}>{customerName || customerPhone || customerId ? `Customer ready: ${customerName || customerPhone || customerId}` : "Fast billing for walk-in and saved customers"}</Text>
+              <Text style={styles.headerHint}>{sessionId.trim() ? `Session live: ${sessionId}` : (customerName || customerPhone || customerId ? `Customer ready: ${customerName || customerPhone || customerId}` : "Open a session, then scan and bill without losing pace.")}</Text>
             </View>
             <View style={styles.headerStats}>
               <Text style={styles.headerStatValue}>{totalItems} items</Text>
@@ -965,43 +1316,43 @@ export function MerchantPosScreen() {
           </View>
         </View>
 
-        {!scannerOpen ? (
-          <View style={styles.miniCartCard}>
-            <View style={styles.miniCartRow}>
-              <View>
-                <Text style={styles.summaryTitle}>Cart at a glance</Text>
-                <Text style={styles.helperText}>Your current POS work stays here while you move around the app.</Text>
-              </View>
-              <Text style={styles.cartBadge}>{totalItems} items</Text>
-            </View>
-            {miniCartItems.length ? miniCartItems.map((item) => (
-              <View key={`mini-${item.id}`} style={styles.miniCartRow}>
-                <View style={styles.productInfo}>
-                  <Text style={styles.productTitle}>{item.name}</Text>
-                  <Text style={styles.productMeta}>{item.quantity} x {getUnitPrice(item.price, globalDiscount, item.discountRate).toFixed(2)} BDT</Text>
-                </View>
-                <Text style={styles.addText}>{buildCartAmount(item, globalDiscount).toFixed(2)}</Text>
-              </View>
-            )) : <Text style={styles.helperText}>Scan or add a product to start the bill.</Text>}
-            {extraCartItems ? <Text style={styles.helperText}>+{extraCartItems} more items in this receipt</Text> : null}
-            <View style={styles.inlineRow}>
-              <Pressable style={styles.secondaryButton} onPress={handleOpenCartPreview}>
-                <Text style={styles.secondaryButtonText}>View full cart</Text>
-              </Pressable>
-              <Pressable style={styles.secondaryButton} onPress={() => void printReceipt()}>
-                <Text style={styles.secondaryButtonText}>Receipt preview</Text>
-              </Pressable>
-              <Pressable style={styles.secondaryButton} onPress={() => scrollRef.current?.scrollToEnd({ animated: true })}>
-                <Text style={styles.secondaryButtonText}>Checkout</Text>
-              </Pressable>
-            </View>
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Counter actions</Text>
+            <Text style={styles.helperText}>{nextBestActionLabel}</Text>
           </View>
-        ) : null}
+          <View style={styles.quickActionGrid}>
+            <Pressable style={styles.quickActionTile} onPress={() => sessionId.trim() ? handleOpenCheckoutPanel() : void handleOpenSession()}>
+              <Text style={styles.quickActionTitle}>{sessionId.trim() ? "Session open" : "Open session"}</Text>
+              <Text style={styles.quickActionBody}>{sessionId.trim() ? "Counter is active" : "Start billing for this shift"}</Text>
+            </Pressable>
+            <Pressable style={styles.quickActionTile} onPress={() => void openScanner()}>
+              <Text style={styles.quickActionTitle}>Scan items</Text>
+              <Text style={styles.quickActionBody}>Fast barcode flow with live cart</Text>
+            </Pressable>
+            <Pressable style={styles.quickActionTile} onPress={handleOpenCheckoutPanel}>
+              <Text style={styles.quickActionTitle}>Payment</Text>
+              <Text style={styles.quickActionBody}>{canCheckout ? "Ready for checkout" : nextBestActionLabel}</Text>
+            </Pressable>
+            <Pressable style={styles.quickActionTile} onPress={() => cart.length ? void handleCancelSale() : setManualEntryOpen(true)}>
+              <Text style={styles.quickActionTitle}>{cart.length ? "Cancel sale" : "Manual item"}</Text>
+              <Text style={styles.quickActionBody}>{cart.length ? "Clear bill for next customer" : "Open manual item entry fast"}</Text>
+            </Pressable>
+          </View>
+          <View style={styles.checklistRow}>
+            {checkoutNeeds.map((item) => (
+              <View key={item.label} style={[styles.checklistChip, item.ready ? styles.checklistChipReady : styles.checklistChipPending]}>
+                <Text style={[styles.checklistChipTitle, item.ready ? styles.checklistChipTitleReady : null]}>{item.label}</Text>
+                <Text style={[styles.checklistChipBody, item.ready ? styles.checklistChipBodyReady : null]}>{item.detail}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
 
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>{scannerOpen ? "Scan mode" : "Find products"}</Text>
-            <Pressable style={styles.linkChip} onPress={() => scannerOpen ? setScannerOpen(false) : void loadProducts(searchQuery.trim())}><Text style={styles.linkChipText}>{scannerOpen ? "Close scan" : "Refresh"}</Text></Pressable>
+            <Pressable style={styles.linkChip} onPress={() => scannerOpen ? closeScanner() : void loadProducts(searchQuery.trim())}><Text style={styles.linkChipText}>{scannerOpen ? "Close scan" : "Refresh"}</Text></Pressable>
           </View>
           {features.productSearchEnabled ? (
             <TextInput
@@ -1009,11 +1360,40 @@ export function MerchantPosScreen() {
               value={searchQuery}
               onChangeText={(value) => {
                 setSearchQuery(value);
+                if (value.trim()) {
+                  void loadAISuggestions(value);
+                } else {
+                  setAiSuggestions([]);
+                }
                 setError(null);
+              }}
+              onSubmitEditing={() => {
+                setAiSuggestions([]);
+                void loadProducts(searchQuery.trim());
               }}
               placeholder="Search by name, category, or barcode"
               placeholderTextColor="#6b7280"
+              returnKeyType="search"
+              autoCapitalize="none"
+              autoCorrect={false}
             />
+          ) : null}
+          {aiSuggestions.length > 0 ? (
+            <View style={styles.suggestionsDropdown}>
+              {aiSuggestions.map((suggestion, index) => (
+                <Pressable
+                  key={index}
+                  style={[styles.suggestionItem, index === aiSuggestions.length - 1 && { borderBottomWidth: 0 }]}
+                  onPress={() => {
+                    setSearchQuery(suggestion);
+                    setAiSuggestions([]);
+                    void loadProducts(suggestion);
+                  }}
+                >
+                  <Text style={styles.suggestionText}>{suggestion}</Text>
+                </Pressable>
+              ))}
+            </View>
           ) : null}
           <View style={styles.inlineRow}>
             <TextInput
@@ -1061,41 +1441,168 @@ export function MerchantPosScreen() {
                 <View style={[styles.quickChip, styles.quickChipActive]}>
                   <Text style={[styles.quickChipText, styles.quickChipTextActive]}>Scanner on</Text>
                 </View>
-                <Pressable style={styles.linkChip} onPress={() => setScannerOpen(false)}><Text style={styles.linkChipText}>Off</Text></Pressable>
+                <Pressable style={styles.linkChip} onPress={() => closeScanner()}><Text style={styles.linkChipText}>Off</Text></Pressable>
+              </View>
+              <View style={styles.cameraFrame}>
+                <View style={styles.cameraOverlay}>
+                  <View style={styles.scanFrame} />
+                </View>
+              </View>
+              <View style={[styles.scanFeedbackCard, scanStatusTone]}>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={styles.scanFeedbackTitle}>{scanStatusTitle}</Text>
+                  {lastScannedCode ? <Text style={styles.scanFeedbackCode}>{lastScannedCode}</Text> : null}
+                </View>
+                <Text style={styles.scanFeedbackBody}>{scanMessage}</Text>
+                {scanMatchedName ? <Text style={styles.scanFeedbackMeta}>Latest match: {scanMatchedName}</Text> : null}
+                {scanCartDelta ? <Text style={styles.scanFeedbackSubtle}>{scanCartDelta}</Text> : null}
+                <View style={styles.modeStrip}>
+                  <Pressable style={styles.modeButton} onPress={() => barcodeInputRef.current?.focus()}>
+                    <Text style={styles.modeButtonText}>Type barcode</Text>
+                  </Pressable>
+                  <Pressable style={styles.modeButton} onPress={() => setManualEntryOpen(true)}>
+                    <Text style={styles.modeButtonText}>Manual item</Text>
+                  </Pressable>
+                  <Pressable style={styles.modeButton} onPress={handleOpenCartPreview}>
+                    <Text style={styles.modeButtonText}>Review cart</Text>
+                  </Pressable>
+                  <Pressable style={styles.modeButton} onPress={handleOpenCheckoutPanel}>
+                    <Text style={styles.modeButtonText}>Checkout</Text>
+                  </Pressable>
+                </View>
               </View>
               {scannerError ? (
                 <View style={styles.permissionCard}>
                   <Text style={styles.scannerErrorText}>{scannerError}</Text>
                 </View>
               ) : null}
-              {latestCartItem ? (
-                <View style={[styles.miniCartCard, { marginTop: 10, marginBottom: 10 }]}>
-                  <View style={styles.miniCartRow}>
+              {scanState === "not_found" && noMatchSuggestions.length ? (
+                <View style={styles.scanSuggestionCard}>
+                  <View style={styles.sectionHeaderRow}>
+                    <Text style={styles.summaryTitle}>Closest matches</Text>
+                    <Text style={styles.helperText}>{noMatchSuggestions.length} suggestions</Text>
+                  </View>
+                  {noMatchSuggestions.map((product) => (
+                    <Pressable key={`scan-suggestion-${product.id}`} style={styles.scanSuggestionRow} onPress={() => addProduct(product)}>
+                      <View style={styles.productInfo}>
+                        <Text style={styles.productTitle}>{product.name}</Text>
+                        <Text style={styles.productMeta}>{product.category} | {product.price.toFixed(2)} BDT{product.barcode ? ` | ${product.barcode}` : ""}</Text>
+                      </View>
+                      <Text style={styles.addText}>Add</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}              <View style={styles.scannerWorkspace}>
+                <View style={styles.scannerSummaryCard}>
+                  <View style={styles.scannerSummaryRow}>
                     <View>
-                      <Text style={styles.summaryTitle}>Latest added</Text>
-                      <Text style={styles.helperText}>{latestCartItem.name}</Text>
+                      <Text style={styles.summaryTitle}>Live cart summary</Text>
+                      <Text style={styles.helperText}>Keep scanning on top, then review cart, preview, payment, or checkout right here.</Text>
                     </View>
                     <Text style={styles.cartBadge}>{totalItems} items</Text>
                   </View>
-                  <View style={styles.miniCartRow}>
-                    <View style={styles.productInfo}>
-                      <Text style={styles.productTitle}>{latestCartItem.name}</Text>
-                      <Text style={styles.productMeta}>{latestCartItem.quantity} x {getUnitPrice(latestCartItem.price, globalDiscount, latestCartItem.discountRate).toFixed(2)} BDT</Text>
+                  <View style={styles.scannerSummaryGrid}>
+                    <View style={styles.scannerMetricTile}>
+                      <Text style={styles.scannerMetricLabel}>Subtotal</Text>
+                      <Text style={styles.scannerMetricValue}>{totalAmount.toFixed(2)} BDT</Text>
                     </View>
-                    <Text style={styles.addText}>{buildCartAmount(latestCartItem, globalDiscount).toFixed(2)}</Text>
+                    <View style={styles.scannerMetricTile}>
+                      <Text style={styles.scannerMetricLabel}>Lines</Text>
+                      <Text style={styles.scannerMetricValue}>{cart.length}</Text>
+                    </View>
+                    <View style={styles.scannerMetricTile}>
+                      <Text style={styles.scannerMetricLabel}>Mode</Text>
+                      <Text style={styles.scannerMetricValue}>{splitEnabled ? "Split" : paymentMode}</Text>
+                    </View>
                   </View>
                   <View style={styles.inlineRow}>
-                    <Pressable style={styles.secondaryButton} onPress={handleOpenCartPreview}><Text style={styles.secondaryButtonText}>Full cart</Text></Pressable>
-                    <Pressable style={styles.secondaryButton} onPress={() => scrollRef.current?.scrollToEnd({ animated: true })}><Text style={styles.secondaryButtonText}>Checkout</Text></Pressable>
+                    <Pressable style={styles.secondaryButton} onPress={() => setScannerPreviewOpen((current) => !current)}>
+                      <Text style={styles.secondaryButtonText}>{scannerPreviewOpen ? "Hide preview" : "Print preview"}</Text>
+                    </Pressable>
+                    <Pressable style={styles.secondaryButton} onPress={handleOpenCheckoutPanel}><Text style={styles.secondaryButtonText}>Payment</Text></Pressable>
+                    <Pressable style={[styles.secondaryButton, !canCheckout ? styles.primaryButtonDisabled : null]} disabled={!canCheckout || isLoading} onPress={() => void handleCheckout()}><Text style={styles.secondaryButtonText}>{isLoading ? "Processing..." : "Checkout"}</Text></Pressable>
+                    <Pressable style={styles.secondaryButton} onPress={() => void handleCancelSale()}><Text style={styles.secondaryButtonText}>Cancel sale</Text></Pressable>
                   </View>
                 </View>
-              ) : null}
-              <View style={styles.inlineRow}>
-                <Pressable style={styles.secondaryButton} onPress={() => barcodeInputRef.current?.focus()}><Text style={styles.secondaryButtonText}>Type barcode</Text></Pressable>
-                <Pressable style={styles.secondaryButton} onPress={() => setManualEntryOpen(true)}><Text style={styles.secondaryButtonText}>Manual</Text></Pressable>
+                {scannerPreviewOpen ? (
+                  <View style={styles.scannerPreviewCard}>
+                    <View style={styles.sectionHeaderRow}>
+                      <Text style={styles.summaryTitle}>Receipt preview</Text>
+                      <Text style={styles.helperText}>{cart.length ? "Current sale draft" : "No items yet"}</Text>
+                    </View>
+                    <Text style={styles.scannerPreviewText}>{draftReceiptText || "Scan or add items first. Preview will appear here before you print or checkout."}</Text>
+                    <View style={styles.inlineRow}>
+                      <Pressable style={styles.secondaryButton} onPress={() => void shareReceipt()}><Text style={styles.secondaryButtonText}>Share last receipt</Text></Pressable>
+                      <Pressable style={styles.secondaryButton} onPress={handleOpenCheckoutPanel}><Text style={styles.secondaryButtonText}>Open payment</Text></Pressable>
+                    </View>
+                  </View>
+                ) : null}
+                {latestCartItem ? (
+                  <View style={[styles.miniCartCard, { marginTop: 4 }]}>
+                    <View style={styles.miniCartRow}>
+                      <View>
+                        <Text style={styles.summaryTitle}>Latest added</Text>
+                        <Text style={styles.helperText}>{latestCartItem.name}</Text>
+                      </View>
+                      <Text style={styles.cartBadge}>{totalItems} items</Text>
+                    </View>
+                    <View style={styles.miniCartRow}>
+                      <View style={styles.productInfo}>
+                        <Text style={styles.productTitle}>{latestCartItem.name}</Text>
+                        <Text style={styles.productMeta}>{latestCartItem.quantity} x {getUnitPrice(latestCartItem.price, globalDiscount, latestCartItem.discountRate).toFixed(2)} BDT</Text>
+                      </View>
+                      <Text style={styles.addText}>{buildCartAmount(latestCartItem, globalDiscount).toFixed(2)}</Text>
+                    </View>
+                    <View style={styles.inlineRow}>
+                      <Pressable style={styles.secondaryButton} onPress={() => addProduct({
+                        id: latestCartItem.id,
+                        name: latestCartItem.name,
+                        price: latestCartItem.price,
+                        costPrice: latestCartItem.costPrice,
+                        stock: 0,
+                        barcode: latestCartItem.barcode || "",
+                        category: latestCartItem.manual ? "Manual" : "Scanned",
+                        discountRate: latestCartItem.discountRate,
+                      })}><Text style={styles.secondaryButtonText}>Add one more</Text></Pressable>
+                      <Pressable style={styles.secondaryButton} onPress={handleOpenCartPreview}><Text style={styles.secondaryButtonText}>Full cart</Text></Pressable>
+                      <Pressable style={styles.secondaryButton} onPress={handleOpenCheckoutPanel}><Text style={styles.secondaryButtonText}>Checkout</Text></Pressable>
+                    </View>
+                  </View>
+                ) : null}
+                <View style={styles.scannerCartPanel}>
+                  <View style={styles.sectionHeaderRow}>
+                    <Text style={styles.summaryTitle}>Cart in scanner mode</Text>
+                    <Text style={styles.helperText}>{cart.length ? "Scroll and edit without leaving scan mode" : "Cart will stay here until checkout or cancel"}</Text>
+                  </View>
+                  {cart.length ? (
+                    <ScrollView nestedScrollEnabled style={styles.scannerCartScroll} contentContainerStyle={styles.scannerCartScrollContent}>
+                      {cart.map((item) => {
+                        const unitPrice = getUnitPrice(item.price, globalDiscount, item.discountRate);
+                        return (
+                          <View key={`scanner-cart-${item.id}`} style={[styles.scannerCartRow, recentCartItemId === item.id ? styles.cartRowHighlight : null]}>
+                            <View style={styles.productInfo}>
+                              <Text style={styles.productTitle}>{item.name}</Text>
+                              <Text style={styles.productMeta}>{item.quantity} x {unitPrice.toFixed(2)} BDT{item.manual ? " | manual" : item.barcode ? ` | ${item.barcode}` : ""}</Text>
+                            </View>
+                            <View style={styles.scannerCartActions}>
+                              <Pressable style={styles.countButton} onPress={() => setCart((current) => current.map((row) => (row.id === item.id ? { ...row, quantity: Math.max(1, row.quantity - 1) } : row)))}><Text style={styles.countButtonText}>-</Text></Pressable>
+                              <Pressable style={styles.countButton} onPress={() => setCart((current) => current.map((row) => (row.id === item.id ? { ...row, quantity: row.quantity + 1 } : row)))}><Text style={styles.countButtonText}>+</Text></Pressable>
+                              <Pressable style={styles.removeButton} onPress={() => setCart((current) => current.filter((row) => row.id !== item.id))}><Text style={styles.removeButtonText}>Remove</Text></Pressable>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </ScrollView>
+                  ) : (
+                    <Text style={styles.helperText}>Scan stays on top, and your cart will remain here even if you close the scanner. Checkout or cancel clears the sale for the next customer.</Text>
+                  )}
+                </View>
               </View>
               <TextInput style={styles.input} value={barcodeInput} onChangeText={setBarcodeInput} placeholder="Paste or scan barcode here" placeholderTextColor="#6b7280" autoCapitalize="none" autoCorrect={false} onSubmitEditing={() => void handleBarcodeLookup(barcodeInput)} />
-              <Pressable style={styles.primaryButton} onPress={() => void handleBarcodeLookup(barcodeInput)}><Text style={styles.primaryButtonText}>Add scanned item</Text></Pressable>
+              <View style={styles.inlineRow}>
+                <Pressable style={styles.primaryButtonCompact} onPress={() => void handleBarcodeLookup(barcodeInput)}><Text style={styles.primaryButtonText}>Add scanned item</Text></Pressable>
+                <Pressable style={styles.secondaryButton} onPress={() => { setSearchQuery(lastScannedCode || barcodeInput); setManualEntryOpen(true); setStatus("Scanner fallback is ready below."); setError(null); }}><Text style={styles.secondaryButtonText}>Use fallback</Text></Pressable>
+              </View>
             </View>
           ) : null}
           <View style={styles.visibleRow}>
@@ -1140,7 +1647,7 @@ export function MerchantPosScreen() {
               const previewPrice = getUnitPrice(product.price, globalDiscount, product.discountRate);
               const safety = getSafetyBand(previewPrice, product.costPrice, pricingSafety);
               return (
-                <Pressable key={product.id} style={styles.productRow} onPress={() => addProduct(product)}>
+                <Pressable key={product.id} style={styles.productRow} onPress={() => addProduct(product)} android_ripple={{ color: "#ff7a00", borderless: false }}>
                   <View style={styles.productInfo}>
                     <View style={styles.titleRow}>
                       <View style={[styles.dot, { backgroundColor: safety.dot }]} />
@@ -1163,8 +1670,8 @@ export function MerchantPosScreen() {
             <View style={styles.cartHeaderActions}>
               <Text style={styles.cartBadge}>{totalItems} items</Text>
               {cart.length ? (
-                <Pressable style={styles.linkChip} onPress={() => { setCart([]); setStatus("Cart cleared."); setError(null); }}>
-                  <Text style={styles.linkChipText}>Clear</Text>
+                <Pressable style={styles.linkChip} onPress={() => void handleCancelSale()}>
+                  <Text style={styles.linkChipText}>Cancel sale</Text>
                 </Pressable>
               ) : null}
             </View>
@@ -1173,7 +1680,7 @@ export function MerchantPosScreen() {
             const unitPrice = getUnitPrice(item.price, globalDiscount, item.discountRate);
             const safety = getSafetyBand(unitPrice, item.costPrice, pricingSafety);
             return (
-              <View key={item.id} style={styles.cartRow}>
+              <View key={item.id} style={[styles.cartRow, recentCartItemId === item.id ? styles.cartRowHighlight : null]}>
                 <View style={styles.productInfo}>
                   <View style={styles.titleRow}>
                     <View style={[styles.dot, { backgroundColor: safety.dot }]} />
@@ -1203,6 +1710,46 @@ export function MerchantPosScreen() {
             );
           }) : <Text style={styles.helperText}>Cart is empty. Add products from above or add a manual item below.</Text>}
           <Pressable style={[styles.secondaryButton, smsAutoEnabled ? styles.splitActive : null]} onPress={() => void toggleSmsAuto()}><Text style={[styles.secondaryButtonText, smsAutoEnabled ? styles.splitActiveText : null]}>{smsAutoEnabled ? "SMS auto on" : "Enable SMS auto"}</Text></Pressable>
+          {pendingOnlineOrderId ? (
+            <View style={styles.pendingPaymentCard}>
+              <View style={styles.sectionHeaderRow}>
+                <View>
+                  <Text style={styles.summaryTitle}>Online payment pending</Text>
+                  <Text style={styles.helperText}>Order {pendingOnlineOrderId} is waiting for payment confirmation.</Text>
+                </View>
+                <Text style={styles.customerPrepBadge}>Pending</Text>
+              </View>
+              <Text style={styles.summaryLine}>{pendingPaymentUrl || "Payment link was not returned. Wait for backend confirmation or reopen the order."}</Text>
+              {pendingOrderReviewed ? <Text style={styles.reviewedHint}>This pending order was already reviewed in Orders.</Text> : null}
+              <View style={styles.inlineRow}>
+                <Pressable style={styles.secondaryButton} onPress={() => void sharePendingPaymentLink()}><Text style={styles.secondaryButtonText}>Share payment link</Text></Pressable>
+                <Pressable style={[styles.secondaryButton, pendingOrderReviewed ? styles.reviewedActionButton : null]} onPress={handleReviewPendingOrder}><Text style={[styles.secondaryButtonText, pendingOrderReviewed ? styles.reviewedActionText : null]}>{pendingOrderReviewed ? "Reopen order" : "Review order"}</Text></Pressable>
+                <Pressable style={styles.secondaryButton} onPress={handleDismissPendingPayment}><Text style={styles.secondaryButtonText}>Clear note</Text></Pressable>
+                {pendingOrderReviewed ? <Pressable style={[styles.secondaryButton, styles.resolvedActionButton]} onPress={handleResolvePendingPayment}><Text style={[styles.secondaryButtonText, styles.resolvedActionText]}>Mark resolved</Text></Pressable> : null}
+              </View>
+            </View>
+          ) : null}
+          {recentOrderLabel || reviewedOrderLabel ? (
+            <View style={styles.activityCard}>
+              <Text style={styles.summaryTitle}>Recent POS activity</Text>
+              {recentOrderLabel ? <Text style={styles.summaryLine}>Last completed order: {recentOrderLabel}</Text> : null}
+              {reviewedOrderLabel ? <Text style={styles.summaryLine}>Last reviewed pending: {reviewedOrderLabel}</Text> : null}
+              <View style={styles.inlineRow}>
+                {recentOrderLabel ? <Pressable style={styles.secondaryButton} onPress={() => navigate("MerchantOrders")}><Text style={styles.secondaryButtonText}>Open orders</Text></Pressable> : null}
+                {reviewedOrderLabel ? <Pressable style={styles.secondaryButton} onPress={() => pendingOnlineOrderId ? handleReviewPendingOrder() : navigate("MerchantOrders")}><Text style={styles.secondaryButtonText}>{pendingOnlineOrderId ? "Review again" : "Open orders"}</Text></Pressable> : null}
+              </View>
+            </View>
+          ) : null}
+          {error && cart.length ? (
+            <View style={styles.recoveryCard}>
+              <Text style={styles.summaryTitle}>Checkout recovery</Text>
+              <Text style={styles.helperText}>Your bill is still in the cart. Fix the issue, then retry or keep editing items.</Text>
+              <View style={styles.inlineRow}>
+                <Pressable style={[styles.secondaryButton, !canCheckout ? styles.primaryButtonDisabled : null]} disabled={!canCheckout || isLoading} onPress={() => void handleCheckout()}><Text style={styles.secondaryButtonText}>Retry checkout</Text></Pressable>
+                <Pressable style={styles.secondaryButton} onPress={handleOpenCartPreview}><Text style={styles.secondaryButtonText}>Review cart</Text></Pressable>
+              </View>
+            </View>
+          ) : null}
           <View style={styles.summaryCard}>
             <Text style={styles.summaryTitle}>Cart summary</Text>
             <Text style={styles.summaryLine}>Total items: {totalItems}</Text>
@@ -1210,14 +1757,74 @@ export function MerchantPosScreen() {
           </View>
         </View>
 
-        <View style={styles.section}>
+        <View style={styles.section} onLayout={(event) => { paymentSectionYRef.current = event.nativeEvent.layout.y; }}>
           <Text style={styles.sectionTitle}>Payment and checkout</Text>
+          <View style={styles.sessionCard}>
+            <View style={styles.sectionHeaderRow}>
+              <View>
+                <Text style={styles.summaryTitle}>POS session</Text>
+                <Text style={styles.helperText}>{sessionId.trim() ? `Session ID: ${sessionId}` : "Open a counter session before checkout so every sale stays linked."}</Text>
+              </View>
+              <Text style={[styles.customerPrepBadge, !sessionId.trim() ? styles.customerPrepBadgeWarn : null]}>{sessionId.trim() ? "Open" : "Required"}</Text>
+            </View>
+            <TextInput
+              style={[styles.input, styles.sessionInput]}
+              value={sessionOpeningBalance}
+              onChangeText={setSessionOpeningBalance}
+              placeholder="Opening cash balance"
+              placeholderTextColor="#6b7280"
+              keyboardType="numeric"
+              editable={!sessionId.trim()}
+            />
+            <View style={styles.inlineRow}>
+              <Pressable style={[styles.secondaryButton, sessionId.trim() ? styles.splitActive : null]} disabled={!!sessionId.trim() || isLoading} onPress={() => void handleOpenSession()}>
+                <Text style={[styles.secondaryButtonText, sessionId.trim() ? styles.splitActiveText : null]}>{sessionId.trim() ? "Session active" : "Open session"}</Text>
+              </Pressable>
+              <Pressable style={styles.secondaryButton} disabled={!sessionId.trim() || isLoading} onPress={() => void handleCloseSession()}>
+                <Text style={styles.secondaryButtonText}>Close session</Text>
+              </Pressable>
+            </View>
+          </View>
+          <View style={styles.customerPrepCard}>
+            <View style={styles.sectionHeaderRow}>
+              <View>
+                <Text style={styles.summaryTitle}>Customer status</Text>
+                <Text style={styles.helperText}>{customerReadyLabel}</Text>
+              </View>
+              <Text style={[styles.customerPrepBadge, effectiveNeedsCustomer && !customerId.trim() ? styles.customerPrepBadgeWarn : null]}>{customerId.trim() ? "Linked" : "Walk-in"}</Text>
+            </View>
+            <View style={styles.customerPrepGrid}>
+              <View style={styles.customerPrepTile}>
+                <Text style={styles.customerPrepLabel}>Customer ID</Text>
+                <Text style={styles.customerPrepValue}>{customerId.trim() || "Not set"}</Text>
+              </View>
+              <View style={styles.customerPrepTile}>
+                <Text style={styles.customerPrepLabel}>Phone</Text>
+                <Text style={styles.customerPrepValue}>{customerPhone.trim() || "Optional"}</Text>
+              </View>
+            </View>
+            <Text style={[styles.helperText, effectiveNeedsCustomer && !customerId.trim() ? styles.customerPrepAlert : null]}>{effectiveNeedsCustomer ? (customerId.trim() ? "Customer is ready for wallet or credit checkout." : "Wallet or credit payment needs a linked customer before checkout.") : "Cash and online can continue without a linked customer."}</Text>
+          </View>
           <TextInput style={styles.input} value={customerId} onChangeText={setCustomerId} placeholder={effectiveNeedsCustomer ? "Customer ID required for wallet or credit" : "Customer ID optional"} placeholderTextColor="#6b7280" autoCapitalize="none" />
-          <TextInput style={styles.input} value={customerPhone} onChangeText={setCustomerPhone} placeholder="Customer phone" placeholderTextColor="#6b7280" keyboardType="phone-pad" />
+          <TextInput style={styles.input} value={customerPhone} onChangeText={(value) => { setCustomerPhone(value); if (!value.trim()) { setCustomerMatches([]); } }} placeholder="Customer phone" placeholderTextColor="#6b7280" keyboardType="phone-pad" />
+          {customerLookupBusy ? <Text style={styles.helperText}>Looking up customer...</Text> : null}
+          {customerMatches.length ? (
+            <View style={styles.customerMatchCard}>
+              {customerMatches.map((customer, index) => (
+                <Pressable key={`customer-match-${customer._id || index}`} style={[styles.customerMatchRow, index === customerMatches.length - 1 ? styles.customerMatchRowLast : null]} onPress={() => applyCustomerSelection(customer)}>
+                  <View style={styles.productInfo}>
+                    <Text style={styles.productTitle}>{customer.name || customer.phone || customer._id || "Customer"}</Text>
+                    <Text style={styles.productMeta}>{customer.phone || "No phone"}{customer._id ? ` | ${customer._id}` : ""}</Text>
+                  </View>
+                  <Text style={styles.addText}>Link</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
           <TextInput style={styles.input} value={customerName} onChangeText={setCustomerName} placeholder="Customer name" placeholderTextColor="#6b7280" />
           <View style={styles.inlineRow}>
             <Pressable style={styles.secondaryButton} onPress={() => void handleCreateCustomer()}><Text style={styles.secondaryButtonText}>Find or create customer</Text></Pressable>
-            <Pressable style={styles.secondaryButton} onPress={() => { setCustomerId(""); setCustomerName(""); setCustomerPhone(""); setStatus("Walk-in customer selected."); setError(null); }}><Text style={styles.secondaryButtonText}>Walk-in</Text></Pressable>
+            <Pressable style={styles.secondaryButton} onPress={() => { setCustomerId(""); setCustomerName(""); setCustomerPhone(""); setCustomerMatches([]); setStatus("Walk-in customer selected."); setError(null); }}><Text style={styles.secondaryButtonText}>Walk-in</Text></Pressable>
           </View>
           {features.discountToolsEnabled ? (
             <>
@@ -1263,6 +1870,7 @@ export function MerchantPosScreen() {
             <Text style={styles.summaryTitle}>Ready to bill</Text>
             <Text style={styles.summaryLine}>Customer: {customerId.trim() ? customerId : "walk-in"}</Text>
             <Text style={styles.summaryLine}>Payment: {splitEnabled ? "Split" : paymentMode}</Text>
+            <Text style={styles.summaryLine}>Session: {sessionId.trim() ? sessionId : "Open a session before checkout"}</Text>
             <Text style={styles.summaryLine}>{effectiveNeedsCustomer ? "Wallet or credit needs a customer before checkout." : "Cash and online can continue without customer ID."}</Text>
             <Text style={styles.summaryLine}>SMS receipt channel: {smsAutoEnabled ? "Enabled" : "Off"}</Text>
           </View>
@@ -1279,6 +1887,7 @@ export function MerchantPosScreen() {
           </View>
           <View style={styles.inlineRow}>
             <Pressable style={styles.secondaryButton} onPress={() => void printReceipt()}><Text style={styles.secondaryButtonText}>Print receipt</Text></Pressable>
+            <Pressable style={styles.secondaryButton} onPress={() => void handleCancelSale()}><Text style={styles.secondaryButtonText}>Cancel sale</Text></Pressable>
             <Pressable style={styles.secondaryButton} onPress={() => void shareReceipt()}><Text style={styles.secondaryButtonText}>Share receipt</Text></Pressable>
             <Pressable style={styles.secondaryButton} onPress={() => navigate("MerchantOrders")}><Text style={styles.secondaryButtonText}>Open orders</Text></Pressable>
           </View>
@@ -1296,11 +1905,73 @@ export function MerchantPosScreen() {
                     {generatedQrTarget ? <Text style={styles.helperText}>{generatedQrTarget}</Text> : null}
         </View>
 
-        {error ? <View style={styles.errorCard}><Text style={styles.errorTitle}>POS action blocked</Text><Text style={styles.errorText}>{error}</Text></View> : null}
+        {error ? <View style={styles.errorCard}><Text style={styles.errorTitle}>POS action blocked</Text><Text style={styles.errorText}>{error}</Text><View style={styles.inlineRow}><Pressable style={styles.secondaryButton} onPress={() => !sessionId.trim() ? void handleOpenSession() : handleOpenCheckoutPanel()}><Text style={styles.secondaryButtonText}>{!sessionId.trim() ? "Open session" : "Open payment"}</Text></Pressable>{cart.length ? <Pressable style={styles.secondaryButton} onPress={handleOpenCartPreview}><Text style={styles.secondaryButtonText}>Review cart</Text></Pressable> : null}<Pressable style={styles.secondaryButton} onPress={() => void loadProducts(searchQuery.trim())}><Text style={styles.secondaryButtonText}>Reload POS</Text></Pressable></View></View> : null}
         {status ? <View style={styles.infoCard}><Text style={styles.infoText}>{status}</Text></View> : null}
         {lastScannedCode ? <Text style={styles.footerText}>Last scanned: {lastScannedCode}</Text> : null}
         <View style={styles.bottomSpacer} />
       </ScrollView>
+      {scannerOpen ? (
+        <View style={styles.scannerFloatBar}>
+          <View style={styles.scannerFloatRow}>
+            <View>
+              <Text style={styles.scannerFloatTitle}>Scan mode active</Text>
+              <Text style={styles.scannerFloatSubtitle}>{scanStatusTitle} | {totalItems} items | {totalAmount.toFixed(2)} BDT</Text>
+            </View>
+            <Pressable style={styles.scannerFloatButton} onPress={() => closeScanner()}>
+              <Text style={styles.scannerFloatButtonText}>Close</Text>
+            </Pressable>
+          </View>
+          <View style={styles.scannerFloatActions}>
+            <Pressable style={styles.scannerFloatAction} onPress={() => barcodeInputRef.current?.focus()}>
+              <Text style={styles.scannerFloatActionText}>Barcode</Text>
+            </Pressable>
+            <Pressable style={styles.scannerFloatAction} onPress={handleOpenCartPreview}>
+              <Text style={styles.scannerFloatActionText}>Cart</Text>
+            </Pressable>
+            <Pressable style={styles.scannerFloatAction} onPress={handleOpenCheckoutPanel}>
+              <Text style={styles.scannerFloatActionText}>Checkout</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+      <View style={styles.stickyCheckoutBar}>
+        <View style={styles.stickyCheckoutMeta}>
+          <Text style={styles.stickyCheckoutKicker}>{splitEnabled ? "Split ready" : paymentMode}</Text>
+          <Text style={styles.stickyCheckoutAmount}>{totalAmount.toFixed(2)} BDT</Text>
+          <Text style={styles.stickyCheckoutHint}>{totalItems} items{!sessionId.trim() ? " | open session first" : effectiveNeedsCustomer && !customerId.trim() ? " | customer needed" : !splitValid ? " | fix split amount" : " | ready when you are"}</Text>
+          <View style={styles.stickyModeRow}>
+            {(["CASH", "ONLINE", "WALLET", "CREDIT"] as const).map((mode) => (
+              <Pressable key={`sticky-${mode}`} style={[styles.stickyModeChip, paymentMode === mode && !splitEnabled ? styles.stickyModeChipActive : null]} onPress={() => { setSplitEnabled(false); setPaymentMode(mode); }}>
+                <Text style={[styles.stickyModeChipText, paymentMode === mode && !splitEnabled ? styles.stickyModeChipTextActive : null]}>{mode}</Text>
+              </Pressable>
+            ))}
+            {features.splitPaymentEnabled ? (
+              <Pressable style={[styles.stickyModeChip, splitEnabled ? styles.stickyModeChipActive : null]} onPress={() => setSplitEnabled((value) => !value)}>
+                <Text style={[styles.stickyModeChipText, splitEnabled ? styles.stickyModeChipTextActive : null]}>Split</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          <View style={styles.stickyActionRow}>
+            <Pressable style={styles.stickyActionButton} onPress={() => setScannerOpen(true)}>
+              <Text style={styles.stickyActionButtonText}>Scan</Text>
+            </Pressable>
+            <Pressable style={styles.stickyActionButton} onPress={handleOpenCartPreview}>
+              <Text style={styles.stickyActionButtonText}>Cart</Text>
+            </Pressable>
+            <Pressable style={styles.stickyActionButton} onPress={handleOpenCheckoutPanel}>
+              <Text style={styles.stickyActionButtonText}>Checkout</Text>
+            </Pressable>
+          </View>
+        </View>
+        <View style={styles.stickyCheckoutActions}>
+          <Pressable style={styles.stickySecondaryButton} onPress={handleOpenCheckoutPanel}>
+            <Text style={styles.stickySecondaryButtonText}>Details</Text>
+          </Pressable>
+          <Pressable style={[styles.stickyCheckoutButton, !canCheckout ? styles.primaryButtonDisabled : null]} disabled={!canCheckout || isLoading} onPress={() => void handleCheckout()}>
+            <Text style={styles.stickyCheckoutButtonText}>{isLoading ? "Processing..." : "Checkout"}</Text>
+          </Pressable>
+        </View>
+      </View>
     </View>
   );
 }
@@ -1348,6 +2019,18 @@ const styles = StyleSheet.create({
   headerStatHint: { fontSize: 11, color: "#fbbf24" },
   section: { backgroundColor: "#ffffff", borderRadius: 18, padding: 14, borderWidth: 1, borderColor: "#d7dfea", gap: 10, shadowColor: "#0B1E3C", shadowOpacity: 0.04, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
   sectionHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 },
+  quickActionGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  quickActionTile: { flexGrow: 1, minWidth: 140, borderRadius: 16, padding: 12, backgroundColor: "#f8fafc", borderWidth: 1, borderColor: "#dbe4f0", gap: 4 },
+  quickActionTitle: { fontSize: 13, fontWeight: "800", color: "#0f172a" },
+  quickActionBody: { fontSize: 11, color: "#475569", lineHeight: 16 },
+  checklistRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  checklistChip: { flexGrow: 1, minWidth: 130, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, gap: 2 },
+  checklistChipReady: { backgroundColor: "#ecfdf5", borderColor: "#86efac" },
+  checklistChipPending: { backgroundColor: "#fff7ed", borderColor: "#fdba74" },
+  checklistChipTitle: { fontSize: 11, fontWeight: "800", color: "#9a3412", textTransform: "uppercase", letterSpacing: 0.6 },
+  checklistChipTitleReady: { color: "#166534" },
+  checklistChipBody: { fontSize: 11, color: "#7c2d12" },
+  checklistChipBodyReady: { color: "#166534" },
   sectionTitle: { fontSize: 14, fontWeight: "700", color: "#111827" },
   input: { borderWidth: 1, borderColor: "#d1d5db", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, backgroundColor: "#ffffff", color: "#111827" },
   searchInput: { marginBottom: 2 },
@@ -1361,8 +2044,10 @@ const styles = StyleSheet.create({
   inlineCard: { borderRadius: 14, backgroundColor: "#f8fafc", padding: 12, gap: 8, borderWidth: 1, borderColor: "#e5e7eb" },
   visibleRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, alignItems: "center" },
   scannerTitle: { fontSize: 14, fontWeight: "700", color: "#ffffff" },
-  cameraFrame: { height: 170, borderRadius: 14, overflow: "hidden", backgroundColor: "#020617" },
-  camera: { flex: 1 },
+  cameraFrame: { height: 112, borderRadius: 14, overflow: "hidden", backgroundColor: "#020617" },
+  camera: { flex: 1, width: "100%" },
+  cameraOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center" },
+  scanFrame: { width: 160, height: 82, borderWidth: 2, borderColor: "#ffffff", borderRadius: 8, backgroundColor: "transparent" },
   permissionCard: { justifyContent: "center", alignItems: "center", padding: 16, borderRadius: 12, backgroundColor: "#1e293b" },
   scannerErrorText: { fontSize: 12, fontWeight: "700", color: "#fecaca", textAlign: "center" },
   scannerHintText: { fontSize: 11, color: "#cbd5e1", textAlign: "center" },
@@ -1392,7 +2077,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 10,
   },
-  cartRow: { gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: "#f3f4f6" },
+  cartRow: { gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: "#f3f4f6", borderRadius: 12, paddingHorizontal: 8 },
+  cartRowHighlight: { backgroundColor: "#fff7ed", borderColor: "#fdba74", borderWidth: 1 },
   discountRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   discountInput: { width: 90, paddingVertical: 8 },
   cartActionRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
@@ -1404,6 +2090,27 @@ const styles = StyleSheet.create({
   summaryTitle: { fontSize: 12, fontWeight: "700", color: "#111827" },
   summaryLine: { fontSize: 11, color: "#475569" },
   summaryAmount: { fontSize: 16, fontWeight: "800", color: "#111827", marginTop: 2 },
+  customerPrepCard: { borderRadius: 16, padding: 12, gap: 10, backgroundColor: "#f8fafc", borderWidth: 1, borderColor: "#dbe4f0" },
+  sessionCard: { borderRadius: 16, padding: 12, gap: 10, backgroundColor: "#fff7ed", borderWidth: 1, borderColor: "#fed7aa" },
+  sessionInput: { backgroundColor: "#ffffff" },
+  pendingPaymentCard: { borderRadius: 16, padding: 12, gap: 10, backgroundColor: "#eff6ff", borderWidth: 1, borderColor: "#bfdbfe" },
+  activityCard: { borderRadius: 16, padding: 12, gap: 8, backgroundColor: "#f8fafc", borderWidth: 1, borderColor: "#dbe4f0" },
+  reviewedHint: { fontSize: 11, fontWeight: "700", color: "#1d4ed8" },
+  reviewedActionButton: { backgroundColor: "#dbeafe", borderColor: "#93c5fd" },
+  reviewedActionText: { color: "#1d4ed8" },
+  resolvedActionButton: { backgroundColor: "#dcfce7", borderColor: "#86efac" },
+  resolvedActionText: { color: "#166534" },
+  recoveryCard: { borderRadius: 16, padding: 12, gap: 10, backgroundColor: "#fff7ed", borderWidth: 1, borderColor: "#fed7aa" },
+  customerPrepBadge: { fontSize: 11, fontWeight: "800", color: "#166534", backgroundColor: "#dcfce7", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
+  customerPrepBadgeWarn: { color: "#9a3412", backgroundColor: "#ffedd5" },
+  customerPrepGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  customerPrepTile: { flexGrow: 1, minWidth: 130, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: "#ffffff", borderWidth: 1, borderColor: "#e5e7eb" },
+  customerPrepLabel: { fontSize: 10, fontWeight: "800", color: "#64748b", textTransform: "uppercase", letterSpacing: 0.6 },
+  customerPrepValue: { fontSize: 13, fontWeight: "700", color: "#0f172a", marginTop: 4 },
+  customerPrepAlert: { color: "#b45309", fontWeight: "700" },
+  customerMatchCard: { borderRadius: 14, borderWidth: 1, borderColor: "#dbe4f0", backgroundColor: "#ffffff", overflow: "hidden" },
+  customerMatchRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#eef2f7" },
+  customerMatchRowLast: { borderBottomWidth: 0 },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   quickChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: "#d1d5db", backgroundColor: "#ffffff" },
   quickChipActive: { backgroundColor: "#111827", borderColor: "#111827" },
@@ -1419,9 +2126,45 @@ const styles = StyleSheet.create({
   scanStatusCard: { borderRadius: 14, backgroundColor: "#fff7ed", borderWidth: 1, borderColor: "#fed7aa", padding: 12, gap: 4 },
   scanStatusTitle: { fontSize: 13, fontWeight: "800", color: "#9a3412" },
   scanStatusBody: { fontSize: 12, color: "#7c2d12", lineHeight: 18 },
+  scanFeedbackCard: { borderRadius: 16, padding: 12, gap: 6, borderWidth: 1 },
+  scanIdleCard: { backgroundColor: "#e0f2fe", borderColor: "#7dd3fc" },
+  scanWorkingCard: { backgroundColor: "#fff7ed", borderColor: "#fdba74" },
+  scanMatchedCard: { backgroundColor: "#dcfce7", borderColor: "#86efac" },
+  scanAlertCard: { backgroundColor: "#fef2f2", borderColor: "#fca5a5" },
+  scanFeedbackTitle: { fontSize: 13, fontWeight: "800", color: "#0f172a" },
+  scanFeedbackCode: { fontSize: 11, fontWeight: "700", color: "#475569" },
+  scanFeedbackBody: { fontSize: 12, color: "#334155", lineHeight: 18 },
+  scanFeedbackMeta: { fontSize: 11, fontWeight: "700", color: "#0f172a" },
+  scanFeedbackSubtle: { fontSize: 11, color: "#475569", fontWeight: "600" },
+  scanSuggestionCard: { borderRadius: 16, padding: 12, gap: 6, backgroundColor: "#ffffff", borderWidth: 1, borderColor: "#fcd34d" },
+  scanSuggestionRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#fef3c7" },
+  scannerWorkspace: { gap: 10 },
+  scannerSummaryCard: { borderRadius: 16, padding: 12, gap: 10, backgroundColor: "#111827", borderWidth: 1, borderColor: "#334155", marginTop: 2 },
+  scannerSummaryRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 },
+  scannerSummaryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  scannerMetricTile: { flexGrow: 1, minWidth: 90, backgroundColor: "#1f2937", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: "#374151" },
+  scannerMetricLabel: { fontSize: 10, fontWeight: "700", color: "#93c5fd", textTransform: "uppercase", letterSpacing: 0.6 },
+  scannerMetricValue: { fontSize: 13, fontWeight: "800", color: "#ffffff", marginTop: 4 },
+  scannerPreviewCard: { borderRadius: 16, padding: 12, gap: 10, backgroundColor: "#f8fafc", borderWidth: 1, borderColor: "#dbe4f0" },
+  scannerPreviewText: { fontSize: 11, lineHeight: 18, color: "#334155", backgroundColor: "#ffffff", borderRadius: 12, padding: 12, borderWidth: 1, borderColor: "#e5e7eb" },
+  scannerCartPanel: { borderRadius: 18, padding: 12, gap: 10, backgroundColor: "#ffffff", borderWidth: 1, borderColor: "#dbe4f0", minHeight: 220 },
+  scannerCartScroll: { maxHeight: 260 },
+  scannerCartScrollContent: { gap: 8, paddingBottom: 4 },
+  scannerCartRow: { gap: 8, padding: 10, borderRadius: 14, borderWidth: 1, borderColor: "#e5e7eb", backgroundColor: "#f8fafc" },
+  scannerCartActions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  scannerFloatBar: { position: "absolute", left: 12, right: 12, bottom: 120, backgroundColor: "#111827", borderRadius: 18, padding: 12, borderWidth: 1, borderColor: "#334155", zIndex: 20, elevation: 14, shadowColor: "#000000", shadowOpacity: 0.18, shadowRadius: 16, shadowOffset: { width: 0, height: 10 }, gap: 8 },
+  scannerFloatRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 },
+  scannerFloatTitle: { fontSize: 13, fontWeight: "800", color: "#ffffff" },
+  scannerFloatSubtitle: { fontSize: 11, color: "#cbd5e1" },
+  scannerFloatButton: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: "#ff7a00" },
+  scannerFloatButtonText: { fontSize: 11, fontWeight: "800", color: "#111827" },
+  scannerFloatActions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  scannerFloatAction: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 999, backgroundColor: "#1e293b" },
+  scannerFloatActionText: { fontSize: 11, fontWeight: "700", color: "#f8fafc" },
   splitPanel: { gap: 8 },
   splitCell: { gap: 6 },
   primaryButton: { backgroundColor: "#0B1E3C", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 14, alignItems: "center" },
+  primaryButtonCompact: { flex: 1, minWidth: 180, backgroundColor: "#0B1E3C", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 14, alignItems: "center" },
   primaryButtonDisabled: { opacity: 0.55 },
   primaryButtonText: { color: "#ffffff", fontSize: 13, fontWeight: "700" },
   qrImage: { width: 220, height: 220, alignSelf: "center" },
@@ -1432,8 +2175,78 @@ const styles = StyleSheet.create({
   infoCard: { backgroundColor: "#eff6ff", borderColor: "#bfdbfe", borderWidth: 1, borderRadius: 14, padding: 14 },
   infoText: { fontSize: 12, color: "#374151" },
   footerText: { fontSize: 11, color: "#6b7280", textAlign: "center" },
-  bottomSpacer: { height: 8 },
+  stickyCheckoutBar: { position: "absolute", left: 12, right: 12, bottom: 12, backgroundColor: "#0f172a", borderRadius: 18, padding: 12, borderWidth: 1, borderColor: "#1e3a5f", flexDirection: "row", alignItems: "center", gap: 12, shadowColor: "#020617", shadowOpacity: 0.18, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 10 },
+  stickyCheckoutMeta: { flex: 1, gap: 2 },
+  stickyActionRow: { flexDirection: "row", gap: 8, marginTop: 8 },
+  stickyActionButton: { flex: 1, backgroundColor: "#1e293b", borderRadius: 14, paddingVertical: 10, alignItems: "center" },
+  stickyActionButtonText: { fontSize: 12, fontWeight: "700", color: "#ffffff" },
+  stickyCheckoutKicker: { fontSize: 11, fontWeight: "800", color: "#93c5fd", textTransform: "uppercase", letterSpacing: 0.8 },
+  stickyCheckoutAmount: { fontSize: 18, fontWeight: "800", color: "#ffffff" },
+  stickyCheckoutHint: { fontSize: 11, color: "#cbd5e1" },
+  stickyModeRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 6 },
+  stickyModeChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: "#334155", backgroundColor: "#111827" },
+  stickyModeChipActive: { backgroundColor: "#ff7a00", borderColor: "#ff7a00" },
+  stickyModeChipText: { fontSize: 10, fontWeight: "800", color: "#cbd5e1" },
+  stickyModeChipTextActive: { color: "#111827" },
+  stickyCheckoutActions: { gap: 8, alignItems: "stretch" },
+  stickySecondaryButton: { backgroundColor: "#1e293b", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#334155" },
+  stickySecondaryButtonText: { fontSize: 12, fontWeight: "800", color: "#e2e8f0" },
+  stickyCheckoutButton: { backgroundColor: "#ff7a00", borderRadius: 14, paddingHorizontal: 18, paddingVertical: 14, alignItems: "center", justifyContent: "center" },
+  stickyCheckoutButtonText: { fontSize: 13, fontWeight: "800", color: "#111827" },
+  bottomSpacer: { height: 96 },
+  suggestionsDropdown: { backgroundColor: "#ffffff", borderRadius: 12, borderWidth: 1, borderColor: "#e5e7eb", marginTop: 4, maxHeight: 200 },
+  suggestionItem: { paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#f3f4f6" },
+  suggestionText: { fontSize: 14, color: "#111827" },
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

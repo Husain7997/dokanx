@@ -1,0 +1,109 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Extract version
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+    - name: Create release notes
+      id: release_notes
+      run: |
+        # Generate release notes from commits
+        PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+        if [ -z "$PREVIOUS_TAG" ]; then
+          RELEASE_NOTES="Initial release"
+        else
+          RELEASE_NOTES=$(git log --pretty=format:"%s" --no-merges ${PREVIOUS_TAG}..HEAD)
+        fi
+        echo "notes<<EOF" >> $GITHUB_OUTPUT
+        echo "$RELEASE_NOTES" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Create GitHub release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ steps.get_version.outputs.VERSION }}
+        body: ${{ steps.release_notes.outputs.notes }}
+        draft: false
+        prerelease: false
+
+  deploy-production:
+    needs: release
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure kubectl
+      uses: azure/k8s-set-context@v3
+      with:
+        method: kubeconfig
+        kubeconfig: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
+
+    - name: Extract version
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+    - name: Deploy backend
+      run: |
+        kubectl set image deployment/dokanx-backend backend=ghcr.io/${{ github.repository }}/backend:${{ steps.get_version.outputs.VERSION }} -n dokanx
+        kubectl set image deployment/dokanx-backend-worker backend-worker=ghcr.io/${{ github.repository }}/backend:${{ steps.get_version.outputs.VERSION }} -n dokanx
+        kubectl set image deployment/dokanx-backend-scheduler backend-scheduler=ghcr.io/${{ github.repository }}/backend:${{ steps.get_version.outputs.VERSION }} -n dokanx
+        kubectl rollout status deployment/dokanx-backend -n dokanx --timeout=600s
+        kubectl rollout status deployment/dokanx-backend-worker -n dokanx --timeout=600s
+        kubectl rollout status deployment/dokanx-backend-scheduler -n dokanx --timeout=600s
+
+    - name: Deploy frontend services
+      run: |
+        kubectl set image deployment/dokanx-storefront storefront=ghcr.io/${{ github.repository }}/storefront:${{ steps.get_version.outputs.VERSION }} -n dokanx
+        kubectl set image deployment/dokanx-merchant-dashboard merchant-dashboard=ghcr.io/${{ github.repository }}/merchant-dashboard:${{ steps.get_version.outputs.VERSION }} -n dokanx
+        kubectl set image deployment/dokanx-admin-panel admin-panel=ghcr.io/${{ github.repository }}/admin-panel:${{ steps.get_version.outputs.VERSION }} -n dokanx
+        kubectl set image deployment/dokanx-developer-portal developer-portal=ghcr.io/${{ github.repository }}/developer-portal:${{ steps.get_version.outputs.VERSION }} -n dokanx
+
+        # Wait for all deployments
+        kubectl rollout status deployment/dokanx-storefront -n dokanx --timeout=600s
+        kubectl rollout status deployment/dokanx-merchant-dashboard -n dokanx --timeout=600s
+        kubectl rollout status deployment/dokanx-admin-panel -n dokanx --timeout=600s
+        kubectl rollout status deployment/dokanx-developer-portal -n dokanx --timeout=600s
+
+    - name: Run production smoke tests
+      run: |
+        sleep 60
+
+        # Test all endpoints
+        curl -f https://dokanx.com || exit 1
+        curl -f https://api.dokanx.com/health || exit 1
+        curl -f "https://api.dokanx.com/metrics?format=prometheus" || exit 1
+        curl -f https://merchant.dokanx.com || exit 1
+        curl -f https://admin.dokanx.com || exit 1
+        curl -f https://dev.dokanx.com || exit 1
+
+    - name: Run database migrations
+      run: |
+        kubectl exec -n dokanx deployment/dokanx-backend -- npm run migrate
+
+    - name: Notify deployment success
+      run: |
+        echo "Production deployment completed successfully for version ${{ steps.get_version.outputs.VERSION }}"

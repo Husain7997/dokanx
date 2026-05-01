@@ -3,6 +3,7 @@ import { create } from "zustand";
 
 import {
   getMerchantProfileRequest,
+  getApiBaseUrl,
   merchantLoginRequest,
   registerUnauthorizedHandler,
 } from "../lib/api-client";
@@ -88,7 +89,11 @@ export const useMerchantAuthStore = create<AuthState>((set, get) => ({
       await get().refreshProfile();
       return true;
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Merchant login failed";
+      const baseUrl = getApiBaseUrl("1.0.0");
+      let message = error instanceof Error ? error.message : "Merchant login failed";
+      if (/network request failed/i.test(message) || /unable to reach/i.test(message)) {
+        message = `${message}. Check API host: ${baseUrl}/api/auth/login`;
+      }
       set({ isLoading: false, error: message });
       return false;
     }

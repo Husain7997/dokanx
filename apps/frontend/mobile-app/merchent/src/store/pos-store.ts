@@ -25,13 +25,17 @@ type PosDraft = {
   paymentMode: SplitMode;
   splitEnabled: boolean;
   splitAmounts: Record<SplitMode, string>;
+  sessionId: string;
+  sessionOpeningBalance: string;
 };
 
 type MerchantPosState = PosDraft & {
   isHydrated: boolean;
+  scannerOpen: boolean;
   scannerActive: boolean;
   hydrate: () => Promise<void>;
   setDraft: (patch: Partial<PosDraft>) => Promise<void>;
+  setScannerOpen: (open: boolean) => void;
   setScannerActive: (active: boolean) => void;
   resetDraft: () => Promise<void>;
 };
@@ -45,6 +49,8 @@ const defaultDraft: PosDraft = {
   paymentMode: "CASH",
   splitEnabled: false,
   splitAmounts: { CASH: "", ONLINE: "", WALLET: "", CREDIT: "" },
+  sessionId: "",
+  sessionOpeningBalance: "0",
 };
 
 async function persistDraft(draft: PosDraft) {
@@ -76,6 +82,8 @@ async function readDraft(): Promise<PosDraft> {
         WALLET: typeof parsed.splitAmounts?.WALLET === "string" ? parsed.splitAmounts.WALLET : "",
         CREDIT: typeof parsed.splitAmounts?.CREDIT === "string" ? parsed.splitAmounts.CREDIT : "",
       },
+      sessionId: typeof parsed.sessionId === "string" ? parsed.sessionId : defaultDraft.sessionId,
+      sessionOpeningBalance: typeof parsed.sessionOpeningBalance === "string" ? parsed.sessionOpeningBalance : defaultDraft.sessionOpeningBalance,
     };
   } catch {
     return defaultDraft;
@@ -85,6 +93,7 @@ async function readDraft(): Promise<PosDraft> {
 export const useMerchantPosStore = create<MerchantPosState>((set, get) => ({
   ...defaultDraft,
   isHydrated: false,
+  scannerOpen: false,
   scannerActive: false,
   hydrate: async () => {
     try {
@@ -104,13 +113,17 @@ export const useMerchantPosStore = create<MerchantPosState>((set, get) => ({
       paymentMode: patch.paymentMode ?? get().paymentMode,
       splitEnabled: patch.splitEnabled ?? get().splitEnabled,
       splitAmounts: patch.splitAmounts ?? get().splitAmounts,
+      sessionId: patch.sessionId ?? get().sessionId,
+      sessionOpeningBalance: patch.sessionOpeningBalance ?? get().sessionOpeningBalance,
     };
     set(next);
     await persistDraft(next);
   },
+  setScannerOpen: (open) => set({ scannerOpen: open }),
   setScannerActive: (active) => set({ scannerActive: active }),
   resetDraft: async () => {
-    set({ ...defaultDraft, scannerActive: false });
+    set({ ...defaultDraft, scannerOpen: false, scannerActive: false });
     await persistDraft(defaultDraft);
   },
 }));
+

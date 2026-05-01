@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const PosSession = require("../models/posSession.model");
 const Order = require("../models/order.model");
 const Product = require("../models/product.model");
@@ -8,9 +9,15 @@ const { createAudit } = require("../utils/audit.util");
 
 async function resolveCustomer(customerId) {
   if (!customerId) return null;
-  const customer = await User.findOne({
-    $or: [{ globalCustomerId: customerId }, { _id: customerId }],
-  }).select("_id globalCustomerId name email phone").lean();
+
+  const query = [{ globalCustomerId: customerId }];
+  if (mongoose.Types.ObjectId.isValid(customerId)) {
+    query.push({ _id: customerId });
+  }
+
+  const customer = await User.findOne({ $or: query })
+    .select("_id globalCustomerId name email phone")
+    .lean();
   return customer || null;
 }
 

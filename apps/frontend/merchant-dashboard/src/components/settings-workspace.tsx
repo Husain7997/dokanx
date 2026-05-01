@@ -1,17 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Alert, AnalyticsCards, Badge, Button, SelectDropdown, TextInput } from "@dokanx/ui";
+import { useAuth } from "@dokanx/auth";
+import { Alert, AnalyticsCards, Badge, Button, Checkbox, SelectDropdown, TextInput } from "@dokanx/ui";
 
 import {
   addTeamMember,
   applyThemeWithOverrides,
+  listTeamActivity,
   listTeamMembers,
   listThemes,
   resetTheme,
   updateShopSettings,
   updateTeamMember,
 } from "@/lib/runtime-api";
+import { PERMISSION_GROUPS, getRolePermissions, hasPermission } from "@/lib/permissions";
 
 import { OwnerSessionPanel } from "./owner-session-panel";
 import { WorkspaceCard } from "./workspace-card";
@@ -22,6 +25,22 @@ type ThemeOption = {
   name?: string;
   slug?: string;
   category?: string;
+};
+
+type TeamActivity = {
+  id?: string;
+  action?: string;
+  actorId?: string | null;
+  actorName?: string;
+  actorRole?: string;
+  createdAt?: string | null;
+  targetType?: string;
+  targetId?: string | null;
+  permissionsMode?: string;
+  permissionOverrides?: string[];
+  inviteIssued?: boolean;
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
 };
 
 type TeamMember = {
@@ -37,7 +56,25 @@ type TeamMember = {
   passwordResetRequired?: boolean;
 };
 
+function formatTeamAction(action?: string) {
+  return String(action || "TEAM_ACTIVITY")
+    .toLowerCase()
+    .split("_")
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
+}
+
+const EMPTY_DRAFT = {
+  name: "Operations Lead",
+  email: "staff@merchant-dashboard.test",
+  phone: "01710000000",
+  role: "STAFF",
+  permissions: [] as string[],
+};
+
 export function SettingsWorkspace() {
+  const auth = useAuth();
+  const canManageTeam = hasPermission(auth.user, "SHOP_MANAGE_TEAM");
   const [settings, setSettings] = useState({
     shopName: "Merchant Workspace",
     supportEmail: "ops@merchant-dashboard.test",
@@ -54,17 +91,13 @@ export function SettingsWorkspace() {
     vatRate: "0",
     defaultDiscountRate: "0",
   });
-  const [teamDraft, setTeamDraft] = useState({
-    name: "Operations Lead",
-    email: "staff@merchant-dashboard.test",
-    phone: "01710000000",
-    role: "STAFF",
-    permissions: "READ_ORDERS,WRITE_PRODUCTS,WRITE_THEME",
-  });
+  const [teamDraft, setTeamDraft] = useState(EMPTY_DRAFT);
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>("Shop profile, branding, theme overrides, and team permissions are now managed from one workspace.");
   const [themes, setThemes] = useState<ThemeOption[]>([]);
   const [selectedThemeId, setSelectedThemeId] = useState("");
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [teamActivity, setTeamActivity] = useState<TeamActivity[]>([]);
   const [latestInvite, setLatestInvite] = useState<{ url: string; expiresAt?: string } | null>(null);
   const [loadingThemes, setLoadingThemes] = useState(false);
   const [submittingTheme, setSubmittingTheme] = useState(false);
@@ -103,6 +136,11 @@ export function SettingsWorkspace() {
     ];
   }, [settings.brandAccentColor, settings.brandPrimaryColor, settings.city, settings.payoutSchedule, teamMembers, themes.length]);
 
+  const roleBasePermissions = useMemo(
+    () => getRolePermissions({ role: teamDraft.role }),
+    [teamDraft.role]
+  );
+
   async function loadThemes() {
     setLoadingThemes(true);
     try {
@@ -111,8 +149,7 @@ export function SettingsWorkspace() {
       setThemes(rows);
       setSelectedThemeId((current) => current || String(rows[0]?._id || rows[0]?.id || ""));
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unable to load themes.";
-      setMessage(errorMessage);
+      setMessage(error instanceof Error ? error.message : "Unable to load themes.");
     } finally {
       setLoadingThemes(false);
     }
@@ -123,15 +160,52 @@ export function SettingsWorkspace() {
       const response = await listTeamMembers();
       setTeamMembers(Array.isArray(response.data) ? (response.data as TeamMember[]) : []);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unable to load team members.";
-      setMessage(errorMessage);
+      setMessage(error instanceof Error ? error.message : "Unable to load team members.");
+    }
+  }
+
+  async function loadTeamActivity() {
+    try {
+      const response = await listTeamActivity();
+      setTeamActivity(Array.isArray(response.data) ? (response.data as TeamActivity[]) : []);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to load team activity.");
     }
   }
 
   useEffect(() => {
     void loadThemes();
-    void loadTeamMembers();
-  }, []);
+    if (canManageTeam) {
+      void loadTeamMembers();
+      void loadTeamActivity();
+    }
+  }, [canManageTeam]);
+
+  function resetTeamDraft() {
+    setTeamDraft(EMPTY_DRAFT);
+    setEditingMemberId(null);
+  }
+
+  function togglePermission(permission: string) {
+    setTeamDraft((current) => ({
+      ...current,
+      permissions: current.permissions.includes(permission)
+        ? current.permissions.filter((item) => item !== permission)
+        : [...current.permissions, permission],
+    }));
+  }
+
+  function startEditingMember(member: TeamMember) {
+    setEditingMemberId(String(member._id || ""));
+    setTeamDraft({
+      name: member.name || "",
+      email: member.email || "",
+      phone: "",
+      role: String(member.role || "STAFF").toUpperCase(),
+      permissions: Array.isArray(member.permissionOverrides) ? member.permissionOverrides.map((item) => String(item).toUpperCase()) : [],
+    });
+    setMessage(`Editing access for ${member.name || member.email || "team member"}.`);
+  }
 
   async function handleApplyTheme() {
     if (!selectedThemeId) {
@@ -158,8 +232,7 @@ export function SettingsWorkspace() {
       const activeTheme = themes.find((theme) => String(theme._id || theme.id || "") === selectedThemeId);
       setMessage(`Applied theme: ${activeTheme?.name || selectedThemeId}`);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unable to apply theme.";
-      setMessage(errorMessage);
+      setMessage(error instanceof Error ? error.message : "Unable to apply theme.");
     } finally {
       setSubmittingTheme(false);
     }
@@ -168,13 +241,11 @@ export function SettingsWorkspace() {
   async function handleResetTheme() {
     setSubmittingTheme(true);
     setMessage(null);
-
     try {
       await resetTheme();
       setMessage("Theme reset request completed.");
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unable to reset theme.";
-      setMessage(errorMessage);
+      setMessage(error instanceof Error ? error.message : "Unable to reset theme.");
     } finally {
       setSubmittingTheme(false);
     }
@@ -183,7 +254,6 @@ export function SettingsWorkspace() {
   async function handleSaveSettings() {
     setSubmittingSettings(true);
     setMessage(null);
-
     try {
       const response = await updateShopSettings({
         name: settings.shopName,
@@ -203,36 +273,49 @@ export function SettingsWorkspace() {
       });
       setMessage(response.message || "Shop settings saved.");
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unable to save settings.";
-      setMessage(errorMessage);
+      setMessage(error instanceof Error ? error.message : "Unable to save settings.");
     } finally {
       setSubmittingSettings(false);
     }
   }
 
-  async function handleAddTeamMember() {
+  async function handleSaveTeamMember() {
+    if (!canManageTeam) {
+      setMessage("You do not have permission to manage team access.");
+      return;
+    }
+
     setSubmittingTeam(true);
     setMessage(null);
-
     try {
-      const response = await addTeamMember({
-        name: teamDraft.name,
-        email: teamDraft.email,
-        phone: teamDraft.phone,
-        role: teamDraft.role,
-        permissions: teamDraft.permissions.split(",").map((item) => item.trim()).filter(Boolean),
-      });
-      if (response.invite?.inviteUrl) {
-        setLatestInvite({
-          url: response.invite.inviteUrl,
-          expiresAt: response.invite.expiresAt,
+      if (editingMemberId) {
+        const response = await updateTeamMember(editingMemberId, {
+          role: teamDraft.role,
+          permissions: teamDraft.permissions,
+            permissionsMode: "replace",
         });
+        setMessage(response.message || "Team member access updated.");
+      } else {
+        const response = await addTeamMember({
+          name: teamDraft.name,
+          email: teamDraft.email,
+          phone: teamDraft.phone,
+          role: teamDraft.role,
+          permissions: teamDraft.permissions,
+            permissionsMode: "replace",
+        });
+        if (response.invite?.inviteUrl) {
+          setLatestInvite({
+            url: response.invite.inviteUrl,
+            expiresAt: response.invite.expiresAt,
+          });
+        }
+        setMessage(response.invite?.emailSent ? "Team member saved and invite emailed." : "Team member saved.");
       }
-      await loadTeamMembers();
-      setMessage(response.invite?.emailSent ? "Team member saved and invite emailed." : "Team member saved.");
+      await Promise.all([loadTeamMembers(), loadTeamActivity()]);
+      resetTeamDraft();
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unable to save team member.";
-      setMessage(errorMessage);
+      setMessage(error instanceof Error ? error.message : "Unable to save team member.");
     } finally {
       setSubmittingTeam(false);
     }
@@ -241,14 +324,12 @@ export function SettingsWorkspace() {
   async function handlePromoteMember(memberId: string) {
     setSubmittingTeam(true);
     setMessage(null);
-
     try {
       await updateTeamMember(memberId, { role: "OWNER" });
-      await loadTeamMembers();
+      await Promise.all([loadTeamMembers(), loadTeamActivity()]);
       setMessage("Team member role updated.");
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unable to update team member.";
-      setMessage(errorMessage);
+      setMessage(error instanceof Error ? error.message : "Unable to update team member.");
     } finally {
       setSubmittingTeam(false);
     }
@@ -257,7 +338,6 @@ export function SettingsWorkspace() {
   async function handleResendInvite(memberId: string) {
     setSubmittingTeam(true);
     setMessage(null);
-
     try {
       const response = await updateTeamMember(memberId, { resendInvite: true });
       if (response.invite?.inviteUrl) {
@@ -266,11 +346,10 @@ export function SettingsWorkspace() {
           expiresAt: response.invite.expiresAt,
         });
       }
-      await loadTeamMembers();
+      await Promise.all([loadTeamMembers(), loadTeamActivity()]);
       setMessage(response.invite?.emailSent ? "Invite refreshed and emailed." : "Invite refreshed.");
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unable to resend invite.";
-      setMessage(errorMessage);
+      setMessage(error instanceof Error ? error.message : "Unable to resend invite.");
     } finally {
       setSubmittingTeam(false);
     }
@@ -377,20 +456,60 @@ export function SettingsWorkspace() {
           title="Team roles and permissions"
           description="Invite teammates, assign roles, and keep access scoped to the right operators."
         >
-          <div className="grid gap-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <TextInput label="Name" value={teamDraft.name} onChange={(event) => setTeamDraft((current) => ({ ...current, name: event.target.value }))} />
-              <TextInput label="Email" value={teamDraft.email} onChange={(event) => setTeamDraft((current) => ({ ...current, email: event.target.value }))} />
+          {!canManageTeam ? (
+            <Alert variant="info">Your account can view the workspace but cannot manage team access.</Alert>
+          ) : (
+            <div className="grid gap-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <TextInput label="Name" value={teamDraft.name} onChange={(event) => setTeamDraft((current) => ({ ...current, name: event.target.value }))} />
+                <TextInput label="Email" value={teamDraft.email} onChange={(event) => setTeamDraft((current) => ({ ...current, email: event.target.value }))} disabled={Boolean(editingMemberId)} />
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <TextInput label="Phone" value={teamDraft.phone} onChange={(event) => setTeamDraft((current) => ({ ...current, phone: event.target.value }))} disabled={Boolean(editingMemberId)} />
+                <SelectDropdown label="Role" value={teamDraft.role} onValueChange={(value) => setTeamDraft((current) => ({ ...current, role: value }))} options={teamRoleOptions} />
+              </div>
+              <div className="rounded-3xl border border-border/60 bg-card/80 p-4">
+                <p className="text-sm font-medium text-foreground">Access matrix</p>
+                <p className="mt-1 text-xs text-muted-foreground">Role defaults apply automatically. Check only the extra access this person should get.</p>
+                <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                  {roleBasePermissions.map((permission) => (
+                    <Badge key={permission} variant="success">Default: {permission}</Badge>
+                  ))}
+                  {!roleBasePermissions.length ? <Badge variant="neutral">No default permissions</Badge> : null}
+                </div>
+                <div className="mt-4 grid gap-4">
+                  {PERMISSION_GROUPS.map((group) => (
+                    <div key={group.id} className="rounded-2xl border border-border/60 p-4">
+                      <p className="text-sm font-medium text-foreground">{group.label}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{group.description}</p>
+                      <div className="mt-4 grid gap-3">
+                        {group.items.map((item) => (
+                          <label key={item.key} className="flex items-start gap-3 rounded-2xl border border-border/50 px-3 py-3">
+                            <Checkbox checked={teamDraft.permissions.includes(item.key)} onCheckedChange={() => togglePermission(item.key)} />
+                            <span>
+                              <span className="block text-sm font-medium text-foreground">{item.label}</span>
+                              <span className="mt-1 block text-xs text-muted-foreground">{item.description}</span>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <Button onClick={handleSaveTeamMember} loading={submittingTeam} loadingText="Saving team member">
+                  {editingMemberId ? "Update member access" : "Add team member"}
+                </Button>
+                {editingMemberId ? (
+                  <Button variant="ghost" onClick={resetTeamDraft} disabled={submittingTeam}>
+                    Cancel editing
+                  </Button>
+                ) : null}
+              </div>
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <TextInput label="Phone" value={teamDraft.phone} onChange={(event) => setTeamDraft((current) => ({ ...current, phone: event.target.value }))} />
-              <SelectDropdown label="Role" value={teamDraft.role} onValueChange={(value) => setTeamDraft((current) => ({ ...current, role: value }))} options={teamRoleOptions} />
-            </div>
-            <TextInput label="Permissions (comma separated)" value={teamDraft.permissions} onChange={(event) => setTeamDraft((current) => ({ ...current, permissions: event.target.value }))} />
-            <Button onClick={handleAddTeamMember} loading={submittingTeam} loadingText="Saving team member">
-              Add or update team member
-            </Button>
-          </div>
+          )}
+
           <div className="mt-6 grid gap-3">
             {teamMembers.map((member) => (
               <div key={String(member._id || member.email)} className="rounded-3xl border border-border/60 p-4 text-sm">
@@ -401,18 +520,31 @@ export function SettingsWorkspace() {
                       <Badge variant={String(member.role || "").toUpperCase() === "OWNER" ? "success" : "neutral"}>{member.role || "STAFF"}</Badge>
                     </div>
                     <p className="mt-1 text-muted-foreground">{member.email}</p>
-                    <p className="mt-1 text-muted-foreground">{(member.permissionOverrides || []).join(", ") || "No overrides"}</p>
-                    <p className="mt-1 text-muted-foreground">
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {(member.permissionOverrides || []).length ? (member.permissionOverrides || []).map((permission) => (
+                        <Badge key={permission} variant="neutral">{permission}</Badge>
+                      )) : <span className="text-xs text-muted-foreground">Role default permissions only</span>}
+                    </div>
+                    <p className="mt-2 text-muted-foreground">
                       Invite: {member.invitation?.acceptedAt ? "Accepted" : member.invitation?.expiresAt ? `Pending until ${member.invitation.expiresAt}` : "Not issued"}
                     </p>
                   </div>
-                  <div className="flex gap-2">
-                    <Button variant="secondary" onClick={() => void handlePromoteMember(String(member._id || ""))} disabled={submittingTeam}>
-                      Promote
-                    </Button>
-                    <Button variant="ghost" onClick={() => void handleResendInvite(String(member._id || ""))} disabled={submittingTeam}>
-                      Resend invite
-                    </Button>
+                  <div className="flex flex-wrap gap-2">
+                    {canManageTeam ? (
+                      <Button variant="secondary" onClick={() => startEditingMember(member)} disabled={submittingTeam}>
+                        Edit access
+                      </Button>
+                    ) : null}
+                    {canManageTeam ? (
+                      <Button variant="secondary" onClick={() => void handlePromoteMember(String(member._id || ""))} disabled={submittingTeam}>
+                        Promote
+                      </Button>
+                    ) : null}
+                    {canManageTeam ? (
+                      <Button variant="ghost" onClick={() => void handleResendInvite(String(member._id || ""))} disabled={submittingTeam}>
+                        Resend invite
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
               </div>

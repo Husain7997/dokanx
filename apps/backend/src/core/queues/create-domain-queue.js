@@ -90,15 +90,22 @@ function createDomainQueue({ name, defaultAttempts, defaultBackoffDelay }) {
   }
 
   async function getStatus() {
-    const [counts, deadLetterCounts] = await Promise.all([
+    const [counts, deadLetterCounts, oldestWaitingJobs] = await Promise.all([
       queue.getJobCounts(),
       deadLetterQueue.getJobCounts(),
+      queue.getWaiting(0, 0),
     ]);
+
+    const oldestWaitingJob = Array.isArray(oldestWaitingJobs) ? oldestWaitingJobs[0] || null : null;
+    const oldestWaitingMs = oldestWaitingJob?.timestamp
+      ? Math.max(0, Date.now() - Number(oldestWaitingJob.timestamp))
+      : 0;
 
     return {
       name,
       counts,
       deadLetter: deadLetterCounts,
+      oldestWaitingMs,
     };
   }
 

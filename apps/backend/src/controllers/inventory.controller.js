@@ -2,9 +2,10 @@ const inventory = require("@/inventory");
 const { withLock } = require("@/core/infrastructure");
   const t = require('@/core/language').t;
 const Inventory = require("../models/Inventory.model");
+const { createAudit } = require("../utils/audit.util");
 exports.adjustStock = async (req, res) => {
 
-  const { product, quantity, note } = req.body;
+  const { product, quantity, note, source } = req.body;
 
   const ledger = await inventory.createInventoryEntry({
     shopId: req.shop._id,
@@ -14,6 +15,21 @@ exports.adjustStock = async (req, res) => {
     direction: quantity > 0 ? "IN" : "OUT",
     userId: req.user._id,
     note,
+  });
+
+  await createAudit({
+    action: "INVENTORY_ADJUSTED",
+    performedBy: req.user?._id || null,
+    targetType: "Inventory",
+    targetId: product,
+    req,
+    meta: {
+      quantity: Number(quantity || 0),
+      direction: quantity > 0 ? "IN" : "OUT",
+      note: note || "",
+      source: String(source || "manual_dashboard"),
+      ledgerId: ledger?._id ? String(ledger._id) : null,
+    },
   });
 
 res.json({

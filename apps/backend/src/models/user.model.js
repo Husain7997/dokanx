@@ -18,6 +18,11 @@ const userSchema = new mongoose.Schema(
     type: String,
     default: null,
   },
+  normalizedPhone: {
+    type: String,
+    default: null,
+    index: true,
+  },
   globalCustomerId: {
     type: String,
     unique: true,
@@ -91,7 +96,7 @@ const userSchema = new mongoose.Schema(
 
   role: {
     type: String,
-    enum: ["ADMIN", "OWNER", "STAFF", "CUSTOMER", "DEVELOPER", "AGENT"],
+    enum: ["ADMIN", "OWNER", "STAFF", "CUSTOMER", "DEVELOPER", "AGENT", "SUPER_ADMIN", "FINANCE_ADMIN", "SUPPORT_ADMIN", "AUDIT_ADMIN"],
     default: "CUSTOMER",
   },
 
@@ -117,13 +122,27 @@ const userSchema = new mongoose.Schema(
     type: Date,
     default: null,
   },
+  sessionVersion: {
+    type: Number,
+    default: 0,
+  },
 },
-{ timestamps: true }
+{
+  timestamps: true,
+  toJSON: { getters: true },
+  toObject: { getters: true },
+}
 );
 
 userSchema.pre("save", function ensureGlobalCustomerId() {
   if (this.role === "CUSTOMER" && !this.globalCustomerId) {
     this.globalCustomerId = createGlobalCustomerId();
+  }
+
+  if (this.phone) {
+    this.normalizedPhone = String(this.phone).replace(/\D/g, "") || null;
+  } else {
+    this.normalizedPhone = null;
   }
 });
 

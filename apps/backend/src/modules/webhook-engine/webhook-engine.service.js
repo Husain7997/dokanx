@@ -47,7 +47,7 @@ async function dispatch(event, payload) {
           nextRetryAt: new Date(),
         },
       },
-      { upsert: true, new: true, includeResultMetadata: true }
+      { upsert: true, returnDocument: "after", includeResultMetadata: true }
     );
     const webhookJob = result.value || result;
     const createdNow = Boolean(result?.lastErrorObject?.upserted);
@@ -61,3 +61,4 @@ async function dispatch(event, payload) {
 module.exports = {
   dispatch,
 };
+

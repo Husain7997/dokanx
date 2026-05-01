@@ -8,6 +8,7 @@ const DEFAULT_MAX_RETRIES = Number(process.env.MONGO_MAX_RETRIES || 8);
 const DEFAULT_BASE_DELAY_MS = Number(process.env.MONGO_RETRY_BASE_DELAY_MS || 500);
 const DEFAULT_MAX_DELAY_MS = Number(process.env.MONGO_RETRY_MAX_DELAY_MS || 10000);
 const SERVER_SELECTION_TIMEOUT_MS = Number(process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS || 5000);
+const READ_PREFERENCE = process.env.MONGO_READ_PREFERENCE || "secondaryPreferred";
 
 let listenersAttached = false;
 let connectPromise = null;
@@ -214,11 +215,40 @@ function scheduleReconnect(reason = "manual") {
   }, 0);
 }
 
+function applyReadPreference(query, readPreference = READ_PREFERENCE) {
+  if (!query || typeof query.read !== "function") {
+    return query;
+  }
+
+  return query.read(readPreference);
+}
+
+function createReadQuery(model, filter = {}, projection = null, options = {}) {
+  return applyReadPreference(model.find(filter, projection, options));
+}
+
+function createReadOneQuery(model, filter = {}, projection = null, options = {}) {
+  return applyReadPreference(model.findOne(filter, projection, options));
+}
+
+function createReadAggregate(model, pipeline = []) {
+  return applyReadPreference(model.aggregate(pipeline));
+}
+
+function createReadCountQuery(model, filter = {}) {
+  return applyReadPreference(model.countDocuments(filter));
+}
+
 module.exports = {
   connectMongo,
   scheduleReconnect,
   isMongoConnected,
   getMongoState,
   connectionEvents,
+  applyReadPreference,
+  createReadQuery,
+  createReadOneQuery,
+  createReadAggregate,
+  createReadCountQuery,
   mongoose,
 };

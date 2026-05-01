@@ -152,7 +152,7 @@ async function debitCustomerWallet({
           $inc: { [`customerWallet.${balanceKey}`]: -numericAmount },
           $set: { "customerWallet.updatedAt": new Date() },
         },
-        { new: true, session: session || undefined }
+        { returnDocument: "after", session: session || undefined }
       );
 
       if (!user) {
@@ -496,3 +496,4 @@ module.exports = {
   getLedger,
   normalizeWalletInput
 };
+

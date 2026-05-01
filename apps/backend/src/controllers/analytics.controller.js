@@ -59,8 +59,14 @@ module.exports = {
 
 async function trackEvent(req, res, next) {
   try {
-    const { type, productId, productIds, shopId, context } = req.body || {};
-    const supported = ["PRODUCT_VIEW", "REC_IMPRESSION", "REC_CLICK"];
+    const { type, productId, productIds, shopId, context, sectionId, sectionType, themeId, ctaLink, host } = req.body || {};
+    const supported = [
+      "PRODUCT_VIEW",
+      "REC_IMPRESSION",
+      "REC_CLICK",
+      "STOREFRONT_SECTION_IMPRESSION",
+      "STOREFRONT_SECTION_CTA_CLICK",
+    ];
 
     if (!supported.includes(type)) {
       return res.status(400).json({ message: "Unsupported event type" });
@@ -75,6 +81,28 @@ async function trackEvent(req, res, next) {
         type,
         aggregateId: null,
         payload: { productIds: ids, context: context || null, shopId: shopId || null },
+        metadata: { user: req.user?._id || null, shopId: shopId || null },
+      });
+      return res.json({ success: true });
+    }
+
+    if (type === "STOREFRONT_SECTION_IMPRESSION" || type === "STOREFRONT_SECTION_CTA_CLICK") {
+      if (!sectionId || !sectionType) {
+        return res.status(400).json({ message: "sectionId and sectionType required" });
+      }
+
+      await Event.create({
+        type,
+        aggregateId: null,
+        payload: {
+          sectionId: String(sectionId),
+          sectionType: String(sectionType),
+          themeId: themeId ? String(themeId) : null,
+          context: context || "storefront-home",
+          ctaLink: ctaLink ? String(ctaLink) : null,
+          host: host ? String(host) : null,
+          shopId: shopId || null,
+        },
         metadata: { user: req.user?._id || null, shopId: shopId || null },
       });
       return res.json({ success: true });

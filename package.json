@@ -18,6 +18,8 @@
     "test": "npm run test:backend",
     "test:backend": "npm --prefix apps/backend run test",
     "test:backend:unit": "npm --prefix apps/backend run test:unit",
+    "test:load:smoke": "k6 run tests/load/k6-dokanx-smoke.js",
+    "test:load:mixed": "k6 run -e ENABLE_ORDER_FLOW=true -e ENABLE_PAYMENT_FLOW=true tests/load/k6-dokanx-smoke.js",
     "test:e2e": "playwright test",
     "build:e2e:storefront": "set NEXT_DIST_DIR=.next-e2e&& npm --prefix apps/frontend/storefront-web run build",
     "build:e2e:merchant": "set NEXT_DIST_DIR=.next-e2e&& npm --prefix apps/frontend/merchant-dashboard run build",
@@ -39,6 +41,7 @@
   "overrides": {
     "react": "19.2.3",
     "react-test-renderer": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "yaml": "2.8.3"
   }
 }

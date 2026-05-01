@@ -1,18 +1,20 @@
 import { headers } from "next/headers";
 
-import { getHomePageData, getHomeRecommendations, getProductsData, getShopsDirectory } from "@/lib/server-data";
+import { getHomePageData, getHomeRecommendations, getProductsData, getShopsDirectory, getStorefrontShopByHost } from "@/lib/server-data";
 import { getTenantConfig } from "@/lib/tenant";
 import { CustomerHomeWorkspace } from "@/components/customer-home-workspace";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const tenant = getTenantConfig((await headers()).get("host") || "localhost:3000");
+  const host = (await headers()).get("host") || "localhost:3000";
+  const tenant = getTenantConfig(host);
   const { products: productsData } = await getHomePageData(tenant);
-  const [shops, recommendations, recommendedProducts] = await Promise.all([
+  const [shops, recommendations, recommendedProducts, storefrontShop] = await Promise.all([
     getShopsDirectory(),
     getHomeRecommendations(tenant),
     getProductsData(tenant, { limit: "12" }),
+    getStorefrontShopByHost(host),
   ]);
   const featuredProducts = (recommendations.trending_products as typeof productsData) || productsData.slice(0, 8);
   const recommendedForYou =
@@ -34,6 +36,8 @@ export default async function HomePage() {
 
   return (
     <CustomerHomeWorkspace
+      shopId={String(storefrontShop?._id || storefrontShop?.id || "") || undefined}
+      shopName={typeof storefrontShop?.name === "string" && storefrontShop.name.trim() ? storefrontShop.name : "DokanX Storefront"}
       shops={shops}
       featuredProducts={featuredProducts}
       recommendedProducts={recommendedForYou}

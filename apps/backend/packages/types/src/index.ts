@@ -1,4 +1,13 @@
-export type AuthRole = "admin" | "merchant" | "staff" | "customer" | "developer" | "agent";
+export type AuthRole =
+  | "admin"
+  | "merchant"
+  | "staff"
+  | "customer"
+  | "developer"
+  | "agent"
+  | "finance_admin"
+  | "support_admin"
+  | "audit_admin";
 
 export type TenantConfig = {
   id: string;

@@ -16,6 +16,7 @@ exports.updateTaxRule = async (req, res) => {
   const { id } = req.params;
   const data = req.body;
 
-  const updated = await TaxRule.findByIdAndUpdate(id, data, { new: true });
+  const updated = await TaxRule.findByIdAndUpdate(id, data, { returnDocument: "after" });
   res.json({ message: 'Tax rule updated', data: updated });
 };
+

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@dokanx/auth";
 import {
   Alert,
   AnalyticsCards,
@@ -15,7 +16,8 @@ import {
   SearchInput
 } from "@dokanx/ui";
 
-import { getShopSummary, getWalletReport, getWalletSummary, listAnalyticsSnapshots, listCustomers, listInventory, listOrders } from "@/lib/runtime-api";
+import { adjustInventory, getMerchantAiCopilot, getShopSummary, getWalletReport, getWalletSummary, listAnalyticsSnapshots, listCustomers, listInventory, listOrders, listTeamActivity, retryPayment, updateOrderStatus, upsertCreditPolicy } from "@/lib/runtime-api";
+import { hasPermission } from "@/lib/permissions";
 
 type OrderRow = {
   _id?: string;
@@ -63,6 +65,7 @@ type InventorySnapshot = {
 };
 
 export function DashboardOverview() {
+  const auth = useAuth();
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [customers, setCustomers] = useState<Array<{ totalDue?: number; phone?: string }>>([]);
   const [inventory, setInventory] = useState<InventoryRow[]>([]);
@@ -70,6 +73,9 @@ export function DashboardOverview() {
   const [walletReport, setWalletReport] = useState<{ totalIncome?: number; totalExpense?: number; profitLoss?: number; totalDue?: number } | null>(null);
   const [summary, setSummary] = useState<{ sales?: { totalSales?: number; totalOrders?: number } } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [aiActionMessage, setAiActionMessage] = useState<string | null>(null);
+  const [aiActionTone, setAiActionTone] = useState<"info" | "success" | "warning" | "error">("info");
+  const [aiActionBusyKey, setAiActionBusyKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [trendSeries, setTrendSeries] = useState<Array<{ label: string; value: number }>>([]);
@@ -78,12 +84,24 @@ export function DashboardOverview() {
   const [walletSnapshot, setWalletSnapshot] = useState<WalletSummary | null>(null);
   const [shipmentSnapshot, setShipmentSnapshot] = useState<ShipmentSummary | null>(null);
   const [inventorySnapshot, setInventorySnapshot] = useState<InventorySnapshot | null>(null);
+  const [aiActionHistory, setAiActionHistory] = useState<Array<{ id?: string; action?: string; actorName?: string; actorRole?: string; createdAt?: string | null; targetType?: string; targetId?: string | null; source?: string | null; note?: string | null; amount?: number | null; quantity?: number | null }>>([]);
+  const [aiCopilot, setAiCopilot] = useState<{
+    generatedAt?: string;
+    cards?: Array<{ id?: string; title?: string; severity?: string; metric?: string; message?: string }>;
+    salesSeries?: Array<{ label?: string; value?: number }>;
+    inventoryActions?: Array<{ productId?: string; name?: string; currentStock?: number; reorderPoint?: number; suggestedRestock?: number; estimatedDaysLeft?: number | null; urgency?: string }>;
+    customerSegments?: Array<{ segment?: string; count?: number; ratio?: number; description?: string }>;
+    creditInsights?: Array<{ customerId?: string; customerName?: string; creditScore?: number; outstandingBalance?: number; utilizationRate?: number; riskLabel?: string; recommendedLimit?: number; creditLimit?: number; status?: string }>;
+    paymentIntelligence?: { failureRate?: number; anomalies?: Array<{ gateway?: string; severity?: string; message?: string }> };
+    fulfillmentActions?: Array<{ orderId?: string; ageHours?: number; suggestion?: string; priority?: string; status?: string }>;
+    summary?: { projectedNext7Days?: number; revenueTrend?: number; paymentFailureRate?: number; lowStockCount?: number; riskyCreditCustomers?: number; fulfillmentBacklog?: number };
+  } | null>(null);
 
   async function load() {
     setLoading(true);
     setError(null);
     try {
-      const [ordersResponse, inventoryResponse, walletResponse, summaryResponse, analyticsResponse, customerResponse, walletReportResponse] = await Promise.all([
+      const [ordersResponse, inventoryResponse, walletResponse, summaryResponse, analyticsResponse, customerResponse, walletReportResponse, aiResponse, teamActivityResponse] = await Promise.all([
         listOrders(25),
         listInventory(60),
         getWalletSummary(),
@@ -91,6 +109,8 @@ export function DashboardOverview() {
         listAnalyticsSnapshots({}),
         listCustomers(),
         getWalletReport(),
+        getMerchantAiCopilot({ range: "30" }).catch(() => null),
+        listTeamActivity().catch(() => ({ data: [] })),
       ]);
       setOrders(Array.isArray(ordersResponse.data) ? (ordersResponse.data as OrderRow[]) : []);
       setCustomers(Array.isArray(customerResponse.data) ? customerResponse.data as Array<{ totalDue?: number; phone?: string }> : []);
@@ -98,6 +118,8 @@ export function DashboardOverview() {
       setWalletBalance(Number(walletResponse.data?.balance ?? 0));
       setWalletReport(walletReportResponse.data || null);
       setSummary(summaryResponse.data || null);
+      setAiCopilot(aiResponse?.data || null);
+      setAiActionHistory(Array.isArray(teamActivityResponse.data) ? teamActivityResponse.data.filter((item) => String(item.source || "").toLowerCase() === "merchant_ai_dashboard").slice(0, 6) as Array<{ id?: string; action?: string; actorName?: string; actorRole?: string; createdAt?: string | null; targetType?: string; targetId?: string | null; source?: string | null; note?: string | null; amount?: number | null; quantity?: number | null }> : []);
       const snapshots = Array.isArray(analyticsResponse.data) ? analyticsResponse.data : [];
       const trendSnapshot = snapshots.find((row) => row.metricType === "TREND_ANALYTICS");
       const dailySales = snapshots.find((row) => row.metricType === "DAILY_SALES");
@@ -124,6 +146,100 @@ export function DashboardOverview() {
   useEffect(() => {
     void load();
   }, []);
+
+  async function handleAiRestockAction(item: {
+    productId?: string;
+    name?: string;
+    suggestedRestock?: number;
+  }) {
+    if (!item.productId || !Number(item.suggestedRestock || 0)) return;
+    const busyKey = `restock-${String(item.productId)}`;
+    setAiActionBusyKey(busyKey);
+    setAiActionMessage(null);
+    try {
+      const response = await adjustInventory({
+        product: String(item.productId),
+        quantity: Number(item.suggestedRestock || 0),
+        note: `AI restock action for ${item.name || "product"}`,
+        source: "merchant_ai_dashboard",
+      });
+      setAiActionTone("success");
+      setAiActionMessage(response.message || `${item.name || "Product"} restocked from AI suggestion.`);
+      await load();
+    } catch (err) {
+      setAiActionTone("error");
+      setAiActionMessage(err instanceof Error ? err.message : "Unable to apply AI restock action.");
+    } finally {
+      setAiActionBusyKey(null);
+    }
+  }
+
+  async function handleAiFulfillmentAction(item: {
+    orderId?: string;
+    status?: string;
+  }) {
+    if (!item.orderId) return;
+    const nextAction = getFulfillmentAction(item.status);
+    if (!nextAction) return;
+    const busyKey = `fulfillment-${String(item.orderId)}`;
+    setAiActionBusyKey(busyKey);
+    setAiActionMessage(null);
+    try {
+      if (nextAction.type === "retry") {
+        const response = await retryPayment(String(item.orderId), "merchant_ai_dashboard");
+        setAiActionTone("success");
+        setAiActionMessage(response.message || `Payment retry initiated for order ${String(item.orderId).slice(-6)}.`);
+      } else {
+        const response = await updateOrderStatus(String(item.orderId), nextAction.status);
+        setAiActionTone("success");
+        setAiActionMessage(response.message || `${nextAction.label} applied for order ${String(item.orderId).slice(-6)}.`);
+      }
+      await load();
+    } catch (err) {
+      setAiActionTone("error");
+      setAiActionMessage(err instanceof Error ? err.message : "Unable to apply fulfillment action.");
+    } finally {
+      setAiActionBusyKey(null);
+    }
+  }
+
+
+  async function handleAiCreditAction(item: {
+    customerId?: string;
+    customerName?: string;
+    recommendedLimit?: number;
+    creditLimit?: number;
+    status?: string;
+  }, action: "apply_limit" | "hold") {
+    if (!item.customerId) return;
+    const busyKey = `credit-${action}-${String(item.customerId)}`;
+    setAiActionBusyKey(busyKey);
+    setAiActionMessage(null);
+    try {
+      const payload = action === "hold"
+        ? {
+            customerId: String(item.customerId),
+            creditLimit: Math.max(0, Number(item.creditLimit || item.recommendedLimit || 0)),
+            status: "BLOCKED" as const,
+            source: "merchant_ai_dashboard",
+          }
+        : {
+            customerId: String(item.customerId),
+            creditLimit: Math.max(0, Number(item.recommendedLimit || item.creditLimit || 0)),
+            status: "ACTIVE" as const,
+            source: "merchant_ai_dashboard",
+          };
+      const response = await upsertCreditPolicy(payload);
+      setAiActionTone("success");
+      setAiActionMessage(response.message || `${item.customerName || "Customer"} credit policy updated.`);
+      await load();
+    } catch (err) {
+      setAiActionTone("error");
+      setAiActionMessage(err instanceof Error ? err.message : "Unable to update credit policy.");
+    } finally {
+      setAiActionBusyKey(null);
+    }
+  }
 
   const today = useMemo(() => new Date(), []);
   const quickStats = useMemo(() => {
@@ -158,7 +274,21 @@ export function DashboardOverview() {
   const fallbackSeries = useMemo(() => buildDailySeries(orders, 7), [orders]);
   const fallbackRevenueSeries = useMemo(() => buildDailyRevenueSeries(orders, 7), [orders]);
   const snapshotRevenueSeries = useMemo(() => dailySalesSnapshot.slice(-14).map((row) => ({ label: row.date || "Day", value: Number(row.gmv || 0) })), [dailySalesSnapshot]);
-  const chartSales = trendSeries.length ? trendSeries : fallbackSeries;
+  const aiCards = Array.isArray(aiCopilot?.cards) ? aiCopilot.cards : [];
+  const aiSalesSeries = Array.isArray(aiCopilot?.salesSeries)
+    ? aiCopilot.salesSeries.map((row, index) => ({ label: row.label || `AI ${index + 1}`, value: Number(row.value || 0) }))
+    : [];
+  const aiInventoryActions = Array.isArray(aiCopilot?.inventoryActions) ? aiCopilot.inventoryActions : [];
+  const aiCustomerSegments = Array.isArray(aiCopilot?.customerSegments) ? aiCopilot.customerSegments : [];
+  const aiCreditInsights = Array.isArray(aiCopilot?.creditInsights) ? aiCopilot.creditInsights : [];
+  const aiPaymentAlerts = Array.isArray(aiCopilot?.paymentIntelligence?.anomalies) ? aiCopilot.paymentIntelligence.anomalies : [];
+  const aiFulfillmentActions = Array.isArray(aiCopilot?.fulfillmentActions) ? aiCopilot.fulfillmentActions : [];
+  const canViewAiOverview = hasPermission(auth.user, "AI_VIEW_OVERVIEW");
+  const canViewAiInventory = hasPermission(auth.user, "AI_VIEW_INVENTORY");
+  const canViewAiCustomers = hasPermission(auth.user, "AI_VIEW_CUSTOMERS");
+  const canViewAiCredit = hasPermission(auth.user, "AI_VIEW_CREDIT");
+  const canViewAiPayments = hasPermission(auth.user, "AI_VIEW_PAYMENTS");
+  const chartSales = aiSalesSeries.length ? aiSalesSeries : trendSeries.length ? trendSeries : fallbackSeries;
   const chartRevenue = snapshotRevenueSeries.length ? snapshotRevenueSeries : revenueSeries.length ? revenueSeries : fallbackRevenueSeries;
 
   useEffect(() => {
@@ -220,7 +350,187 @@ export function DashboardOverview() {
       </Card>
 
       {error ? <Alert variant="error">{error}</Alert> : null}
+      {aiActionMessage ? <Alert variant={aiActionTone}>{aiActionMessage}</Alert> : null}
       <AnalyticsCards items={quickStats} />
+
+      <Card className="overflow-hidden border-border/70 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.08),_transparent_45%),linear-gradient(135deg,rgba(15,23,42,0.98),rgba(15,118,110,0.92))] text-white">
+        <div className="grid gap-6 p-6 sm:p-8 lg:grid-cols-[1.15fr_0.85fr]">
+          <div>
+            <p className="text-xs uppercase tracking-[0.24em] text-emerald-100/80">AI Copilot</p>
+            <h2 className="dx-display mt-3 text-2xl sm:text-3xl">The shop now has a decision layer, not just charts.</h2>
+            <p className="mt-3 max-w-2xl text-sm text-emerald-50/80 sm:text-base">
+              Forecast, stock pressure, credit watch, payment anomalies, and order follow-ups are bundled here so the team can act before issues grow.
+            </p>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {canViewAiOverview && aiCards.length ? aiCards.map((item) => (
+                <div key={String(item.id || item.title)} className="rounded-2xl border border-white/15 bg-white/8 px-4 py-4 backdrop-blur">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium text-white">{item.title || "AI insight"}</span>
+                    <Badge variant={resolveAiVariant(item.severity)}>{item.metric || "Live"}</Badge>
+                  </div>
+                  <p className="mt-2 text-xs text-emerald-50/75">{item.message || "New AI signal is available."}</p>
+                </div>
+              )) : <div className="rounded-2xl border border-dashed border-white/20 px-4 py-6 text-sm text-emerald-50/75">AI insights will appear here once order, customer, and payment patterns are available.</div>}
+            </div>
+          </div>
+          <div className="rounded-[24px] border border-white/12 bg-black/15 p-5">
+            <p className="text-xs uppercase tracking-[0.2em] text-emerald-100/70">Projected next 7 days</p>
+            <p className="mt-3 text-3xl font-semibold">{Math.round(aiCopilot?.summary?.projectedNext7Days ?? 0)} BDT</p>
+            <div className="mt-4 grid gap-3 text-sm text-emerald-50/80">
+              <div className="flex items-center justify-between rounded-2xl border border-white/10 px-4 py-3"><span>Revenue trend</span><span>{aiCopilot?.summary?.revenueTrend ?? 0}%</span></div>
+              <div className="flex items-center justify-between rounded-2xl border border-white/10 px-4 py-3"><span>Low stock risks</span><span>{aiCopilot?.summary?.lowStockCount ?? 0}</span></div>
+              <div className="flex items-center justify-between rounded-2xl border border-white/10 px-4 py-3"><span>Risky credit customers</span><span>{aiCopilot?.summary?.riskyCreditCustomers ?? 0}</span></div>
+              <div className="flex items-center justify-between rounded-2xl border border-white/10 px-4 py-3"><span>Payment failure rate</span><span>{Math.round((aiCopilot?.summary?.paymentFailureRate ?? 0) * 100)}%</span></div>
+              <div className="flex items-center justify-between rounded-2xl border border-white/10 px-4 py-3"><span>Automation backlog</span><span>{aiCopilot?.summary?.fulfillmentBacklog ?? 0}</span></div>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <Grid minColumnWidth="300px" className="gap-4">
+        <Card>
+          <CardTitle>AI Restock Suggestions</CardTitle>
+          <CardDescription className="mt-2">Predicted demand converted into reorder actions.</CardDescription>
+          <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
+            {canViewAiInventory && aiInventoryActions.length ? aiInventoryActions.slice(0, 5).map((item) => (
+              <div key={String(item.productId || item.name)} className="rounded-2xl border border-border/60 px-4 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-foreground">{item.name || "Product"}</span>
+                  <Badge variant={resolveAiVariant(item.urgency)}>{item.suggestedRestock ?? 0} add</Badge>
+                </div>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span>{item.currentStock ?? 0} in stock</span>
+                  <span>AI threshold {item.reorderPoint ?? 0}</span>
+                  <span>{item.estimatedDaysLeft ?? 0} days left</span>
+                </div>
+                <div className="mt-3 flex justify-end">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => void handleAiRestockAction(item)}
+                    loading={aiActionBusyKey === `restock-${String(item.productId || "")}`}
+                    loadingText="Restocking"
+                    disabled={!item.productId || !Number(item.suggestedRestock || 0)}
+                  >
+                    Restock now
+                  </Button>
+                </div>
+              </div>
+            )) : <p className="text-sm text-muted-foreground">No AI restock suggestions yet.</p>}
+          </div>
+        </Card>
+
+        <Card>
+          <CardTitle>Customer Segments</CardTitle>
+          <CardDescription className="mt-2">Retention and offer targeting generated from recent behavior.</CardDescription>
+          <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
+            {canViewAiCustomers && aiCustomerSegments.length ? aiCustomerSegments.map((segment) => (
+              <div key={String(segment.segment)} className="rounded-2xl border border-border/60 px-4 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-foreground">{segment.segment || "Segment"}</span>
+                  <Badge variant="neutral">{segment.count ?? 0}</Badge>
+                </div>
+                <p className="mt-2 text-xs">{segment.description || "Behavior cluster"}</p>
+              </div>
+            )) : <p className="text-sm text-muted-foreground">Customer segments will appear once the shop has enough repeat behavior.</p>}
+          </div>
+        </Card>
+
+        <Card>
+          <CardTitle>Credit Watch</CardTitle>
+          <CardDescription className="mt-2">Scored credit customers who may need limit changes or review.</CardDescription>
+          <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
+            {canViewAiCredit && aiCreditInsights.length ? aiCreditInsights.slice(0, 5).map((item) => (
+              <div key={String(item.customerId || item.customerName)} className="rounded-2xl border border-border/60 px-4 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-foreground">{item.customerName || "Customer"}</span>
+                  <Badge variant={resolveAiVariant(item.riskLabel)}>{item.creditScore ?? 0}</Badge>
+                </div>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span>Outstanding {item.outstandingBalance ?? 0} BDT</span>
+                  <span>Use {Math.round(Number(item.utilizationRate ?? 0) * 100)}%</span>
+                  <span>Limit {item.recommendedLimit ?? 0}</span>
+                </div>
+                <div className="mt-3 flex flex-wrap justify-end gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => void handleAiCreditAction(item, "apply_limit")}
+                    loading={aiActionBusyKey === `credit-apply_limit-${String(item.customerId || "")}`}
+                    loadingText="Applying"
+                    disabled={!item.customerId || !Number(item.recommendedLimit || item.creditLimit || 0)}
+                  >
+                    Apply AI limit
+                  </Button>
+                  {String(item.status || "ACTIVE").toUpperCase() !== "BLOCKED" ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void handleAiCreditAction(item, "hold")}
+                      loading={aiActionBusyKey === `credit-hold-${String(item.customerId || "")}`}
+                      loadingText="Holding"
+                      disabled={!item.customerId}
+                    >
+                      Hold credit
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            )) : <p className="text-sm text-muted-foreground">No credit accounts are active yet.</p>}
+          </div>
+        </Card>
+
+        <Card>
+          <CardTitle>Payment & Automation Alerts</CardTitle>
+          <CardDescription className="mt-2">Gateway anomalies and stalled fulfillment actions.</CardDescription>
+          <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
+            {canViewAiPayments
+              ? aiPaymentAlerts.slice(0, 3).map((item, index) => (
+                  <div key={`${item.gateway || "gateway"}-${index}`} className="rounded-2xl border border-border/60 px-4 py-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium text-foreground">{item.gateway || "Gateway"}</span>
+                      <Badge variant={resolveAiVariant(item.severity)}>{item.severity || "info"}</Badge>
+                    </div>
+                    <p className="mt-2 text-xs">{item.message || "Payment anomaly detected."}</p>
+                  </div>
+                ))
+              : null}
+            {canViewAiOverview
+              ? aiFulfillmentActions.slice(0, 2).map((item) => {
+                  const nextAction = getFulfillmentAction(item.status);
+                  return (
+                    <div key={String(item.orderId || item.suggestion)} className="rounded-2xl border border-border/60 px-4 py-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium text-foreground">Order {String(item.orderId || "").slice(-6)}</span>
+                        <Badge variant={resolveAiVariant(item.priority)}>{Math.round(item.ageHours ?? 0)}h</Badge>
+                      </div>
+                      <p className="mt-2 text-xs">{item.suggestion || "Fulfillment follow-up required."}</p>
+                      {nextAction ? (
+                        <div className="mt-3 flex justify-end">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => void handleAiFulfillmentAction(item)}
+                            loading={aiActionBusyKey === `fulfillment-${String(item.orderId || "")}`}
+                            loadingText="Applying"
+                          >
+                            {nextAction.label}
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })
+              : null}
+            {canViewAiPayments && canViewAiOverview && !aiPaymentAlerts.length && !aiFulfillmentActions.length ? (
+              <p className="text-sm text-muted-foreground">No payment or automation alerts right now.</p>
+            ) : null}
+            {!canViewAiPayments && !canViewAiOverview ? (
+              <p className="text-sm text-muted-foreground">Your role does not include payment or automation intelligence access.</p>
+            ) : null}
+          </div>
+        </Card>
+      </Grid>
 
       <Grid minColumnWidth="320px" className="gap-4">
         <Card>
@@ -265,6 +575,29 @@ export function DashboardOverview() {
       </Grid>
 
       <Grid minColumnWidth="320px" className="gap-4">
+
+        <Card>
+          <CardTitle>AI Action History</CardTitle>
+          <CardDescription className="mt-2">Recent restock, retry, and fulfillment actions triggered from the AI dashboard.</CardDescription>
+          <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
+            {aiActionHistory.length ? aiActionHistory.map((item) => (
+              <div key={String(item.id || `${item.action}-${item.createdAt}`)} className="rounded-2xl border border-border/60 px-4 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-foreground">{formatAiAuditAction(item.action)}</span>
+                  <Badge variant="neutral">{item.targetType || "Action"}</Badge>
+                </div>
+                <p className="mt-2 text-xs">{item.actorName || "Team member"} ? {item.createdAt ? new Date(item.createdAt).toLocaleString() : "Unknown time"}</p>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                  {item.quantity ? <span>Qty {item.quantity}</span> : null}
+                  {item.amount ? <span>{item.amount} BDT</span> : null}
+                  {item.targetId ? <span>Target {String(item.targetId).slice(-6)}</span> : null}
+                </div>
+                {item.note ? <p className="mt-2 text-xs">{item.note}</p> : null}
+              </div>
+            )) : <p className="text-sm text-muted-foreground">AI actions you trigger from this dashboard will appear here.</p>}
+          </div>
+        </Card>
+
         <Card>
           <CardTitle>Order momentum</CardTitle>
           <CardDescription className="mt-2">Recent order count so the team can judge demand at a glance.</CardDescription>
@@ -306,6 +639,36 @@ export function DashboardOverview() {
       </Grid>
     </div>
   );
+}
+
+function formatAiAuditAction(action?: string) {
+  return String(action || "AI_ACTION")
+    .toLowerCase()
+    .split("_")
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
+}
+
+function getFulfillmentAction(status?: string) {
+  const normalized = String(status || "").toUpperCase();
+  if (normalized === "PAYMENT_FAILED") {
+    return { type: "retry" as const, label: "Retry payment" };
+  }
+  if (normalized === "PLACED" || normalized === "PAYMENT_PENDING") {
+    return { type: "status" as const, status: "CONFIRMED", label: "Confirm order" };
+  }
+  if (normalized === "CONFIRMED") {
+    return { type: "status" as const, status: "SHIPPED", label: "Mark shipped" };
+  }
+  return null;
+}
+
+function resolveAiVariant(value?: string) {
+  const normalized = String(value || "").toLowerCase();
+  if (["critical", "high", "warning", "risky", "review"].includes(normalized)) return "warning";
+  if (["healthy", "success"].includes(normalized)) return "success";
+  if (["medium", "info", "watch", "low", "neutral"].includes(normalized)) return "neutral";
+  return "neutral";
 }
 
 function isSameDay(a: Date, b: Date) {

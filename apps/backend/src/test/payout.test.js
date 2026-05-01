@@ -51,7 +51,7 @@ describe("payout.service processPayout", () => {
           status: "PROCESSING",
         }),
       }),
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: "after" }
     );
     expect(FinancialEngine.execute).toHaveBeenCalledWith({
       shopId: "shop-1",
@@ -91,3 +91,4 @@ describe("payout.service processPayout", () => {
     expect(result).toBe(payout);
   });
 });
+

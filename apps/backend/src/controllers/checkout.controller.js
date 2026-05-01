@@ -1,6 +1,6 @@
 const CheckoutEngine =
   require("@/core/checkout/checkout.engine");
-const { logSearchEvent } = require("../services/search.service");
+const { addJob } = require("@/core/infrastructure");
 
 exports.checkout = async (req, res) => {
 
@@ -26,17 +26,27 @@ exports.checkout = async (req, res) => {
   const searchId = req.headers["x-search-id"] ? String(req.headers["x-search-id"]) : null;
   const searchQuery = req.headers["x-search-query"] ? String(req.headers["x-search-query"]) : "";
   if (searchId) {
-    await logSearchEvent({
-      searchId,
-      query: searchQuery,
-      eventType: "CHECKOUT",
-      userId: req.user?.id || null,
-      shopId: req.user?.shopId || null,
-      metadata: {
-        items: Array.isArray(req.body.items) ? req.body.items.length : 0,
-        totalAmount: Number(req.body.totalAmount || 0),
-      },
-    });
+    try {
+      await addJob("search-log-event", {
+        searchId,
+        query: searchQuery,
+        eventType: "CHECKOUT",
+        userId: req.user?.id || null,
+        shopId: req.user?.shopId || null,
+        metadata: {
+          items: Array.isArray(req.body.items) ? req.body.items.length : 0,
+          totalAmount: Number(req.body.totalAmount || 0),
+        },
+      }, {
+        queueName: "analytics",
+        attempts: 2,
+        backoff: { type: "exponential", delay: 1000 },
+        removeOnComplete: true,
+        removeOnFail: false,
+      });
+    } catch {
+      // Keep checkout response path independent from telemetry writes.
+    }
   }
 
   res.json({

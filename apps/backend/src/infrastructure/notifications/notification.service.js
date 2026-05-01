@@ -46,7 +46,7 @@ async function resolveSettings(userId) {
   const settings = await NotificationSetting.findOneAndUpdate(
     { userId },
     { $setOnInsert: { userId } },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: "after" }
   ).lean();
 
   return mergeDefaults(settings);
@@ -201,3 +201,4 @@ module.exports = {
   dispatchNotification,
   resolveSettings,
 };
+

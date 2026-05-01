@@ -1,5 +1,6 @@
 const request = require("supertest");
-const mongoose = require("mongoose");
+
+let mongoose;
 
 describe("shipping routes", () => {
   let app;
@@ -10,6 +11,15 @@ describe("shipping routes", () => {
 
   beforeAll(async () => {
     jest.resetModules();
+
+    mongoose = require("mongoose");
+    if (mongoose.connection.readyState !== 1) {
+      await mongoose.connect(process.env.MONGO_URI_TEST, {
+        serverSelectionTimeoutMS: 15000,
+        socketTimeoutMS: 45000,
+        maxPoolSize: 5,
+      });
+    }
 
     shopId = new mongoose.Types.ObjectId();
 

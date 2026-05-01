@@ -304,7 +304,7 @@ async function logGatewayUsage(req, statusCode) {
           lastStatusCode: statusCode,
         },
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: "after" }
     );
     await ApiKey.updateOne(
       { _id: apiKeyId },
@@ -341,3 +341,4 @@ module.exports = {
   requireScopes,
   logGatewayUsage,
 };
+

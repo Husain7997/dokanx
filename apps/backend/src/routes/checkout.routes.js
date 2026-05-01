@@ -3,12 +3,14 @@ const router =
 
 const ctrl =
   require("@/controllers/checkout.controller");
+const idempotency =
+  require("@/core/idempotency/idempotency.middleware");
 
 const { protect } =
   require("@/middlewares");
 
 router.use(protect);
 
-router.post("/", ctrl.checkout);
+router.post("/", idempotency, ctrl.checkout);
 
 module.exports = router;

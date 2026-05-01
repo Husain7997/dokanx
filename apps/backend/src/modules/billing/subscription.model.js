@@ -4,7 +4,7 @@ const schema = new mongoose.Schema(
 {
   tenant: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Tenant",
+    ref: "Shop",
   },
 
   plan: {

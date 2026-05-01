@@ -23,8 +23,14 @@ export function registerUnauthorizedHandler(handler: (() => void | Promise<void>
   unauthorizedHandler = handler;
 }
 
-function buildUrl(baseUrl: string, path: string) {
-  return `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
+function buildUrl(baseUrl: string, path: string, method: RequestMethod) {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  if (method !== "GET") {
+    return `${baseUrl}${normalizedPath}`;
+  }
+
+  const separator = normalizedPath.includes("?") ? "&" : "?";
+  return `${baseUrl}${normalizedPath}${separator}_ts=${Date.now()}`;
 }
 
 function isRetryableStatus(status: number) {
@@ -60,11 +66,13 @@ export async function apiRequest<T>(baseUrl: string, path: string, options: ApiR
     const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
     try {
-      const response = await fetch(buildUrl(baseUrl, path), {
-        method: options.method ?? "GET",
+      const method = options.method ?? "GET";
+      const response = await fetch(buildUrl(baseUrl, path, method), {
+        method,
         signal: controller.signal,
         headers: {
           "Content-Type": "application/json",
+          ...(method === "GET" ? { "Cache-Control": "no-cache, no-store, must-revalidate", Pragma: "no-cache", Expires: "0" } : {}),
           ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
           ...(options.tenantId ? { "x-tenant-id": options.tenantId } : {}),
           ...(options.cartToken ? { "x-cart-token": options.cartToken } : {}),

@@ -23,7 +23,7 @@ exports.updateMe = async (req, res) => {
       website,
       ...(status ? { status } : {}),
     },
-    { new: true, upsert: true }
+    { returnDocument: "after", upsert: true }
   );
 
   res.json({ message: "Developer profile updated", data: developer });
@@ -49,3 +49,4 @@ exports.getUsage = async (req, res) => {
 
   res.json({ data: usage });
 };
+

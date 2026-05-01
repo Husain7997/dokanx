@@ -2,14 +2,13 @@ const PaymentAttempt = require("../models/paymentAttempt.model");
 const Order = require("../models/order.model");
 const { FinancialEngine, FinancialTypes } = require("@/core/financial");
 const mongoose = require("mongoose");
-const { runOnce } = require("@/core/infrastructure");
+const { runOnce, addJob } = require("@/core/infrastructure");
 const { publishEvent } = require("@/infrastructure/events/event.dispatcher");
 const logger = require("@/core/infrastructure/logger");
 const AccountingEntry = require("../modules/wallet-engine/accountingEntry.model");
 const fraudService = require("./fraud.service");
 const { resolveShopId } = require("../utils/order-normalization.util");
 const commissionService = require("../modules/commission-engine/commission.service");
-const agentService = require("../modules/agent/agent.service");
 const walletService = require("./wallet.service");
 const { assertShopFinancialInvariant } = require("./ledger-reconciliation.service");
 const creditService = require("../modules/credit-engine/credit.service");
@@ -182,26 +181,18 @@ async function handlePaymentWebhook(payload) {
     paymentAttemptId: attempt._id,
   });
 
-  try {
-    await agentService.handleSuccessfulShopPayment({
-      shopId,
-      amount: attempt.amount,
-      orderId: order._id,
-    });
-  } catch (agentError) {
-    console.warn("Agent payment hook failed", agentError?.message || agentError);
-  }
-
-  try {
-    await fraudService.evaluateTransaction({
-      orderId: order._id,
-      paymentAttemptId: attempt._id,
-      source: "payment_received",
-      context: {},
-    });
-  } catch (fraudError) {
-    console.warn("Fraud evaluation failed", fraudError?.message || fraudError);
-  }
+  await addJob("payment-post-success", {
+    orderId: order._id,
+    paymentAttemptId: attempt._id,
+    shopId,
+    amount: attempt.amount,
+  }, {
+    queueName: "payments",
+    attempts: 3,
+    backoff: { type: "exponential", delay: 3000 },
+    removeOnComplete: true,
+    removeOnFail: false,
+  });
 
   return { ok: true };
 }

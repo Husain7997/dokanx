@@ -2,6 +2,9 @@ const Notification = require("../models/notification.model");
 const NotificationSetting = require("../models/notificationSetting.model");
 const User = require("../models/user.model");
 const { addJob } = require("@/core/infrastructure");
+const {
+  createReadQuery,
+} = require("../infrastructure/database/mongo.client");
 
 const DEFAULT_SETTINGS = {
   channels: {
@@ -21,7 +24,7 @@ const DEFAULT_SETTINGS = {
 };
 
 exports.listNotifications = async (req, res) => {
-  const notifications = await Notification.find({ userId: req.user._id })
+  const notifications = await createReadQuery(Notification, { userId: req.user._id })
     .sort({ createdAt: -1 })
     .lean();
   res.json({ data: notifications });
@@ -32,7 +35,7 @@ exports.markRead = async (req, res) => {
   const notification = await Notification.findOneAndUpdate(
     { _id: notificationId, userId: req.user._id },
     { isRead: true },
-    { new: true }
+    { returnDocument: "after" }
   );
   if (!notification) return res.status(404).json({ message: "Notification not found" });
   res.json({ data: notification });
@@ -64,7 +67,7 @@ exports.getSettings = async (req, res) => {
   const settings = await NotificationSetting.findOneAndUpdate(
     { userId: req.user._id },
     { $setOnInsert: { userId: req.user._id } },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: "after" }
   ).lean();
 
   res.json({
@@ -93,7 +96,7 @@ exports.updateSettings = async (req, res) => {
   const settings = await NotificationSetting.findOneAndUpdate(
     { userId: req.user._id },
     { $set: updates, $setOnInsert: { userId: req.user._id } },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: "after" }
   ).lean();
 
   res.json({
@@ -133,7 +136,7 @@ exports.registerPushToken = async (req, res) => {
   await User.findByIdAndUpdate(
     req.user._id,
     { $addToSet: { pushTokens: token } },
-    { new: true }
+    { returnDocument: "after" }
   );
 
   res.json({ success: true });
@@ -148,8 +151,9 @@ exports.unregisterPushToken = async (req, res) => {
   await User.findByIdAndUpdate(
     req.user._id,
     { $pull: { pushTokens: token } },
-    { new: true }
+    { returnDocument: "after" }
   );
 
   res.json({ success: true });
 };
+
