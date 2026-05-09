@@ -1,5 +1,5 @@
 const router = require("express").Router();
-const { adjustStock, listInventory, inventoryAlerts } =
+const { adjustStock, listInventory, inventoryAlerts, inventoryIntelligence } =
   require("../controllers/inventory.controller");
 
 const {protect} = require("../middlewares");
@@ -26,6 +26,12 @@ router.get(
   "/alerts",
   protect,
   inventoryAlerts
+);
+
+router.get(
+  "/intelligence",
+  protect,
+  inventoryIntelligence
 );
 
 module.exports = router;

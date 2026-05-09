@@ -13,6 +13,7 @@ type ProductResponse = {
     category?: string;
     price?: number;
     stock?: number;
+    imageUrl?: string;
   } & JsonValue;
   product?: {
     _id?: string;
@@ -20,6 +21,7 @@ type ProductResponse = {
     category?: string;
     price?: number;
     stock?: number;
+    imageUrl?: string;
   } & JsonValue;
 };
 
@@ -33,6 +35,7 @@ type ProductListResponse = {
     price?: number;
     stock?: number;
     isActive?: boolean;
+    imageUrl?: string;
   } & JsonValue>;
 };
 
@@ -215,6 +218,9 @@ type SettlementResponse = {
 type WalletSummaryResponse = {
   data?: {
     balance?: number;
+    availableBalance?: number;
+    pendingBalance?: number;
+    lockedBalance?: number;
     updatedAt?: string;
   } & JsonValue;
 };
@@ -398,10 +404,48 @@ type InventoryListResponse = {
   data?: Array<{
     _id?: string;
     productId?: string;
+    product?: string;
     available?: number;
+    stock?: number;
     reorderPoint?: number;
     updatedAt?: string;
   } & JsonValue>;
+};
+
+type InventoryProductInsight = {
+  _id?: string;
+  name?: string;
+  category?: string;
+  price?: number;
+  costPrice?: number;
+  stock?: number;
+  minStock?: number;
+  lastSoldAt?: string | null;
+  totalSold?: number;
+  avgDailySale?: number;
+  reorderQty?: number;
+  margin?: number;
+  marginPct?: number;
+  isLossRisk?: boolean;
+  quantitySold7d?: number;
+  orderCount7d?: number;
+} & JsonValue;
+
+type InventoryIntelligenceResponse = {
+  data?: {
+    summary?: {
+      lowStockCount?: number;
+      deadStockCount?: number;
+      topSellingCount?: number;
+      reorderCount?: number;
+      lossRiskCount?: number;
+    };
+    lowStock?: InventoryProductInsight[];
+    deadStock?: InventoryProductInsight[];
+    topSelling?: InventoryProductInsight[];
+    reorder?: InventoryProductInsight[];
+    lossRisk?: InventoryProductInsight[];
+  };
 };
 
 type AgentMeResponse = {
@@ -414,6 +458,54 @@ type AgentMeResponse = {
     totalEarnings?: number;
     status?: string;
   } & JsonValue;
+};
+
+type AgentMerchantResponse = {
+  success?: boolean;
+  data?: Array<{
+    _id?: string;
+    name?: string;
+    slug?: string;
+    domain?: string;
+    storefrontDomain?: string;
+    isActive?: boolean;
+    status?: string;
+    createdAt?: string;
+  } & JsonValue>;
+  error?: JsonValue;
+};
+
+type AgentEarningsResponse = {
+  success?: boolean;
+  data?: {
+    availableBalance?: number;
+    totalEarnings?: number;
+    lifetimeCommission?: number;
+    events?: Array<{
+      _id?: string;
+      eventType?: string;
+      shopId?: string;
+      createdAt?: string;
+      metadata?: JsonValue;
+    } & JsonValue>;
+    payouts?: Array<JsonValue>;
+  } & JsonValue;
+  error?: JsonValue;
+};
+
+type AgentInsightsResponse = {
+  success?: boolean;
+  data?: {
+    conversionRate?: number;
+    activeShops?: number;
+    incompleteShops?: number;
+    pendingPayouts?: number;
+    conversionsToday?: number;
+    bestPerformingArea?: string;
+    riskFlags?: string[];
+    recommendations?: string[];
+  } & JsonValue;
+  error?: JsonValue;
 };
 
 type MerchantAiCopilotResponse = {
@@ -515,17 +607,26 @@ function getHeaders() {
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${getApiBaseUrl()}${path}`, {
-    ...init,
-    headers: {
-      ...getHeaders(),
-      ...(init.headers || {}),
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${getApiBaseUrl()}${path}`, {
+      ...init,
+      headers: {
+        ...getHeaders(),
+        ...(init.headers || {}),
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Network request failed";
+    window.dispatchEvent(new CustomEvent("dokanx:api-error", { detail: { message } }));
+    throw new Error(message);
+  }
 
   const payload = (await response.json().catch(() => null)) as (JsonValue & { message?: string; data?: unknown }) | null;
   if (!response.ok) {
-    throw new Error(payload?.message || "Request failed");
+    const message = payload?.message || "Request failed";
+    window.dispatchEvent(new CustomEvent("dokanx:api-error", { detail: { message } }));
+    throw new Error(message);
   }
 
   return payload as T;
@@ -536,6 +637,7 @@ export function createProduct(payload: {
   category: string;
   price: number;
   stock: number;
+  imageUrl?: string;
 }) {
   return request<ProductResponse>("/products", {
     method: "POST",
@@ -547,11 +649,16 @@ export function listShopProducts(shopId: string) {
   return request<ProductListResponse>(`/products/shop/${shopId}`);
 }
 
+export function getProduct(productId: string) {
+  return request<ProductResponse>(`/products/${encodeURIComponent(productId)}`);
+}
+
 export function updateProduct(productId: string, payload: {
   name: string;
   category: string;
   price: number;
   stock: number;
+  imageUrl?: string;
 }) {
   return request<ProductResponse>(`/products/${productId}`, {
     method: "PATCH",
@@ -743,6 +850,27 @@ export function getShopSettings() {
   return request<ShopSettingsResponse>("/shops/me/settings");
 }
 
+export function updateProfile(payload: {
+  name: string;
+  phone?: string;
+  language?: "en" | "bn";
+}) {
+  return request<{ success?: boolean; message?: string; user?: JsonValue }>("/me", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function changePassword(payload: {
+  currentPassword: string;
+  newPassword: string;
+}) {
+  return request<MutationResponse>("/me/password", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function listPublicShops() {
   return request<PublicShopListResponse>("/shops/public");
 }
@@ -902,7 +1030,11 @@ export function createPosOrder(payload: {
 }) {
   return request<MutationResponse>("/pos/orders", {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      items: payload.items,
+      customerId: payload.customerId,
+      paymentMode: payload.paymentType ? payload.paymentType.toUpperCase() : "CASH",
+    }),
   });
 }
 
@@ -1089,6 +1221,51 @@ export function trackShipment(trackingNumber: string) {
   return request<TrackingResponse>(`/shipping/track/${encodeURIComponent(trackingNumber)}`);
 }
 
+export function assignDeliveryOrder(payload: {
+  orderId: string;
+  deliveryAgentId: string;
+  carrier?: string;
+}) {
+  return request<{ success?: boolean; data?: JsonValue; error?: JsonValue }>("/delivery/assign", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function createDeliveryAgent(payload: {
+  name: string;
+  phone: string;
+  email?: string;
+}) {
+  return request<{ success?: boolean; data?: JsonValue; error?: JsonValue }>("/delivery/agents", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listDeliveryAgents() {
+  return request<{ success?: boolean; data?: Array<JsonValue>; error?: JsonValue }>("/delivery/agents");
+}
+
+export function listDeliveryOrders(deliveryAgentId?: string) {
+  const search = new URLSearchParams();
+  if (deliveryAgentId) search.set("deliveryAgentId", deliveryAgentId);
+  return request<{ success?: boolean; data?: Array<JsonValue>; error?: JsonValue }>(
+    `/delivery/orders${search.toString() ? `?${search.toString()}` : ""}`,
+  );
+}
+
+export function updateDeliveryStatus(payload: {
+  shipmentId: string;
+  status: string;
+  location?: string;
+}) {
+  return request<{ success?: boolean; data?: JsonValue; error?: JsonValue }>("/delivery/status", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function downloadShipmentLabelPdf(trackingNumber: string) {
   const response = await fetch(`${getApiBaseUrl()}/shipping/labels/${encodeURIComponent(trackingNumber)}/pdf`, {
     headers: getHeaders(),
@@ -1122,8 +1299,50 @@ export function listOrders(limit?: number) {
   return request<OrderListResponse>(`/orders${search.toString() ? `?${search.toString()}` : ""}`);
 }
 
+export function getOrder(orderId: string) {
+  return request<{ data?: JsonValue; order?: JsonValue }>(`/orders/${encodeURIComponent(orderId)}`);
+}
+
 export function getAgentMe() {
   return request<AgentMeResponse>("/agents/me");
+}
+
+export function createAgentMerchant(payload: {
+  shopName: string;
+  ownerName?: string;
+  phone: string;
+  email?: string;
+  password?: string;
+  slug?: string;
+}) {
+  return request<{ success?: boolean; data?: JsonValue; error?: JsonValue }>("/agents/create-merchant", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listAgentMerchants() {
+  return request<AgentMerchantResponse>("/agents/merchants");
+}
+
+export function getAgentEarnings() {
+  return request<AgentEarningsResponse>("/agents/earnings");
+}
+
+export function getAgentInsights() {
+  return request<AgentInsightsResponse>("/agents/insights");
+}
+
+export function requestAgentPayout(payload: {
+  amount: number;
+  method: "BKASH" | "NAGAD" | "BANK" | "MANUAL";
+  accountRef: string;
+  note?: string;
+}) {
+  return request<{ success?: boolean; data?: JsonValue; error?: JsonValue }>("/agents/payouts", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function listInventory(limit?: number) {
@@ -1132,6 +1351,10 @@ export function listInventory(limit?: number) {
     search.set("limit", String(limit));
   }
   return request<InventoryListResponse>(`/inventory${search.toString() ? `?${search.toString()}` : ""}`);
+}
+
+export function getInventoryIntelligence() {
+  return request<InventoryIntelligenceResponse>("/inventory/intelligence");
 }
 
 export function updateOrderStatus(orderId: string, status: string) {

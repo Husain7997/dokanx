@@ -1,9 +1,3 @@
-const Wallet =
-  require("@/models/wallet.model");
-
-const ledgerRepo =
-  require("@/modules/ledger/ledger.repository");
-
 const mongoose = require("mongoose");
 
 const circuit =
@@ -11,6 +5,8 @@ const circuit =
 
 const { publishEvent } =
   require("@/infrastructure/events/event.dispatcher");
+const { createLedgerEntry } =
+  require("@/services/ledger.service");
 
 /* =========================================
    🔒 GLOBAL LEDGER CONTRACT
@@ -97,35 +93,16 @@ async function execute(command) {
         meta = {}
       } = command;
 
-      const wallet =
-        await Wallet.findOne(
-          { shopId },
-          null,
-          { session }
-        );
-
-      if (!wallet)
-        throw new Error("Wallet not found");
-
-      const newBalance =
-        wallet.balance + amount;
-
-      if (newBalance < 0)
-        throw new Error(
-          "INSUFFICIENT_BALANCE"
-        );
-
-      wallet.balance = newBalance;
-
-      await wallet.save({ session });
-
-      await ledgerRepo.append({
-        shopId,
-        amount,
-        type,
+      const result = await createLedgerEntry({
+        merchantId: shopId,
+        type: normalizeLedgerType(type),
+        amount: Math.abs(amount),
+        direction: amount < 0 ? "DEBIT" : "CREDIT",
         referenceId,
-        meta
-      }, session);
+        referenceType: meta.referenceType || "MANUAL",
+        status: "CONFIRMED",
+        meta,
+      }, { session });
 
       if (ownedSession) {
         await session.commitTransaction();
@@ -141,7 +118,7 @@ async function execute(command) {
         }
       );
 
-      return { balance: newBalance };
+      return { balance: Number(result.wallet?.availableBalance ?? result.wallet?.balance ?? 0) };
 
     } catch (err) {
 
@@ -158,6 +135,19 @@ async function execute(command) {
     }
 
   });
+}
+
+function normalizeLedgerType(type) {
+  const normalized = String(type || "").toUpperCase();
+  if (normalized.includes("PAYOUT")) return "PAYOUT";
+  if (normalized.includes("REFUND")) return "REFUND";
+  if (normalized.includes("COMMISSION")) return "COMMISSION";
+  if (normalized.includes("SALE") || normalized.includes("INCOME") || normalized.includes("CREDIT")) return "SALE";
+  if (normalized.includes("EXPENSE") || normalized.includes("DEBIT")) return "EXPENSE";
+  if (normalized.includes("ADJUST")) return "ADJUSTMENT";
+  if (normalized.includes("TOPUP")) return "TOPUP";
+  if (normalized.includes("TRANSFER")) return "TRANSFER";
+  return "ADJUSTMENT";
 }
 
 module.exports = { execute };

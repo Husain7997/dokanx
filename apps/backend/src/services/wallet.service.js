@@ -18,6 +18,10 @@ const User =
  require("../models/user.model");
 const logger =
  require("@/core/infrastructure/logger");
+const ledgerService =
+ require("./ledger.service");
+const Ledger =
+ require("../modules/ledger/ledger.model");
 
 function normalizeCustomerWallet(wallet = {}) {
   return {
@@ -309,57 +313,25 @@ async function creditWallet({
   return runOnce(
     `wallet-credit:${normalized.referenceId}`,
     async () => {
-      const ownedSession = !session;
-      const activeSession = session || await mongoose.startSession();
-      try {
-        if (ownedSession) {
-          activeSession.startTransaction();
-        }
-        const result = await FinancialEngine.execute({
-          shopId: normalized.shopId,
-          amount: normalized.amount,
-          type: "WALLET_CREDIT",
-          referenceId: normalized.referenceId,
-          session: activeSession,
-        });
-        await accountingService.addTransaction({
-          shopId: normalized.shopId,
-          type: "income",
-          walletType: "CASH",
-          amount: normalized.amount,
-          referenceId: normalized.referenceId,
-          metadata: { source: "wallet_credit" },
-          applyWalletBalance: false,
-          session: activeSession,
-        });
-        await verifyShopWalletPostingInvariant({
-          shopId: normalized.shopId,
-          referenceId: normalized.referenceId,
-          transactionType: "income",
-          walletType: "CASH",
-          amount: normalized.amount,
-          session: activeSession,
-        });
-        if (ownedSession) {
-          await activeSession.commitTransaction();
-        }
-        logger.info({
-          event: "SHOP_WALLET_CREDIT_APPLIED",
-          shopId: String(normalized.shopId),
-          referenceId: normalized.referenceId,
-          amount: normalized.amount,
-        }, "Shop wallet credited");
-        return result;
-      } catch (error) {
-        if (ownedSession) {
-          await activeSession.abortTransaction();
-        }
-        throw error;
-      } finally {
-        if (ownedSession) {
-          activeSession.endSession();
-        }
-      }
+      const result = await ledgerService.createLedgerEntry({
+        merchantId: normalized.shopId,
+        type: "ADJUSTMENT",
+        direction: "CREDIT",
+        amount: normalized.amount,
+        referenceId: normalized.referenceId,
+        referenceType: "MANUAL",
+        status: "CONFIRMED",
+        meta: { source: "wallet_credit" },
+      }, {
+        session,
+      });
+      logger.info({
+        event: "SHOP_WALLET_CREDIT_APPLIED",
+        shopId: String(normalized.shopId),
+        referenceId: normalized.referenceId,
+        amount: normalized.amount,
+      }, "Shop wallet credited");
+      return { balance: Number(result.wallet?.availableBalance ?? result.wallet?.balance ?? 0) };
     }
   );
 }
@@ -381,66 +353,44 @@ async function debitWallet({
   return runOnce(
     `wallet-debit:${normalized.referenceId}`,
     async () => {
-      const ownedSession = !session;
-      const activeSession = session || await mongoose.startSession();
-      try {
-        if (ownedSession) {
-          activeSession.startTransaction();
-        }
-        const result = await FinancialEngine.execute({
-          shopId: normalized.shopId,
-          amount: -Math.abs(normalized.amount),
-          type: "WALLET_DEBIT",
-          referenceId: normalized.referenceId,
-          session: activeSession,
-        });
-        await accountingService.addTransaction({
-          shopId: normalized.shopId,
-          type: "expense",
-          walletType: "CASH",
-          amount: normalized.amount,
-          referenceId: normalized.referenceId,
-          metadata: { source: "wallet_debit" },
-          applyWalletBalance: false,
-          session: activeSession,
-        });
-        await verifyShopWalletPostingInvariant({
-          shopId: normalized.shopId,
-          referenceId: normalized.referenceId,
-          transactionType: "expense",
-          walletType: "CASH",
-          amount: normalized.amount,
-          session: activeSession,
-        });
-        if (ownedSession) {
-          await activeSession.commitTransaction();
-        }
-        logger.info({
-          event: "SHOP_WALLET_DEBIT_APPLIED",
-          shopId: String(normalized.shopId),
-          referenceId: normalized.referenceId,
-          amount: normalized.amount,
-        }, "Shop wallet debited");
-        return result;
-      } catch (error) {
-        if (ownedSession) {
-          await activeSession.abortTransaction();
-        }
-        throw error;
-      } finally {
-        if (ownedSession) {
-          activeSession.endSession();
-        }
-      }
+      const result = await ledgerService.createLedgerEntry({
+        merchantId: normalized.shopId,
+        type: "ADJUSTMENT",
+        direction: "DEBIT",
+        amount: normalized.amount,
+        referenceId: normalized.referenceId,
+        referenceType: "MANUAL",
+        status: "CONFIRMED",
+        meta: { source: "wallet_debit" },
+      }, {
+        session,
+      });
+      logger.info({
+        event: "SHOP_WALLET_DEBIT_APPLIED",
+        shopId: String(normalized.shopId),
+        referenceId: normalized.referenceId,
+        amount: normalized.amount,
+      }, "Shop wallet debited");
+      return { balance: Number(result.wallet?.availableBalance ?? result.wallet?.balance ?? 0) };
     }
   );
 }
 
 async function addTransaction(input) {
   const normalized = normalizeWalletInput(input);
-  return accountingService.addTransaction({
-    ...normalized,
-    metadata: normalized.metadata || {},
+  const transactionType = String(normalized.type || normalized.transactionType || "").toLowerCase();
+  const direction = transactionType === "expense" ? "DEBIT" : "CREDIT";
+  const type = direction === "CREDIT" ? "SALE" : "EXPENSE";
+  return ledgerService.createLedgerEntry({
+    merchantId: normalized.shopId,
+    type,
+    direction,
+    amount: normalized.amount,
+    referenceId: normalized.referenceId,
+    referenceType: normalized.metadata?.referenceType || "MANUAL",
+    status: "CONFIRMED",
+    meta: normalized.metadata || {},
+  }, {
     session: normalized.session || null,
   });
 }
@@ -450,9 +400,29 @@ async function getLedger(filters) {
 }
 
 async function generateReport(filters) {
-  const report = await accountingService.generateReport(filters);
-  report.profitLoss = Number((report.totalIncome - report.totalExpense).toFixed(2));
-  return report;
+  const filter = { shopId: filters.shopId };
+  if (filters.type) filter.type = String(filters.type).toUpperCase();
+  if (filters.dateFrom || filters.dateTo) {
+    filter.createdAt = {};
+    if (filters.dateFrom) filter.createdAt.$gte = new Date(filters.dateFrom);
+    if (filters.dateTo) filter.createdAt.$lte = new Date(filters.dateTo);
+  }
+  const rows = await Ledger.find(filter).sort({ createdAt: -1 }).lean();
+  const confirmed = rows.filter((row) => row.status === "CONFIRMED");
+  const totalIncome = confirmed
+    .filter((row) => row.direction === "CREDIT")
+    .reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const totalExpense = confirmed
+    .filter((row) => row.direction === "DEBIT")
+    .reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  return {
+    totalIncome: Number(totalIncome.toFixed(2)),
+    totalExpense: Number(totalExpense.toFixed(2)),
+    totalCheque: 0,
+    totalDue: 0,
+    profitLoss: Number((totalIncome - totalExpense).toFixed(2)),
+    rows,
+  };
 }
 
 async function verifyShopWalletPostingInvariant({

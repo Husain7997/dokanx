@@ -53,6 +53,15 @@ router.post(
   payoutController.execute
 );
 
+router.post(
+  '/:id/reject',
+  requireSensitiveOtp({
+    action: 'PAYOUT_REJECT',
+    targetId: (req) => req.params.id,
+  }),
+  payoutController.reject
+);
+
 /**
  * 🔹 Manual payout (ops / internal)
  */

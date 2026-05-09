@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@dokanx/auth";
 import {
   Alert,
@@ -31,7 +32,9 @@ type InventoryRow = {
   _id?: string;
   productId?: string;
   available?: number;
+  stock?: number;
   reorderPoint?: number;
+  minStock?: number;
   updatedAt?: string;
 };
 
@@ -70,6 +73,8 @@ export function DashboardOverview() {
   const [customers, setCustomers] = useState<Array<{ totalDue?: number; phone?: string }>>([]);
   const [inventory, setInventory] = useState<InventoryRow[]>([]);
   const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [walletLockedBalance, setWalletLockedBalance] = useState<number>(0);
+  const [walletPendingBalance, setWalletPendingBalance] = useState<number>(0);
   const [walletReport, setWalletReport] = useState<{ totalIncome?: number; totalExpense?: number; profitLoss?: number; totalDue?: number } | null>(null);
   const [summary, setSummary] = useState<{ sales?: { totalSales?: number; totalOrders?: number } } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -115,7 +120,9 @@ export function DashboardOverview() {
       setOrders(Array.isArray(ordersResponse.data) ? (ordersResponse.data as OrderRow[]) : []);
       setCustomers(Array.isArray(customerResponse.data) ? customerResponse.data as Array<{ totalDue?: number; phone?: string }> : []);
       setInventory(Array.isArray(inventoryResponse.data) ? (inventoryResponse.data as InventoryRow[]) : []);
-      setWalletBalance(Number(walletResponse.data?.balance ?? 0));
+      setWalletBalance(Number(walletResponse.data?.availableBalance ?? walletResponse.data?.balance ?? 0));
+      setWalletLockedBalance(Number(walletResponse.data?.lockedBalance ?? 0));
+      setWalletPendingBalance(Number(walletResponse.data?.pendingBalance ?? 0));
       setWalletReport(walletReportResponse.data || null);
       setSummary(summaryResponse.data || null);
       setAiCopilot(aiResponse?.data || null);
@@ -249,7 +256,7 @@ export function DashboardOverview() {
     const todayKey = toDateKey(today);
     const todaysSalesFromSnapshot = dailySalesSnapshot.find((row) => row.date === todayKey)?.gmv || 0;
     const todaysSales = todaysSalesFromSnapshot || orders.filter((order) => order.createdAt && isSameDay(new Date(order.createdAt), today)).reduce((acc, order) => acc + Number(order.totalAmount || 0), 0);
-    const lowStock = inventory.filter((row) => Number(row.available || 0) <= Number(row.reorderPoint || 0)).length;
+    const lowStock = inventory.filter((row) => Number(row.available ?? row.stock ?? 0) <= Number(row.reorderPoint ?? row.minStock ?? 5)).length;
     const delivered = orders.filter((order) => String(order.status || "") === "DELIVERED").length;
     const conversion = shipmentSnapshot?.successRate ? Math.round(shipmentSnapshot.successRate * 100) : totalOrders ? Math.round((delivered / totalOrders) * 100) : 0;
     const lowStockCount = inventorySnapshot?.lowStockCount ?? lowStock;
@@ -257,19 +264,20 @@ export function DashboardOverview() {
     const searchableCustomers = customers.filter((customer) => Boolean(customer.phone)).length;
 
     return [
-      { label: "Today's sales", value: `${todaysSales} BDT`, meta: "Sales today" },
-      { label: "Pending orders", value: String(pendingOrders), meta: "Needs action" },
-      { label: "Wallet balance", value: `${walletBalance} BDT`, meta: "Available payout" },
-      { label: "Low stock alerts", value: String(lowStockCount), meta: "Inventory watchlist" },
+      { label: "আজকের বিক্রি", value: `${todaysSales} BDT`, meta: "Today sales" },
+      { label: "আজকের অর্ডার", value: String(pendingOrders), meta: "Needs action" },
+      { label: "ক্যাশ ইন/আউট", value: `${walletBalance} BDT`, meta: "Available payout" },
+      { label: "পেন্ডিং পেআউট", value: `${walletLockedBalance} BDT`, meta: `${walletPendingBalance} BDT pending ledger` },
+      { label: "লো স্টক", value: String(lowStockCount), meta: "Inventory watchlist" },
       { label: "Courier success", value: `${conversion}%`, meta: "Delivered / total shipments" },
       { label: "CRM ready", value: String(searchableCustomers), meta: "Customers with mobile index" },
       { label: "Customer due", value: `${totalDue} BDT`, meta: "Outstanding credit" },
       { label: "Revenue", value: `${summary?.sales?.totalSales ?? revenue} BDT`, meta: "Lifetime revenue" },
     ];
-  }, [customers, dailySalesSnapshot, inventory, inventorySnapshot?.lowStockCount, orders, shipmentSnapshot?.successRate, summary, today, walletBalance]);
+  }, [customers, dailySalesSnapshot, inventory, inventorySnapshot?.lowStockCount, orders, shipmentSnapshot?.successRate, summary, today, walletBalance, walletLockedBalance, walletPendingBalance]);
 
   const recentOrders = useMemo(() => orders.slice(0, 8), [orders]);
-  const lowStockItems = useMemo(() => inventory.filter((row) => Number(row.available || 0) <= Number(row.reorderPoint || 0)).slice(0, 8), [inventory]);
+  const lowStockItems = useMemo(() => inventory.filter((row) => Number(row.available ?? row.stock ?? 0) <= Number(row.reorderPoint ?? row.minStock ?? 5)).slice(0, 8), [inventory]);
   const topProducts = useMemo(() => buildTopProducts(orders, 8), [orders]);
   const fallbackSeries = useMemo(() => buildDailySeries(orders, 7), [orders]);
   const fallbackRevenueSeries = useMemo(() => buildDailyRevenueSeries(orders, 7), [orders]);
@@ -322,18 +330,23 @@ export function DashboardOverview() {
       <Card className="overflow-hidden border-border/70 bg-card/92">
         <div className="grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
           <div className="p-6 sm:p-8">
-            <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">Merchant command center</p>
-            <h1 className="dx-display mt-3 text-3xl sm:text-4xl">Run the shop from one calm dashboard.</h1>
-            <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:text-base">Sales, stock, payouts, and fulfillment are grouped here so the team can see what needs attention without hunting through tabs.</p>
+            <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">Merchant dashboard</p>
+            <h1 className="dx-display mt-3 text-3xl sm:text-4xl">আজকের দোকান এক নজরে।</h1>
+            <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:text-base">Sales, stock, cash flow, and fulfillment alerts are grouped first so the team can act quickly.</p>
             <div className="mt-5 flex flex-wrap gap-3">
-              <Button onClick={() => void load()} loading={loading} loadingText="Refreshing dashboard">Refresh overview</Button>
+              <Button onClick={() => void load()} loading={loading} loadingText="Refreshing dashboard">Refresh</Button>
               <div className="min-w-[220px] flex-1 max-w-md">
-                <SearchInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search recent orders or products" />
+                <SearchInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Order ID or product search" />
               </div>
+            </div>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Button asChild variant="secondary"><Link href="/products">Add Product</Link></Button>
+              <Button asChild variant="secondary"><Link href="/pos">Open POS</Link></Button>
+              <Button asChild variant="secondary"><Link href="/orders">Create Order</Link></Button>
             </div>
           </div>
           <div className="border-t border-border/60 bg-background/70 p-6 sm:p-8 lg:border-l lg:border-t-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Today</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Smart alerts</p>
             <div className="mt-4 grid gap-3">
               {actionQueue.map((item) => (
                 <div key={item.label} className="rounded-2xl border border-border/60 bg-card/90 px-4 py-3 shadow-[var(--shadow-sm)]">
@@ -564,8 +577,8 @@ export function DashboardOverview() {
                   <Badge variant="warning">Reorder</Badge>
                 </div>
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <span>{row.available ?? 0} left</span>
-                  <span>Threshold {row.reorderPoint ?? 0}</span>
+                  <span>{row.available ?? row.stock ?? 0} left</span>
+                  <span>Threshold {row.reorderPoint ?? row.minStock ?? 5}</span>
                   <span>{row.updatedAt ? new Date(row.updatedAt).toLocaleDateString() : "Recently updated"}</span>
                 </div>
               </div>

@@ -5,7 +5,9 @@ const Product = require("../models/product.model");
 const User = require("../models/user.model");
 const inventory = require("../inventory");
 const walletService = require("../services/wallet.service");
+const walletAdapter = require("../services/wallet/walletAdapter.service");
 const { createAudit } = require("../utils/audit.util");
+const { createLedgerEntry } = require("../services/ledger.service");
 
 async function resolveCustomer(customerId) {
   if (!customerId) return null;
@@ -106,12 +108,17 @@ exports.createPosOrder = async (req, res) => {
 
   const productIds = items.map((item) => item.product).filter(Boolean);
   const products = productIds.length
-    ? await Product.find({ _id: { $in: productIds } }).lean()
+    ? await Product.find({ _id: { $in: productIds }, shopId, isActive: { $ne: false } }).lean()
     : [];
   const productMap = new Map(products.map((product) => [String(product._id), product]));
 
   const normalizedItems = items.map((item, index) => {
     const product = item.product ? productMap.get(String(item.product)) : null;
+    if (item.product && !product) {
+      const error = new Error("Product is not available in this shop");
+      error.statusCode = 403;
+      throw error;
+    }
     const quantity = Math.max(1, Number(item.quantity) || 1);
     const price = Number(product?.price ?? item.price ?? 0);
     const name = String(item.name || product?.name || `Manual item ${index + 1}`).trim();
@@ -127,11 +134,14 @@ exports.createPosOrder = async (req, res) => {
       name,
       quantity,
       price,
+      costPrice: Number(product?.costPrice || 0),
     };
   });
 
   const inventoryItems = normalizedItems.filter((item) => item.product);
   const totalAmount = normalizedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const totalCost = normalizedItems.reduce((sum, item) => sum + Number(item.costPrice || 0) * item.quantity, 0);
+  const profit = Number((totalAmount - totalCost).toFixed(2));
   const normalizedBreakdown = normalizePaymentBreakdown(paymentBreakdown, totalAmount);
   const effectiveModes = normalizedBreakdown.length ? normalizedBreakdown.map((item) => item.mode) : [rawPaymentMode];
 
@@ -168,6 +178,20 @@ exports.createPosOrder = async (req, res) => {
       walletAmount,
       onlineAmount,
       creditAmount,
+      finance: {
+        profit: {
+          grossProfit: profit,
+          totalCost: Number(totalCost.toFixed(2)),
+          items: normalizedItems.map((item) => ({
+            productId: item.product,
+            quantity: item.quantity,
+            costPrice: item.costPrice,
+            sellingPrice: item.price,
+            profit: Number(((item.price - item.costPrice) * item.quantity).toFixed(2)),
+          })),
+        },
+        postedAt: new Date(),
+      },
     },
   });
 
@@ -199,6 +223,24 @@ exports.createPosOrder = async (req, res) => {
     });
   }
 
+  if (initialPaymentStatus === "SUCCESS" && totalAmount > 0) {
+    await walletAdapter.ensureWallet(shopId);
+    await createLedgerEntry({
+      merchantId: shopId,
+      type: "SALE",
+      direction: "CREDIT",
+      amount: totalAmount,
+      referenceId: String(order._id),
+      referenceType: "ORDER",
+      status: "CONFIRMED",
+      meta: {
+        source: "merchant_pos_order",
+        orderId: order._id,
+        profit,
+      },
+    });
+  }
+
   res.status(201).json({ data: order });
 
   await createAudit({
@@ -209,4 +251,3 @@ exports.createPosOrder = async (req, res) => {
     req,
   });
 };
-

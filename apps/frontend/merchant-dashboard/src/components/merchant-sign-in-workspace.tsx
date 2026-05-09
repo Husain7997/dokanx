@@ -10,8 +10,8 @@ export function MerchantSignInWorkspace() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [credentials, setCredentials] = useState({
-    email: "owner@test.com",
-    password: "Secret123!",
+    email: "merchant@dokanx.com",
+    password: "Password123!",
   });
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -19,7 +19,9 @@ export function MerchantSignInWorkspace() {
   useEffect(() => {
     if (auth.status === "authenticated") {
       const requestedReturnTo = searchParams.get("returnTo");
-      const defaultReturnTo = auth.user?.roleName === "agent" ? "/agent/learn" : "/settings";
+      const normalizedRole = String(auth.user?.roleName || auth.user?.role || "").toLowerCase();
+      const isMerchantUser = normalizedRole === "merchant" || normalizedRole === "owner" || normalizedRole === "agent";
+      const defaultReturnTo = isMerchantUser ? "/dashboard" : "/login";
       const returnTo =
         requestedReturnTo && requestedReturnTo.startsWith("/") && !requestedReturnTo.startsWith("//")
           ? requestedReturnTo
@@ -28,15 +30,27 @@ export function MerchantSignInWorkspace() {
       router.replace(returnTo);
       router.refresh();
     }
-  }, [auth.status, auth.user?.roleName, router, searchParams]);
+  }, [auth.status, auth.user?.role, auth.user?.roleName, router, searchParams]);
 
   async function handleLogin() {
     setSubmitting(true);
     setMessage(null);
 
     try {
-      await auth.login(credentials);
+      const user = await auth.login(credentials);
       setMessage("Merchant session is active.");
+      const requestedReturnTo = searchParams.get("returnTo");
+      const returnTo =
+        requestedReturnTo && requestedReturnTo.startsWith("/") && !requestedReturnTo.startsWith("//")
+          ? requestedReturnTo
+          : "/dashboard";
+      const normalizedRole = String(user.roleName || user.role || "").toLowerCase();
+      const isMerchantUser = normalizedRole === "merchant" || normalizedRole === "owner" || normalizedRole === "agent";
+      const destination = isMerchantUser ? returnTo : "/login";
+      router.replace(destination);
+      window.setTimeout(() => {
+        window.location.assign(destination);
+      }, 50);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to sign in.");
     } finally {
@@ -85,21 +99,21 @@ export function MerchantSignInWorkspace() {
             </div>
             <div className="rounded-2xl border border-border/50 bg-background/80 p-4">
               <div className="flex items-center justify-between gap-3">
-                <p className="font-medium text-foreground">Need a demo account?</p>
-                <Badge variant="neutral">Dev</Badge>
+                <p className="font-medium text-foreground">Account required</p>
+                <Badge variant="neutral">Secure</Badge>
               </div>
-              <p className="mt-2 text-muted-foreground">Run `scripts/dev-seed.ps1` to create an owner, shop, and sample product set for local testing.</p>
+              <p className="mt-2 text-muted-foreground">Use a merchant account created through onboarding or invitation to enter the workspace.</p>
             </div>
           </div>
         </div>
 
         <Card className="self-start rounded-[32px] border border-border/60 bg-card/88 p-6 shadow-[0_18px_45px_rgba(11,30,60,0.12)] backdrop-blur">
           <CardTitle>Merchant sign in</CardTitle>
-          <CardDescription className="mt-2">Use a valid OWNER, STAFF, ADMIN, or AGENT account to enter the correct workspace.</CardDescription>
+          <CardDescription className="mt-2">Use a valid MERCHANT or OWNER account to enter the workspace.</CardDescription>
           <div className="mt-6 grid gap-4">
             <TextInput
-              label="Email"
-              type="email"
+              label="Email or phone"
+              type="text"
               autoComplete="email"
               value={credentials.email}
               onChange={(event) => setCredentials((current) => ({ ...current, email: event.target.value }))}
@@ -122,7 +136,7 @@ export function MerchantSignInWorkspace() {
             </Button>
             <div className="rounded-2xl border border-border/50 bg-background/80 p-4 text-xs text-muted-foreground">
               <p className="font-medium text-foreground">Expected redirect</p>
-              <p className="mt-1">Owners and staff go to merchant settings or the requested route. Agents are redirected to the agent learning space.</p>
+              <p className="mt-1">Merchants go to the dashboard or the requested route.</p>
             </div>
             {message ? <Alert variant="info">{message}</Alert> : null}
           </div>

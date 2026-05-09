@@ -45,6 +45,8 @@ exports.createShop = async (req, res) => {
       locale: req.body.locale,
       owner: req.user._id,
       isActive: true,
+      status: "ACTIVE",
+      kycStatus: "VERIFIED",
       acquisitionSource:
         req.body.agentCode || req.body.ref || req.query.ref
           ? "agent"

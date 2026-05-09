@@ -37,6 +37,13 @@ async function ensureWallet(shopId, defaults = {}, options = {}) {
       $setOnInsert: {
         shopId,
         balance: 0,
+        availableBalance: 0,
+        pendingBalance: 0,
+        lockedBalance: 0,
+        available_balance: 0,
+        pending_settlement: 0,
+        withdrawable_balance: 0,
+        balances: { cash: 0, credit: 0, bank: 0 },
         currency: defaults.currency || "BDT",
         status: "ACTIVE",
         isFrozen: false,

@@ -1,16 +1,14 @@
 const PaymentAttempt = require("../models/paymentAttempt.model");
 const Order = require("../models/order.model");
-const { FinancialEngine, FinancialTypes } = require("@/core/financial");
 const mongoose = require("mongoose");
 const { runOnce, addJob } = require("@/core/infrastructure");
 const { publishEvent } = require("@/infrastructure/events/event.dispatcher");
 const logger = require("@/core/infrastructure/logger");
-const AccountingEntry = require("../modules/wallet-engine/accountingEntry.model");
+const Ledger = require("../modules/ledger/ledger.model");
 const fraudService = require("./fraud.service");
 const { resolveShopId } = require("../utils/order-normalization.util");
 const commissionService = require("../modules/commission-engine/commission.service");
-const walletService = require("./wallet.service");
-const { assertShopFinancialInvariant } = require("./ledger-reconciliation.service");
+const { createLedgerEntry } = require("./ledger.service");
 const creditService = require("../modules/credit-engine/credit.service");
 
 function extractCreditRepaymentReference(payload = {}) {
@@ -126,20 +124,21 @@ async function handlePaymentWebhook(payload) {
           await commissionService.applyCommission(freshOrder, { session });
         }
 
-        await walletService.addTransaction({
-          shopId,
-          customerId: freshOrder.customerId || null,
-          type: "income",
-          walletType: freshOrder.paymentMode === "CREDIT" ? "CREDIT" : "CASH",
+        await createLedgerEntry({
+          merchantId: shopId,
+          type: "SALE",
+          direction: "CREDIT",
           amount: freshAttempt.amount,
           referenceId: String(freshOrder._id),
-          metadata: {
+          referenceType: "ORDER",
+          status: "PENDING",
+          meta: {
             paymentAttempt: freshAttempt._id,
             commissionSnapshot: freshOrder.commissionSnapshot || null,
             trafficType: freshOrder.trafficType || "marketplace",
+            source: "payment_success_pending_delivery",
           },
-          session,
-        });
+        }, { session });
 
         freshOrder.paymentStatus = "SUCCESS";
         if (freshOrder.status === "PAYMENT_PENDING" || freshOrder.status === "PLACED") {
@@ -205,14 +204,15 @@ async function assertSuccessfulPaymentInvariant({
   paymentMode,
   session,
 }) {
-  const [freshOrder, freshAttempt, accountingEntry] = await Promise.all([
+  const [freshOrder, freshAttempt, ledgerEntry] = await Promise.all([
     Order.findById(orderId).session(session || null).lean(),
     PaymentAttempt.findById(paymentAttemptId).session(session || null).lean(),
-    AccountingEntry.findOne({
+    Ledger.findOne({
       shopId,
       referenceId: String(orderId),
-      transactionType: "income",
-      walletType: paymentMode === "CREDIT" ? "CREDIT" : "CASH",
+      type: "SALE",
+      referenceType: "ORDER",
+      status: "PENDING",
     }).session(session || null).lean(),
   ]);
 
@@ -232,7 +232,7 @@ async function assertSuccessfulPaymentInvariant({
     throw error;
   }
 
-  if (!accountingEntry || Number(accountingEntry.amount || 0) !== Number(amount || 0)) {
+  if (!ledgerEntry || Number(ledgerEntry.amount || 0) !== Number(amount || 0)) {
     const error = new Error("PAYMENT_LEDGER_MISMATCH");
     error.statusCode = 409;
     error.code = "PAYMENT_LEDGER_MISMATCH";
@@ -240,7 +240,7 @@ async function assertSuccessfulPaymentInvariant({
     throw error;
   }
 
-  await assertShopFinancialInvariant({ shopId, session, referenceId: String(orderId) });
+  return { ledgerEntryId: ledgerEntry._id };
 }
 
 module.exports = {

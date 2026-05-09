@@ -22,12 +22,13 @@ const { createAudit } = require("../utils/audit.util");
 const fraudService = require("../services/fraud.service");
 const { t } = require("@/core/infrastructure");
 const { resolveShopId } = require("../utils/order-normalization.util");
+const Shop = require("../models/shop.model");
+const { isVerifiedShop } = require("../middlewares/requireMerchantKyc.middleware");
+const { createLedgerEntry } = require("../services/ledger.service");
 
 // const features = require('../config/features');
 
 
-
-console.log("✅ payment.controller.js LOADED");
 
 const ALLOWED_PAYMENT_PROVIDERS = new Set(["bkash", "nagad", "stripe"]);
 const DEFAULT_PAYMENT_PROVIDER = "bkash";
@@ -81,6 +82,20 @@ exports.initiatePayment = async (req, res, next) => {
     if (!canAccessOrder(req, order)) {
       return res.status(403).json({ message: "Forbidden" });
     }
+    const orderShop = await Shop.findById(resolveShopId(order));
+    if (orderShop && !isVerifiedShop(orderShop)) {
+      return res.status(403).json({
+        success: false,
+        message: "Merchant KYC verification required before online payment.",
+        data: { status: orderShop.status, kycStatus: orderShop.kycStatus },
+      });
+    }
+
+    return res.status(503).json({
+      success: false,
+      message: "Online payments are coming soon. Cash on delivery is currently available.",
+      availablePaymentModes: ["COD"],
+    });
 
     const gateway = normalizedProvider;
 
@@ -273,6 +288,20 @@ exports.refundPayment = async (req, res) => {
 
   order.status = "REFUNDED";
   await order.save();
+
+  await createLedgerEntry({
+    merchantId: resolveShopId(order),
+    type: "REFUND",
+    direction: "DEBIT",
+    amount: Number(amount || order.totalAmount || 0),
+    referenceId: order._id,
+    referenceType: "REFUND",
+    status: "CONFIRMED",
+    meta: {
+      source: "payment_refund",
+      reason: reason || "",
+    },
+  });
 
   await createAudit({
     action: "ORDER_REFUND_APPROVED",

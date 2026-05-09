@@ -41,12 +41,16 @@ function normalizeProductPayload(body) {
     price: Number(source.price || 0),
     costPrice: Math.max(0, Number(source.costPrice || 0)),
     stock: Math.max(0, Number(source.stock || 0)),
+    minStock: Math.max(0, Number(source.minStock ?? 5)),
     barcode: typeof source.barcode === "string" && source.barcode.trim() ? source.barcode.trim() : null,
     imageUrl: typeof source.imageUrl === "string" ? source.imageUrl.trim() : "",
     productionDate: source.productionDate ? new Date(source.productionDate) : null,
     expiryDate: source.expiryDate ? new Date(source.expiryDate) : null,
     slug: typeof source.slug === "string" && source.slug.trim() ? source.slug.trim() : null,
     discountRate: Math.max(0, Math.min(100, Number(source.discountRate || 0))),
+    isPublished: source.isPublished === undefined ? true : Boolean(source.isPublished),
+    isFeatured: source.isFeatured === undefined ? false : Boolean(source.isFeatured),
+    isSearchable: source.isSearchable === undefined ? true : Boolean(source.isSearchable),
     warranty: normalizeProtectionConfig(source.warranty, "service"),
     guarantee: normalizeProtectionConfig(source.guarantee, "replacement"),
   };
@@ -82,6 +86,7 @@ async function createProductRecord({ shopId, ownerId, source }) {
     price: payload.price,
     costPrice: payload.costPrice,
     stock: payload.stock,
+    minStock: payload.minStock,
     discountRate: payload.discountRate,
     slug: payload.slug,
     barcode: payload.barcode,
@@ -92,6 +97,9 @@ async function createProductRecord({ shopId, ownerId, source }) {
     owner: ownerId,
     reserved: 0,
     inventoryVersion: 0,
+    isPublished: payload.isPublished,
+    isFeatured: payload.isFeatured,
+    isSearchable: payload.isSearchable,
     warranty: payload.warranty,
     guarantee: payload.guarantee,
   });
@@ -198,7 +206,11 @@ exports.updateProduct = async (req, res) => {
     product.price = payload.price;
     product.costPrice = payload.costPrice;
     product.stock = payload.stock;
+    product.minStock = payload.minStock;
     product.discountRate = payload.discountRate;
+    product.isPublished = payload.isPublished;
+    product.isFeatured = payload.isFeatured;
+    product.isSearchable = payload.isSearchable;
     product.slug = payload.slug;
     product.barcode = payload.barcode;
     product.imageUrl = payload.imageUrl;
@@ -254,7 +266,7 @@ exports.getProductsByShop = async (req, res) => {
       return res.status(400).json({ success: false, message: "shopId required" });
     }
 
-    const filter = { shopId, isActive: { $ne: false } };
+    const filter = { shopId, isActive: { $ne: false }, isPublished: { $ne: false } };
     if (q) {
       filter.$or = [
         { name: { $regex: String(q), $options: "i" } },
@@ -289,10 +301,15 @@ exports.getProductsByShop = async (req, res) => {
 
 exports.listProducts = async (req, res) => {
   try {
-    const { shopId, q, limit, minStock, slug } = req.query;
+    const { shopId, q, limit, minStock, slug, includeDrafts, featured } = req.query;
+    const scopedShopId = req.shop?._id || req.user?.shopId || shopId;
+    const isMerchantOrAdmin = Boolean(req.user);
     const filter = { isActive: true };
-    if (shopId) filter.shopId = shopId;
+    if (scopedShopId) filter.shopId = scopedShopId;
+    if (!isMerchantOrAdmin || includeDrafts !== "true") filter.isPublished = { $ne: false };
     if (slug) filter.slug = slug;
+    if (featured === "true") filter.isFeatured = true;
+    if (q) filter.isSearchable = { $ne: false };
     if (minStock) filter.stock = { $gte: Number(minStock) };
     if (q) {
       filter.$or = [
@@ -306,7 +323,7 @@ exports.listProducts = async (req, res) => {
       namespace: "products",
       key: {
         scope: "list-products",
-        query: req.query,
+        query: { ...req.query, scopedShopId: scopedShopId ? String(scopedShopId) : null },
       },
       ttlSeconds: q ? 45 : 120,
       resolver: async () => {
@@ -334,7 +351,11 @@ exports.getProductDetail = async (req, res) => {
       },
       ttlSeconds: 180,
       resolver: async () => {
-        const product = await createReadOneQuery(Product, { _id: req.params.productId }).lean();
+        const product = await createReadOneQuery(Product, {
+          _id: req.params.productId,
+          isActive: true,
+          isPublished: { $ne: false },
+        }).lean();
         return product ? { data: product } : null;
       },
     });
@@ -376,7 +397,7 @@ exports.getProductByBarcode = async (req, res) => {
       },
       ttlSeconds: 180,
       resolver: async () => {
-        const product = await createReadOneQuery(Product, { shopId, barcode, isActive: { $ne: false } }).lean();
+                const product = await createReadOneQuery(Product, { shopId, barcode, isActive: { $ne: false }, isPublished: { $ne: false } }).lean();
         return product ? { data: product } : null;
       },
     });

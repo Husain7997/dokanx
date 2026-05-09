@@ -88,6 +88,22 @@ const productSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    minStock: {
+      type: Number,
+      default: 5,
+      min: 0,
+    },
+    lastSoldAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+    totalSold: {
+      type: Number,
+      default: 0,
+      min: 0,
+      index: true,
+    },
     reserved: {
       type: Number,
       default: 0,
@@ -100,6 +116,21 @@ const productSchema = new mongoose.Schema(
     isActive: {
       type: Boolean,
       default: true,
+    },
+    isPublished: {
+      type: Boolean,
+      default: true,
+      index: true,
+    },
+    isFeatured: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    isSearchable: {
+      type: Boolean,
+      default: true,
+      index: true,
     },
     moderationStatus: {
       type: String,

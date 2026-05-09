@@ -64,8 +64,8 @@ const shopSchema = new mongoose.Schema(
     // ✅ Future ready
     status: {
       type: String,
-      enum: ["ACTIVE", "SUSPENDED"],
-      default: "ACTIVE",
+      enum: ["DRAFT", "SUBMITTED", "VERIFIED", "ACTIVE", "SUSPENDED"],
+      default: "DRAFT",
     },
     supportEmail: String,
     whatsapp: String,
@@ -347,8 +347,8 @@ const shopSchema = new mongoose.Schema(
     },
     kycStatus: {
       type: String,
-      enum: ["NOT_SUBMITTED", "PENDING", "APPROVED", "REJECTED"],
-      default: "NOT_SUBMITTED",
+      enum: ["DRAFT", "SUBMITTED", "VERIFIED", "REJECTED", "NOT_SUBMITTED", "PENDING", "APPROVED"],
+      default: "DRAFT",
     },
     kycSubmittedAt: Date,
     kycApprovedAt: Date,

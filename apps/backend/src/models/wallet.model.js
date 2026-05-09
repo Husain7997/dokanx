@@ -17,6 +17,9 @@ const WalletSchema = new mongoose.Schema(
       type: Number,
       default: 0
     },
+    availableBalance: { type: Number, default: 0 },
+    pendingBalance: { type: Number, default: 0 },
+    lockedBalance: { type: Number, default: 0 },
     available_balance: { type: Number, default: 0 },
     pending_settlement: { type: Number, default: 0 },
     withdrawable_balance: { type: Number, default: 0 },

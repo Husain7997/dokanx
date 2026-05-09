@@ -3,6 +3,7 @@ const payoutService = require('../../services/payout.service');
 const {
   approvePayout,
   executePayout,
+  rejectPayout,
   retryPayout,
   createAdminPayout,
   processPayout,
@@ -117,6 +118,18 @@ exports.execute = async (req, res) => {
       req.params.id,
       req.headers['idempotency-key']
     );
+    return res.json(payout);
+  } catch (err) {
+    return res.status(err.statusCode || 400).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+exports.reject = async (req, res) => {
+  try {
+    const payout = await rejectPayout(req.params.id, req.user._id, req.body?.reason || "");
     return res.json(payout);
   } catch (err) {
     return res.status(err.statusCode || 400).json({

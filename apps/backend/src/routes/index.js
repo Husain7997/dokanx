@@ -42,6 +42,7 @@ const approvalAdminRoutes = require('./admin/approval.routes');
 const integrationAdminRoutes = require('./admin/integrations.routes');
 const walletAdminRoutes = require('./admin/wallet.routes');
 const securityAdminRoutes = require('./admin/security.routes');
+const billingAdminRoutes = require('./admin/billing.routes');
 const productModerationRoutes = require('./admin/product.moderation.routes');
 const healthRoute = require('./health.routes');
 const systemRoute = require("../infrastructure/monitoring/health.routes");
@@ -68,11 +69,15 @@ const creditRoutes = require("../modules/credit-engine/credit.routes");
 const customerRoutes = require("../modules/customer/customer.routes");
 const warrantyRoutes = require("../modules/warranty-engine/warranty.routes");
 const agentRoutes = require("../modules/agent/agent.routes");
+const merchantRoutes = require("./merchant.routes");
 
-router.use("/financial-test", require("./financial.test.routes"));
+if (process.env.NODE_ENV !== "production") {
+  router.use("/financial-test", require("./financial.test.routes"));
+}
 router.use("/", meRoutes);
 router.use('/platform', platformRoutes);
 router.use("/auth", authRoutes);
+router.use("/merchants", merchantRoutes);
 router.use("/shops", shopRoutes);
 router.use("/shop/payouts", shopPayoutRoutes);
 router.use("/products", productRoutes);
@@ -116,7 +121,9 @@ router.use("/customers", customerRoutes);
 router.use("/claims", warrantyRoutes);
 router.use("/agents", agentRoutes);
 router.use("/reports", require("../modules/reporting/report.routes"));
-router.use("/dev", require("./dev.routes"));
+if (process.env.NODE_ENV !== "production") {
+  router.use("/dev", require("./dev.routes"));
+}
 router.use('/admin/settlements', settlementAdminRoutes);
 router.use('/shop/wallet', walletShopRoutes);
 router.use("/admin", adminMetricsRoutes);
@@ -130,6 +137,7 @@ router.use('/admin/approval', approvalAdminRoutes);
 router.use('/admin/integrations', integrationAdminRoutes);
 router.use('/admin', walletAdminRoutes);
 router.use('/admin/security', securityAdminRoutes);
+router.use('/admin/billing', billingAdminRoutes);
 router.use('/admin', productModerationRoutes);
 router.use('/health', healthRoute);
 router.use('/system', systemRoute);

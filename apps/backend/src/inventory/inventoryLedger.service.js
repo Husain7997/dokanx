@@ -18,6 +18,7 @@ function normalizeLedgerType(type) {
 
 async function createInventoryEntry({
   items,
+  product,
   productId,
   shopId,
   quantity,
@@ -50,7 +51,8 @@ async function createInventoryEntry({
       return results;
     }
 
-    const product = await Product.findById(productId).session(activeSession);
+    const resolvedProductId = productId || product;
+    const product = await Product.findById(resolvedProductId).session(activeSession);
 
     if (!product) {
       throw new Error("Product not found");
@@ -65,7 +67,7 @@ async function createInventoryEntry({
 
     const resolvedShopId = shopId || product.shopId;
     const normalizedType = normalizeLedgerType(type);
-    const idempotencyKey = `${referenceId || "inventory"}:${productId}:${direction}:${normalizedType}`;
+    const idempotencyKey = `${referenceId || "inventory"}:${resolvedProductId}:${direction}:${normalizedType}`;
 
     const existingEntry = await InventoryLedger.findOne({ idempotencyKey }).session(activeSession);
     if (existingEntry) {
@@ -79,7 +81,7 @@ async function createInventoryEntry({
 
     await InventoryLedger.create(
       [{
-        product: productId,
+        product: resolvedProductId,
         shopId: resolvedShopId,
         quantity,
         type: normalizedType,
@@ -93,7 +95,7 @@ async function createInventoryEntry({
     );
 
     await publishEvent("INVENTORY_MUTATION", {
-      productId,
+      productId: resolvedProductId,
       shopId: resolvedShopId,
       quantity,
       direction,
@@ -102,9 +104,13 @@ async function createInventoryEntry({
     });
 
     product.stock = newStock;
+    if (normalizedType === "ORDER_COMMIT" && direction === "OUT") {
+      product.lastSoldAt = new Date();
+      product.totalSold = Number(product.totalSold || 0) + Number(quantity || 0);
+    }
     await product.save({ session: activeSession });
 
-    const threshold = Number(process.env.LOW_STOCK_THRESHOLD || 5);
+    const threshold = Number(product.minStock ?? process.env.LOW_STOCK_THRESHOLD ?? 5);
     if (newStock <= threshold) {
       await publishEvent("inventory.low_stock", {
         productId,
@@ -115,7 +121,7 @@ async function createInventoryEntry({
     }
 
     return {
-      productId,
+      productId: resolvedProductId,
       shopId: resolvedShopId,
       stock: newStock,
     };

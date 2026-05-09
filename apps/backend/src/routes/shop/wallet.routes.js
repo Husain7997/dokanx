@@ -7,6 +7,7 @@ const WalletController = require("../../controllers/shop/wallet.controller");
 const {
   requestPayout
 } = require('../../controllers/shop/shopPayout.controller');
+const { requireMerchantKyc } = require("../../middlewares/requireMerchantKyc.middleware");
 
 router.use(protect);
 router.use(allowRoles("OWNER", "STAFF", "ADMIN"));
@@ -14,6 +15,7 @@ router.post(
   '/payouts',
   protect,
   allowRoles("OWNER", "ADMIN"),
+  requireMerchantKyc,
   requestPayout
 );
 

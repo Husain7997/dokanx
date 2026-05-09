@@ -3,6 +3,7 @@ const { withLock } = require("@/core/infrastructure");
   const t = require('@/core/language').t;
 const Inventory = require("../models/Inventory.model");
 const { createAudit } = require("../utils/audit.util");
+const inventoryService = require("../services/inventory.service");
 exports.adjustStock = async (req, res) => {
 
   const { product, quantity, note, source } = req.body;
@@ -44,11 +45,7 @@ exports.lockTest = async (req, res) => {
 
   await withLock("test-lock", async () => {
 
-    console.log("LOCK ACQUIRED");
-
     await new Promise(r => setTimeout(r, 5000));
-
-    console.log("LOCK RELEASED");
 
   });
 
@@ -78,6 +75,13 @@ exports.listInventory = async (req, res) => {
 exports.inventoryAlerts = async (req, res) => {
   const shopId = req.shop?._id;
   if (!shopId) return res.status(400).json({ message: "Shop missing" });
-  const rows = await Inventory.find({ shopId, stock: { $lte: 5 } }).lean();
+  const rows = await inventoryService.getLowStockProducts(shopId);
   res.json({ data: rows });
+};
+
+exports.inventoryIntelligence = async (req, res) => {
+  const shopId = req.shop?._id;
+  if (!shopId) return res.status(400).json({ message: "Shop missing" });
+  const data = await inventoryService.getInventoryIntelligence(shopId);
+  res.json({ data });
 };
