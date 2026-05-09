@@ -11,6 +11,8 @@ const {
 const { resolveShopId } = require("../utils/order-normalization.util");
 const { createLedgerEntry } = require("./ledger.service");
 const agentService = require("../modules/agent/agent.service");
+const customerService = require("./customer.service");
+const marketingEvents = require("./event.service");
 
 function normalizeOrderStatus(status) {
   const normalized = String(status || "").trim().toUpperCase();
@@ -139,6 +141,12 @@ async function postDeliveredOrderFinance(order) {
     },
   };
   await order.save();
+  await customerService.syncCustomerFromOrder(order);
+  marketingEvents.emitEvent("ORDER_DELIVERED", {
+    order,
+    customerId: order.customerId || order.customer || order.user,
+    shopId: merchantId,
+  });
 
   await createLedgerEntry({
     merchantId,

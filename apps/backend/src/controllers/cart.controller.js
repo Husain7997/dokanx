@@ -3,6 +3,7 @@ const Cart = require("../models/cart.model");
 const Product = require("../models/product.model");
 const { randomToken } = require("../utils/crypto.util");
 const { logSearchEvent } = require("../services/search.service");
+const automationService = require("../services/automation.service");
 
 function computeTotals(items) {
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -109,6 +110,10 @@ exports.saveCart = async (req, res) => {
         subtotal: totals.subtotal,
       },
     });
+  }
+
+  if (normalizedItems.length) {
+    automationService.scheduleAbandonedCart(cart._id);
   }
 
   res.json({ data: cart, guestToken });
