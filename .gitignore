@@ -9,17 +9,25 @@ yarn-error.log*
 
 # Environment variables
 .env
+.env.*
 .env.local
 .env.production
 .env.test
 .env.*.local
+!.env.example
+!**/.env.example
 
 # Build outputs
 dist/
 build/
+.gradle/
 .next/
+**/.next/
+**/.next-*/
+**/.next-*
 out/
 **/.next-e2e/
+*.tsbuildinfo
 
 # OS files
 .DS_Store
@@ -35,8 +43,11 @@ docker-data/
 # Logs
 logs/
 *.log
-/apps/backend/src/test/.env.test
-/apps/backend/src/test/.env.test
+
+# Local backups and temporary files
+backups/
+tmp/
 
 # Test artifacts
+coverage/
 test-results/
